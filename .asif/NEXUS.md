@@ -200,6 +200,37 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260304-04 — Adopt CI Gate Protocol
+**From**: NXTG-AI CoS | **Priority**: P0
+**Injected**: 2026-03-04 | **Estimate**: S | **Status**: PENDING
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: New ASIF standard (`standards/ci-gate-protocol.md`). No push without local test pass. All teams must adopt.
+
+**Action Items**:
+1. [ ] Add CI Gate Protocol section to CLAUDE.md:
+   ```
+   ## CI Gate Protocol (ASIF Standard)
+   Before EVERY `git push`, you MUST:
+   1. Run the full test suite (`npm test`)
+   2. Verify ZERO failures (xfail/skip OK, failures NOT OK)
+   3. If tests fail → fix before pushing. No exceptions.
+   4. Include test count in commit message: "Tests: X passed, Y skipped"
+   Violating this protocol means broken CI, which means Asif gets spammed.
+   ```
+2. [ ] Install pre-push hook: `cp ~/ASIF/scripts/templates/pre-push-hook.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push`
+3. [ ] Run full test suite. Confirm 1028+ passing. Report count.
+4. [ ] Verify CI is GREEN on GitHub Actions. If not, fix it.
+
+**Constraints**:
+- Execute BEFORE DIRECTIVE-NXTG-20260304-01 (OPA Rego). CI gate comes first.
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260304-01 — Lane C v2 Phase 1: PolicyGate → OPA Rego
 **From**: NXTG-AI CoS | **Priority**: P1
 **Injected**: 2026-03-04 | **Estimate**: M | **Status**: PENDING
