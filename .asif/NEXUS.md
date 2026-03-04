@@ -258,38 +258,6 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ---
 
-### DIRECTIVE-NXTG-20260228-03 — Post-Sprint Hardening
-**From**: NXTG-AI CoS | **Priority**: P2
-**Injected**: 2026-02-28 | **Estimate**: S | **Status**: DONE
-
-> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
-
-**Action Items**:
-1. [x] Run full test suite and confirm 1028/1028 passing
-2. [x] Review N-14 (Lane C v2: Semantic Governance) IDEA and add implementation notes based on PI-007 OPA WASM research. Include sub-10μs latency finding from the research brief
-3. [x] Archive any remaining stale CoS directives to NEXUS-archive.md
-
-**Response** (filled by project team — 2026-02-28):
-> **Started**: 2026-02-28 | **Completed**: 2026-02-28 | **Actual**: S (~20min)
->
-> **1. Test suite:** 1028/1028 passing confirmed (41 client + 987 server). Zero regressions.
->
-> **2. N-14 enriched:** Added implementation notes to N-14 detail section based on PI-007 OPA WASM research. Key additions:
-> - Sub-10μs policy evaluation latency (negligible vs sub-400ms SLA)
-> - Package: `@open-policy-agent/opa-wasm` v1.10.0 — in-process, no sidecar
-> - 3-phase migration path: PolicyGate→Rego, ModeratorCheck→Rego+OpenAI Mod API, AllowedClaimsRegistry→Rego+ChromaDB embeddings
-> - Cross-project reuse: oneDB (P-09) deny-by-default Rego patterns
-> - Estimated effort: L (3-5 days)
->
-> **3. Archived:** 7 completed directives moved to `.asif/NEXUS-archive.md`:
-> - DIRECTIVE-NXTG-20260216-01 (UAT Bug Triage)
-> - DIRECTIVE-NXTG-20260219-02 (Fix HIGH Bugs + Coverage)
-> - DIRECTIVE-NXTG-20260220-01 (CI/CD Compliance)
-> - DIRECTIVE-NXTG-20260222-01 (Load Test + SLA Baseline)
-> - DIRECTIVE-NXTG-20260222-02 (Security Audit)
-> - DIRECTIVE-NXTG-20260222-02 (Fix 5 UAT Bugs + Demo Polish)
-> - DIRECTIVE-NXTG-20260228-01 (Close N-07/N-08/N-10)
-
 ---
 
 ## Portfolio Intelligence
