@@ -311,6 +311,23 @@ NXTG-Forge (P-03) Infinity Terminal (N-02) has the portfolio's most battle-teste
 ### PI-005: HunyuanVideo-Avatar Could Enable Visual Talking-Head Mode (2026-02-19)
 Podcast-Pipeline (P-04) has selected HunyuanVideo-Avatar (Tencent) for audio-driven talking-head video generation. The model takes a speaker photo + audio and produces lip-synced video with emotion control. It runs on ~10GB VRAM (RTX 4090 has 24GB). This could give voice-jib-jab a visual mode — users see an animated talking head during conversations. When Podcast-Pipeline installs and tests it, evaluate whether it fits your real-time latency requirements.
 
+### PI-007: Voice TTS SOTA March 2026 — Kokoro+RVC Pipeline Replaceable (2026-03-04)
+
+Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
+
+**Key findings affecting P-07 (voice-jib-jab):**
+1. **Fish Speech v1.5** (Apache 2.0, 4B) — TTS-Arena #1, zero-shot voice cloning from 10-30s reference audio. Could replace the entire Kokoro+RVC pipeline with a single-stage model. No per-celebrity training needed.
+2. **Qwen3-TTS** (Apache 2.0, 0.6-1.7B) — **3-second** voice cloning. Voice design via natural language description. Aligns with portfolio Qwen standard.
+3. **Chatterbox** (MIT, 5-second clone) — paralinguistic control: `[laugh]`, `[cough]`, `[sigh]`. Celebrity voice mimicry without training.
+4. **Seed-VC** — zero-shot voice conversion. Direct replacement for RVC without per-speaker training. `github.com/Plachtaa/seed-vc`
+5. **RVC** — aging. Zero-shot alternatives (Fish Speech, Qwen3-TTS, Seed-VC) eliminate the need for per-celebrity RVC training.
+6. **Kokoro** — still best at 82M params. Rust port exists. Keep as lightweight fallback.
+
+**Recommended P-07 actions** (from brief):
+- Replace Kokoro+RVC with Fish Speech v1.5 or Qwen3-TTS (one-stage, no per-celebrity training)
+- Add IndexTTS-2 for 8-dimension emotion vector control
+- If real-time VC still needed, replace RVC with Seed-VC (zero-shot)
+
 ---
 
 ## Team Questions
