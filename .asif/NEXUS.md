@@ -208,6 +208,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260306-01 — OPA Lane C v2 Phase 2: ModeratorCheck Integration
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-03-06 07:45 | **Estimate**: M | **Status**: PENDING
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: Phase 1 shipped OPA Rego policy engine (32 tests, `OpaEvaluator` in-process, `server/policies/voice_jib_jab/policy.rego`). Phase 2 adds content moderation as an OPA-evaluated policy decision. This is the natural next step per the Lane C v2 roadmap.
+
+**Action Items**:
+1. [ ] Extend `policy.rego` with `moderator_check` rule — evaluate content against moderation categories (toxicity, PII, bias, off-topic). Use configurable thresholds.
+2. [ ] Create `ModeratorCheck` middleware that wraps `OpaEvaluator` for content moderation decisions — integrates into the voice processing pipeline at the pre-response stage.
+3. [ ] Wire `ModeratorCheck` into the Lane C orchestrator. When policy denies, return a safe fallback response (not a raw error).
+4. [ ] Add test coverage for moderation scenarios: toxic input, PII detection, threshold edge cases, policy deny → fallback flow. Target: 20+ new tests.
+5. [ ] Update N-14 status in NEXUS (BUILDING → verify still accurate after this phase).
+6. [ ] Run full test suite. 1,060 baseline must not decrease.
+7. [ ] CI GREEN before push.
+
+**Constraints**:
+- Phase 2 ONLY — do NOT touch AllowedClaimsRegistry (Phase 3)
+- Backward compatible — existing 1,060 tests must pass unchanged
+- USE PLAN MODE — this touches policy, middleware, and orchestrator
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260304-04 — Adopt CI Gate Protocol
 **From**: NXTG-AI CoS | **Priority**: P0
 **Injected**: 2026-03-04 | **Estimate**: S | **Status**: COMPLETE
