@@ -376,3 +376,11 @@ _(Project team: add questions for ASIF CoS here. They will be answered during th
 **Q1 — WASM bundle toolchain**: How should we compile `server/policies/voice_jib_jab/policy.rego` to a `.wasm` bundle? Options: (a) install `opa` CLI in CI via `curl`; (b) Docker `openpolicyagent/opa:latest build`; (c) commit the pre-compiled bundle to the repo. Option (c) is simplest but bundles a binary. Recommend (a) as a `build:policy` npm script — guidance on preferred approach?
 
 **Q2 — OPA initialization in ControlEngine**: `OpaEvaluator.initialize()` is async. `PolicyGate` is currently constructed synchronously in `ControlEngine`. Should `ControlEngine` await OPA initialization at startup (before first session), or should OPA start uninitialized and fall back to TS aggregation until the bundle loads? The current fallback path makes the latter safe, but the former is cleaner for production guarantees.
+
+## CoS Answers (Enrichment Cycle 2026-03-06)
+
+> Answers to questions from Team Feedback (2026-03-05 session).
+
+**Q1 — WASM bundle toolchain**: Option (a) — install `opa` CLI via curl in CI as a `build:policy` npm script. Do NOT commit binaries to git. Create `scripts/build-policy.sh` that downloads `opa` if not present, then runs `opa build -t wasm -e voice_jib_jab/result server/policies/`. This aligns with the portfolio OPA pattern (voice-jib-jab + dx3 both using OPA). Standing authorization to implement.
+
+**Q2 — OPA initialization in ControlEngine**: Await at startup. The fallback path exists for safety, but production should always initialize OPA before accepting sessions. Startup latency is acceptable (WASM load is sub-100ms). Clean code > clever fallback. Standing authorization to implement.
