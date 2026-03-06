@@ -322,3 +322,57 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 ## Team Questions
 
 _(Project team: add questions for ASIF CoS here. They will be answered during the next enrichment cycle.)_
+
+---
+
+## Team Feedback
+
+> Session: 2026-03-05 | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Deliverable | Detail |
+|-------------|--------|
+| `OpaEvaluator` class | Wraps `@open-policy-agent/opa-wasm` v1.10.0. Async `initialize()`, sync sub-ms `evaluate()`, `_injectPolicy()` backdoor for test injection |
+| `server/policies/voice_jib_jab/policy.rego` | Full Rego policy: `decision_priority` map, `winning_check` (max-priority → max-severity → first-wins), `result` default/override, `should_short_circuit` signal |
+| `PolicyGate` OPA wiring | Optional `OpaEvaluator` in constructor. When initialized: OPA owns decision/severity/safeRewrite. TS loop preserved for checksRun, allReasonCodes, short-circuit. Zero behavior change for existing callers. |
+| 32 new tests | `OpaEvaluator.test.ts`: lifecycle (5), I/O mapping (8), format variations (4), latency <1ms (1), PolicyGate integration (8), edge cases (6) |
+| CI Gate Protocol | CLAUDE.md section + pre-push hook installed |
+| **Test count** | **1019 server tests, 0 failures** (987 baseline + 32 new). Commit `e360727` on `main`. |
+
+---
+
+### 2. What surprised me?
+
+**Jest ESM + dynamic import mocking was cleaner than expected.** `OpaEvaluator.initialize()` uses `await import('@open-policy-agent/opa-wasm')` — a dynamic import inside an async method. I expected to need `jest.unstable_mockModule()`. Instead, `jest.mock('...', factory)` at the top of the test file intercepted the dynamic import cleanly. This is because ts-jest with the ESM preset still runs via Jest's CJS module registry internally — the ESM syntax is compiled, not native.
+
+**The `_injectPolicy()` backdoor made the entire test suite file-I/O-free.** 31 of 32 tests use `_injectPolicy()` to inject a mock OPA policy object directly, bypassing `fs.readFileSync` and the WASM loader entirely. The mock `fs` was only needed for the 2 `initialize()` lifecycle tests. This pattern (sync backdoor for async-initialized dependencies) is worth reusing everywhere.
+
+**N-14 Phase 1 is wired but not production-runnable yet.** The Rego policy exists and the TypeScript wiring is in place, but `OpaEvaluator.initialize()` requires a pre-compiled `.wasm` bundle file. There is no `scripts/build-policy.sh` and no `opa` CLI in the toolchain. Production use of OPA is blocked until the bundle compilation pipeline exists. Tests pass because they use `_injectPolicy()` — the missing bundle is invisible to CI.
+
+---
+
+### 3. Cross-project signals
+
+**`_injectPolicy()` pattern → reusable across ASIF.** Any class that wraps an async-initialized external resource (database, WASM engine, HTTP client) can expose a sync `_injectDependency()` backdoor for test injection. Eliminates file I/O mocking noise and makes 95% of tests trivially fast. If oneDB (P-09) or DesktopAI (P-01) has async-init wrappers with heavy test setup, this pattern would clean them up.
+
+**Rego `decision_priority` map pattern → portable.** The `decision_priority := {"allow": 0, "rewrite": 1, "refuse": 2, "escalate": 3, "cancel_output": 4}` map + `max()` aggregation pattern translates any TypeScript priority-merge loop into a 10-line Rego rule. Any ASIF project with a priority queue or severity-ranked decision system can adopt this directly.
+
+**PolicyGate optional-OPA wiring → clean migration pattern.** Introducing OPA as an optional constructor argument (fallback to existing logic when absent) is a zero-risk migration strategy. Existing tests pass unchanged. New tests exercise the OPA path. This pattern works for any incremental engine swap — useful if oneDB wants to add a fallback path for their OPA evaluations.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **WASM bundle compilation pipeline** (unblocks production N-14 use): `scripts/build-policy.sh` using `opa build` CLI or Docker (`openpolicyagent/opa:latest`). Add to `package.json` as `build:policy` script. Without this, OpaEvaluator is test-only.
+2. **N-14 Phase 2 — ModeratorCheck → Rego + OpenAI Moderation API**: Tier 1 pattern engine stays (zero-latency). Add Tier 2 semantic call gated by Rego rule. The Tier 1/Tier 2 gate is a natural Rego rule: `invoke_tier2 if { tier1.result == "allow" }`.
+3. **N-13 Multi-Tenant Isolation**: Now that OPA is wired, per-tenant policy rules become a natural extension — inject tenant data document into OPA and let Rego enforce org-scoped allow/deny.
+4. **Coverage housekeeping**: `OpaEvaluator.ts` and `policy_gate.ts` changes should be verified in coverage report to confirm they don't pull any metric below 70%.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q1 — WASM bundle toolchain**: How should we compile `server/policies/voice_jib_jab/policy.rego` to a `.wasm` bundle? Options: (a) install `opa` CLI in CI via `curl`; (b) Docker `openpolicyagent/opa:latest build`; (c) commit the pre-compiled bundle to the repo. Option (c) is simplest but bundles a binary. Recommend (a) as a `build:policy` npm script — guidance on preferred approach?
+
+**Q2 — OPA initialization in ControlEngine**: `OpaEvaluator.initialize()` is async. `PolicyGate` is currently constructed synchronously in `ControlEngine`. Should `ControlEngine` await OPA initialization at startup (before first session), or should OPA start uninitialized and fall back to TS aggregation until the bundle loads? The current fallback path makes the latter safe, but the former is cleaner for production guarantees.
