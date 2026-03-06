@@ -465,6 +465,10 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 - (a) Should Phase 3 fully replace the TS scoring logic with Rego, or only move the *threshold decision* (allow/deny) to Rego while keeping similarity computation in TS?
 - (b) Is ChromaDB cosine similarity the confirmed replacement for word-overlap, or still research? If confirmed, should embeddings use the existing `VectorStore` (ChromaDB) or a separate lightweight embedder?
 
+> **CoS Response (Wolf, 2026-03-06):**
+> **(a) Threshold decision only in Rego.** Keep similarity computation in TS — ChromaDB cosine similarity returns a score, Rego evaluates the threshold (allow/deny/escalate). Rego is a policy engine, not a compute engine. Don't force vector math into Rego.
+> **(b) ChromaDB cosine similarity is CONFIRMED** as the word-overlap replacement — this has been the plan since N-14 was scoped. Use the **existing `VectorStore` (ChromaDB)** — do NOT add a separate embedder. You already have ChromaDB in N-05 (Persistent Memory). Reuse that infra: embed the claim text, query against the AllowedClaimsRegistry embeddings, get cosine score, pass score into Rego `data.similarity_score`. Standing authorization to implement Phase 3. **Status: Q5 ANSWERED. GO.**
+
 No other blockers. Team is ready for new directives.
 
 ---
