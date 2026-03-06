@@ -23,7 +23,7 @@
 | N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | IDEA | P1 | — |
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | IDEA | P1 | — |
-| N-14 | Lane C v2: Semantic Governance | GOVERNANCE | IDEA | P2 | — |
+| N-14 | Lane C v2: Semantic Governance | GOVERNANCE | BUILDING | P2 | 2026-03-05 |
 
 ---
 
@@ -139,8 +139,14 @@
 **What**: Org-scoped knowledge, policy, audit. Admin console. RBAC (admin, agent, viewer).
 
 ### N-14: Lane C v2: Semantic Governance
-**Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P2
+**Pillar**: GOVERNANCE | **Status**: BUILDING | **Priority**: P2
 **What**: Tier 2 semantic moderation (OpenAI Moderation API) for subtle/context-dependent violations. Embedding similarity for claims matching (vs. word-overlap). OPA integration (PI-002) for declarative policy rules. Successor to N-07 v1 scope.
+
+**Phase 1 SHIPPED (2026-03-05)**:
+- `OpaEvaluator` class: wraps `@open-policy-agent/opa-wasm` v1.10.0; async `initialize()`, sync `evaluate()`, `_injectPolicy()` for testing
+- `server/policies/voice_jib_jab/policy.rego`: Rego policy mirrors TS `DECISION_PRIORITY` logic; `winning_check`, `should_short_circuit`, default `result` rule
+- `PolicyGate` wired: accepts optional `OpaEvaluator` in constructor; when initialized, OPA decides decision/severity/safeRewrite; TS loop still tracks checksRun/allReasonCodes/short-circuit
+- 32 new tests: lifecycle, input/output mapping, format variations, latency (<1ms/eval), PolicyGate integration, edge cases. Zero regressions (1019 server tests).
 
 **Implementation Notes (PI-007 OPA WASM Research — 2026-02-28)**:
 - **Latency**: OPA compiled to WebAssembly delivers **sub-10 microsecond** policy evaluation — negligible against sub-400ms SLA.
@@ -193,6 +199,8 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-28 | CoS directive execution: N-07 BUILDING→SHIPPED (Lane C v1 complete — PolicyGate, AuditTrail, LatencyBudget, AllowedClaimsRegistry, FallbackPlanner, ModeratorCheck). N-08 BUILDING→SHIPPED (RAGPipeline + retrieval stack, 897 LOC + 363 LOC tests). N-10 BUILDING→SHIPPED (load test, SLA, security audit, runbook — monitoring deferred to prod infra). N-14 created as IDEA (Lane C v2: Semantic Governance — OPA, embedding similarity, OpenAI Moderation API). 10/13 initiatives now SHIPPED, 0 BUILDING, 3 IDEA. |
 | 2026-02-22 | UAT bugs verified (all 5 fixed in prior directives). Demo guide created: `DEMO-GUIDE.md` (5-min stakeholder script, 6 acts, synthetic voices only). 1028/1028 tests passing. |
 | 2026-02-28 | Post-sprint hardening (DIRECTIVE-NXTG-20260228-03): 1028/1028 tests confirmed passing. N-14 enriched with PI-007 OPA WASM implementation notes (sub-10μs latency, 3-phase migration path). 7 completed directives archived to NEXUS-archive.md. NEXUS trimmed to active directive only. |
+| 2026-03-05 | DIRECTIVE-NXTG-20260304-04: CI Gate Protocol adopted — section added to CLAUDE.md, pre-push hook installed. 1019 server + 41 client tests confirmed passing. |
+| 2026-03-05 | DIRECTIVE-NXTG-20260304-01: N-14 Phase 1 shipped — OpaEvaluator + Rego policy + PolicyGate wiring. @open-policy-agent/opa-wasm@1.10.0 installed. 32 new tests. 1019 server tests (zero regressions). N-14 IDEA→BUILDING. |
 
 ---
 
@@ -202,7 +210,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260304-04 — Adopt CI Gate Protocol
 **From**: NXTG-AI CoS | **Priority**: P0
-**Injected**: 2026-03-04 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-04 | **Estimate**: S | **Status**: COMPLETE
 
 > **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
 
@@ -227,13 +235,18 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Execute BEFORE DIRECTIVE-NXTG-20260304-01 (OPA Rego). CI gate comes first.
 
 **Response** (filled by project team):
->
+> **COMPLETE — 2026-03-05**
+> - CI Gate Protocol section added to `CLAUDE.md` (all 4 steps)
+> - Pre-push hook installed at `.git/hooks/pre-push`
+> - Full server test suite: **1019 passed, 0 failed** (987 baseline + 32 new OPA tests)
+> - Full client suite: **41 passed** (unchanged)
+> - GitHub Actions CI: confirmed green on `main` (prior merge at 1028 tests)
 
 ---
 
 ### DIRECTIVE-NXTG-20260304-01 — Lane C v2 Phase 1: PolicyGate → OPA Rego
 **From**: NXTG-AI CoS | **Priority**: P1
-**Injected**: 2026-03-04 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-04 | **Estimate**: M | **Status**: COMPLETE
 
 > **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
 
@@ -254,7 +267,15 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - USE PLAN MODE before coding. Outline the Rego rule structure first.
 
 **Response** (filled by project team):
->
+> **COMPLETE — 2026-03-05**
+> - `@open-policy-agent/opa-wasm@1.10.0` installed as production dependency (3 packages, in-process — no sidecar)
+> - `server/policies/voice_jib_jab/policy.rego` — Rego policy translates TS `DECISION_PRIORITY` merge loop to declarative rules: `winning_check` (max priority → max severity → first-wins), `result` default + override, `should_short_circuit` signal
+> - `server/src/insurance/opa_evaluator.ts` — `OpaEvaluator` wrapper: async `initialize()`, sync sub-millisecond `evaluate()`, `_injectPolicy()` for test injection (no file I/O)
+> - `PolicyGate` wired: optional `OpaEvaluator` in constructor; when initialized, OPA determines final decision/severity/safeRewrite; TS loop preserved for checksRun tracking, allReasonCodes aggregation, and short-circuit performance
+> - Backward compatible: zero OpaEvaluator = existing TS aggregation path, all 987 original tests unchanged
+> - **32 new tests** in `OpaEvaluator.test.ts` covering lifecycle, I/O mapping, format edge cases, latency assertion, PolicyGate integration
+> - **Server suite: 1019 passed, 0 failed** (987 + 32). N-14 moved IDEA → BUILDING.
+> - Phase 1 ONLY: ModeratorCheck (Phase 2) and AllowedClaimsRegistry (Phase 3) untouched.
 
 ---
 

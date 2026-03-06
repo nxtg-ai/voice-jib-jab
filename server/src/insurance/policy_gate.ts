@@ -23,6 +23,7 @@ import {
 } from "./allowed_claims_registry.js";
 import { PolicyDecision } from "../schemas/events.js";
 import type { ModerationCategory } from "./moderation_patterns.js";
+import type { OpaEvaluator, OpaCheckInput } from "./opa_evaluator.js";
 
 // ── Check result returned by each individual policy check ──────────────
 
@@ -617,10 +618,11 @@ const DECISION_PRIORITY: Record<PolicyDecision, number> = {
 
 export class PolicyGate {
   private checks: PolicyCheck[];
+  private opaEvaluator?: OpaEvaluator;
 
-  constructor(checks: PolicyCheck[] = []) {
-    // Sort by implicit severity: PII → Moderator → Claims → any custom
+  constructor(checks: PolicyCheck[] = [], opaEvaluator?: OpaEvaluator) {
     this.checks = checks;
+    this.opaEvaluator = opaEvaluator;
   }
 
   /**
@@ -628,11 +630,16 @@ export class PolicyGate {
    * First non-allow at the highest severity wins.
    * Short-circuits on cancel_output or critical-severity refuse/escalate
    * to avoid wasted work after a terminal decision.
+   *
+   * When an initialized OpaEvaluator is provided, OPA determines the final
+   * decision/severity/safeRewrite from the completed check results.
+   * The TS loop still runs for checksRun/allReasonCodes tracking and short-circuit.
    */
   evaluate(ctx: EvaluationContext): GateResult {
     const start = Date.now();
     const checksRun: string[] = [];
     const allReasonCodes: string[] = [];
+    const completedCheckInputs: OpaCheckInput[] = [];
 
     let winningResult: CheckResult = {
       decision: "allow",
@@ -645,6 +652,14 @@ export class PolicyGate {
       const result = check.evaluate(ctx);
 
       allReasonCodes.push(...result.reasonCodes);
+      completedCheckInputs.push({
+        name: check.name,
+        decision: result.decision,
+        reasonCodes: result.reasonCodes,
+        severity: result.severity,
+        safeRewrite: result.safeRewrite,
+        requiredDisclaimerId: result.requiredDisclaimerId,
+      });
 
       // Higher-priority decision wins; break ties by severity
       const currentPriority = DECISION_PRIORITY[winningResult.decision];
@@ -668,6 +683,21 @@ export class PolicyGate {
       ) {
         break;
       }
+    }
+
+    if (this.opaEvaluator?.isInitialized) {
+      const opaOutput = this.opaEvaluator.evaluate({
+        checks: completedCheckInputs,
+      });
+      return {
+        decision: opaOutput.decision,
+        reasonCodes: allReasonCodes,
+        severity: opaOutput.severity,
+        safeRewrite: opaOutput.safeRewrite ?? undefined,
+        requiredDisclaimerId: opaOutput.requiredDisclaimerId ?? undefined,
+        checkDurationMs: Date.now() - start,
+        checksRun,
+      };
     }
 
     return {

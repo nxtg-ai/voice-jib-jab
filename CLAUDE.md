@@ -46,3 +46,11 @@ For any directive that touches 3+ files or requires architectural decisions:
 Do NOT skip planning on complex directives. Plan mode and agent teams are your super-powers.
 
 **Escalation via Team Questions**: When you hit a blocker, need an architecture review, or have a portfolio-level question, add it under `## Team Questions` in your `.asif/NEXUS.md`. Your CoS checks these 3x daily during scheduled enrichment cycles and will respond inline or issue follow-up directives.
+
+## CI Gate Protocol (ASIF Standard)
+Before EVERY `git push`, you MUST:
+1. Run the full test suite (`npm test`)
+2. Verify ZERO failures (xfail/skip OK, failures NOT OK)
+3. If tests fail → fix before pushing. No exceptions.
+4. Include test count in commit message: "Tests: X passed, Y skipped"
+Violating this protocol means broken CI, which means Asif gets spammed.
