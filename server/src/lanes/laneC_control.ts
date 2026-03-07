@@ -90,6 +90,7 @@ import {
 } from "../insurance/moderation_patterns.js";
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import { OpaModeratorCheck } from "../insurance/opa_moderator.js";
+import { OpaClaimsCheck } from "../insurance/opa_claims.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
@@ -123,6 +124,11 @@ export interface ControlEngineConfig {
    * Example: { "default": 0.5, "SELF_HARM": 0.3 }
    */
   moderationThresholds?: Record<string, number>;
+  /**
+   * Cosine similarity threshold for OPA claims check (default 0.6).
+   * Only used when opaEvaluator is provided.
+   */
+  opaClaimsThreshold?: number;
 }
 
 const DEFAULT_CONFIG: ControlEngineConfig = {
@@ -321,7 +327,16 @@ export class ControlEngine extends EventEmitter {
     } else {
       checks.push(new Moderator(this.config.moderationDenyPatterns));
     }
-    checks.push(new ClaimsChecker(this.config.claimsRegistry));
+    if (this.config.opaEvaluator) {
+      checks.push(
+        new OpaClaimsCheck(this.config.opaEvaluator, {
+          registry: this.config.claimsRegistry,
+          threshold: this.config.opaClaimsThreshold ?? 0.6,
+        }),
+      );
+    } else {
+      checks.push(new ClaimsChecker(this.config.claimsRegistry));
+    }
     this.gate = new PolicyGate(checks);
 
     this.override = new OverrideController(

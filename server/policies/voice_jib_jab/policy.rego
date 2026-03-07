@@ -128,3 +128,21 @@ _moderator_result(name) := {"decision": "escalate", "severity": 4, "reason_code"
 _moderator_result(name) := {"decision": "refuse", "severity": 4, "reason_code": concat("", ["MODERATION:", name])} if {
 	name != "SELF_HARM"
 }
+
+# ── ClaimsCheck — OPA threshold evaluation ────────────────────────────────
+#
+# Architecture (Phase 3 N-14): TS computes TF-IDF cosine similarity via
+# VectorStore, OPA evaluates the threshold and owns the allow/refuse decision.
+#
+# Input: input.claims_check = {
+#   "similarity_score": number,   # cosine score from VectorStore (0.0–1.0)
+#   "threshold": number           # acceptance threshold (default 0.6)
+# }
+# Output: { "decision": string, "severity": number, "reason_code": string|null }
+# ─────────────────────────────────────────────────────────────────────────
+
+default claims_check := {"decision": "refuse", "severity": 3, "reason_code": "CLAIMS:UNVERIFIED"}
+
+claims_check := {"decision": "allow", "severity": 0, "reason_code": null} if {
+	input.claims_check.similarity_score >= input.claims_check.threshold
+}

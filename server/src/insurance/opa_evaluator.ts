@@ -52,6 +52,19 @@ export interface OpaModeratorOutput {
   reasonCode: string | null;
 }
 
+export interface OpaClaimsInput {
+  claims_check: {
+    similarity_score: number;
+    threshold: number;
+  };
+}
+
+export interface OpaClaimsOutput {
+  decision: PolicyDecision;
+  severity: number;
+  reasonCode: string | null;
+}
+
 // ── Internal OPA WASM types ────────────────────────────────────────────
 
 interface OpaPolicy {
@@ -162,6 +175,41 @@ export class OpaEvaluator {
       severity: typeof resultObj.severity === "number" ? resultObj.severity : 0,
       reasonCode:
         typeof resultObj.reason_code === "string" ? resultObj.reason_code : null,
+    };
+  }
+
+  /**
+   * Evaluate the claims_check rule against a cosine similarity score and threshold.
+   * Returns the claims decision in sub-millisecond time.
+   *
+   * @throws {Error} if initialize() has not been called.
+   */
+  evaluateClaimsCheck(input: OpaClaimsInput): OpaClaimsOutput {
+    if (!this.policy) {
+      throw new Error(
+        "OpaEvaluator not initialized. Call initialize() before evaluateClaimsCheck().",
+      );
+    }
+
+    const results = this.policy.evaluate(input);
+
+    const raw = results?.[0]?.expressions?.[0]?.value as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!raw) {
+      return { decision: "refuse", severity: 3, reasonCode: "CLAIMS:UNVERIFIED" };
+    }
+
+    const resultObj = (raw.claims_check ?? raw) as Record<string, unknown>;
+
+    return {
+      decision: (resultObj.decision as PolicyDecision | undefined) ?? "refuse",
+      severity: typeof resultObj.severity === "number" ? resultObj.severity : 3,
+      reasonCode:
+        typeof resultObj.reason_code === "string"
+          ? resultObj.reason_code
+          : "CLAIMS:UNVERIFIED",
     };
   }
 

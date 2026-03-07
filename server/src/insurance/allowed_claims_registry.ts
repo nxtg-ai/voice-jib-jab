@@ -17,6 +17,7 @@
 
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
+import { VectorStore } from "../retrieval/VectorStore.js";
 
 interface AllowedClaimsCatalogEntry {
   id?: unknown;
@@ -85,11 +86,13 @@ export class AllowedClaimsRegistry {
   private disallowedPatterns: string[];
   private disallowedPatternsLower: string[];
   private config: AllowedClaimsRegistryConfig;
+  private vectorStore: VectorStore<ApprovedClaim>;
 
   constructor(config: Partial<AllowedClaimsRegistryConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.claims = new Map();
     this.claimTexts = [];
+    this.vectorStore = new VectorStore<ApprovedClaim>();
 
     let claims = Array.isArray(this.config.claims) ? this.config.claims : [];
     let disallowedPatterns = Array.isArray(this.config.disallowedPatterns)
@@ -119,6 +122,14 @@ export class AllowedClaimsRegistry {
     for (const claim of claims) {
       this.claims.set(claim.id, claim);
       this.claimTexts.push(claim);
+    }
+
+    // Index claims into VectorStore for TF-IDF cosine similarity matching.
+    // Replaces the word-overlap heuristic in matchText() Pass 2.
+    if (this.claimTexts.length > 0) {
+      this.vectorStore.index(
+        this.claimTexts.map((c) => ({ id: c.id, text: c.text, metadata: c })),
+      );
     }
   }
 
@@ -172,13 +183,12 @@ export class AllowedClaimsRegistry {
       }
     }
 
-    // Pass 2: partial containment (stub heuristic)
+    // Pass 2: partial containment (word-overlap heuristic — preserved for backward compat)
     let bestMatch: ApprovedClaim | null = null;
     let bestScore = 0;
 
     for (const claim of this.claimTexts) {
       const claimLower = claim.text.toLowerCase();
-      // Simple word-overlap ratio as stub confidence metric
       const proposedWords = new Set(normalised.split(/\s+/));
       const claimWords = claimLower.split(/\s+/);
       const overlapCount = claimWords.filter((w) =>
@@ -209,6 +219,19 @@ export class AllowedClaimsRegistry {
       requiredDisclaimerId: null,
       matchType: "none",
     };
+  }
+
+  /**
+   * Compute TF-IDF cosine similarity between proposed text and the claims corpus.
+   * Returns the top-1 cosine score (0.0–1.0) from the VectorStore index.
+   *
+   * Used by OpaClaimsCheck to pass a similarity_score into the OPA threshold rule.
+   * Does NOT affect matchText() semantics — the two methods are independent.
+   */
+  getSimilarityScore(proposedText: string): number {
+    if (this.claimTexts.length === 0) return 0;
+    const results = this.vectorStore.search(proposedText, 1);
+    return results.length > 0 && results[0] ? results[0].score : 0;
   }
 
   /**
