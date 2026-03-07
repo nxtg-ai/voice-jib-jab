@@ -488,6 +488,55 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-07 (check-in 25) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Deliverable | Detail |
+|-------------|--------|
+| N-14 Phase 3 — `OpaClaimsCheck` | Two-tier claims verification: `getSimilarityScore()` (TF-IDF cosine via `VectorStore`) → OPA `claims_check` threshold rule → `CheckResult`. |
+| `AllowedClaimsRegistry.getSimilarityScore()` | New method using `VectorStore`. Independent of `matchText()` — backward compat preserved. Corpus indexed at construction. |
+| `policy.rego` `claims_check` rule | `similarity_score >= threshold → allow`, else `→ refuse CLAIMS:UNVERIFIED`. Third WASM entrypoint. |
+| `build-policy.sh` updated | Third entrypoint `voice_jib_jab/policy/claims_check` added. |
+| `ControlEngine` wired | `opaClaimsThreshold` config field; `OpaClaimsCheck` replaces `ClaimsChecker` when `opaEvaluator` provided. |
+| 18 new tests | `OpaClaimsCheck.test.ts`: lifecycle (4), disallowed patterns (2), OPA allow (3), OPA refuse (2), threshold edge cases (5), integration (2). |
+| **N-14 → SHIPPED** | Dashboard: **11/14 SHIPPED, 0 BUILDING**. |
+| **Test count** | **1062 passed, 0 failed**. Commits: `755e145` (feat), `036d245` (NEXUS). |
+
+---
+
+### 2. What surprised me?
+
+**Changing `matchText()` to use VectorStore broke an existing test — and the failure was subtle.** The `ClaimsCheck` in `policy_gate.ts` uses `matchResult.matchType` to decide its return value. Swapping word-overlap for TF-IDF cosine changed which `matchType` was returned for the `FDA_CLAIM` test case. The test expected `"none"` (no match → `UNVERIFIED_CLAIM`), but TF-IDF on a small corpus (1 document) produced a score high enough to return `"partial"`. Fix: keep `matchText()` unchanged, add `getSimilarityScore()` as a new independent method. This is the right separation — `matchText()` serves the existing `ClaimsCheck` interface; `getSimilarityScore()` serves `OpaClaimsCheck`. Two consumers, two methods.
+
+**TF-IDF cosine on a single-document corpus inflates scores.** With one document, all terms get IDF = 1.0 and the query's term overlap with that document is magnified. The word-overlap heuristic in `matchText()` didn't have this property because it's purely proportion-based. The lesson: VectorStore TF-IDF is designed for multi-document retrieval. When used as a single-document similarity check, scores behave differently than intuition suggests. For small corpora, the new `getSimilarityScore()` should be interpreted relative to the corpus size.
+
+---
+
+### 3. Cross-project signals
+
+**"Two methods for two consumers" is the right API design when adding a new computation path to an existing class.** Instead of modifying `matchText()` and breaking downstream code, `getSimilarityScore()` is additive. Any ASIF project adding vector similarity to an existing text-matching class should follow this pattern: add a new method, don't change the existing one.
+
+**TF-IDF VectorStore is not ChromaDB.** The CoS Q5/Q6 answers referenced "ChromaDB" and "existing VectorStore" somewhat interchangeably. The actual `VectorStore.ts` in this project is a pure in-memory TF-IDF implementation — no external dependency, no embeddings API, fully synchronous. It is NOT ChromaDB. For portfolio communication, these should be kept distinct: TF-IDF cosine (what we have) vs. embedding cosine (true semantic similarity). The difference matters for paraphrase handling.
+
+---
+
+### 4. What I'd prioritize next
+
+With N-14 SHIPPED and 0 initiatives BUILDING, the portfolio enters a new phase. Three options:
+
+1. **N-11 SIP Telephony** (P1, IDEA): LiveKit SIP adapter would add real phone-call support. Highest business value for enterprise deployment.
+2. **N-13 Multi-Tenant Isolation** (P1, IDEA): Org-scoped policy, RBAC, admin console. Required before any multi-customer production deployment.
+3. **True semantic embeddings upgrade for N-14**: The current `getSimilarityScore()` uses TF-IDF, not embedding cosine. Upgrading to OpenAI embeddings or a local model would handle paraphrasing properly (the original N-14 vision). Low risk — `OpaClaimsCheck` interface unchanged, only `getSimilarityScore()` internals change.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q7 — True embedding similarity for claims**: The shipped `getSimilarityScore()` uses TF-IDF cosine, not dense vector embeddings. This handles keyword overlap but not paraphrasing ("response is instant" ≈ "latency is near zero"). The original N-14 vision mentioned embedding cosine. Is upgrading `getSimilarityScore()` to use OpenAI embeddings (or a local ONNX model) in scope for this sprint, or deferred? If deferred, should we document it as N-14 Phase 4 or a separate initiative?
+
+---
+
 > Session: 2026-03-07 (check-in 24) | Author: Claude Sonnet 4.6
 
 Nothing new. Awaiting directive.
