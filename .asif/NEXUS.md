@@ -42,8 +42,8 @@
 ### GOVERNANCE — "Enterprise Policy Enforcement"
 - Lane C parallel control plane (policy gates, moderation, audit)
 - Hard-cancel audio mid-stream. Decision logging for compliance
-- **Shipped**: N-07 (v1)
-- **Ideas**: N-13, N-14
+- **Shipped**: N-07 (v1), N-14 (v2: OPA + embedding similarity)
+- **Ideas**: N-13
 
 ### GROUNDING — "Fact-Checked Responses"
 - ChromaDB vector store with knowledge pack. Citation trails
@@ -222,7 +222,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260307-03 — N-14 Phase 3: AllowedClaimsRegistry to Rego + Embedding Similarity
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-07 12:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-07 12:45 | **Estimate**: M | **Status**: DONE
 
 > **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
 
