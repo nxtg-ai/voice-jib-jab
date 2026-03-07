@@ -23,7 +23,7 @@
 | N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | IDEA | P1 | — |
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | IDEA | P1 | — |
-| N-14 | Lane C v2: Semantic Governance | GOVERNANCE | BUILDING | P2 | 2026-03-05 |
+| N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
 
 ---
 
@@ -142,6 +142,14 @@
 **Pillar**: GOVERNANCE | **Status**: BUILDING | **Priority**: P2
 **What**: Tier 2 semantic moderation (OpenAI Moderation API) for subtle/context-dependent violations. Embedding similarity for claims matching (vs. word-overlap). OPA integration (PI-002) for declarative policy rules. Successor to N-07 v1 scope.
 
+**Phase 3 SHIPPED (2026-03-07)**:
+- `AllowedClaimsRegistry.getSimilarityScore()` — TF-IDF cosine via `VectorStore`, independent of `matchText()` (backward compat preserved)
+- `OpaEvaluator.evaluateClaimsCheck()` — `OpaClaimsInput`/`OpaClaimsOutput` + `claims_check` Rego rule (score >= threshold → allow, else → refuse)
+- `OpaClaimsCheck` (`opa_claims.ts`) — two-tier: cosine score → OPA threshold → `CheckResult`; fallback to direct compare when OPA uninitialised
+- `ControlEngine` wired: `opaClaimsThreshold` config field; `OpaClaimsCheck` replaces `ClaimsChecker` when `opaEvaluator` provided
+- `build-policy.sh` updated: third entrypoint `voice_jib_jab/policy/claims_check`
+- 18 new tests (`OpaClaimsCheck.test.ts`). 1062 total, 0 failed. N-14 → SHIPPED.
+
 **Phase 1 SHIPPED (2026-03-05)**:
 - `OpaEvaluator` class: wraps `@open-policy-agent/opa-wasm` v1.10.0; async `initialize()`, sync `evaluate()`, `_injectPolicy()` for testing
 - `server/policies/voice_jib_jab/policy.rego`: Rego policy mirrors TS `DECISION_PRIORITY` logic; `winning_check`, `should_short_circuit`, default `result` rule
@@ -204,6 +212,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-03-06 | DIRECTIVE-NXTG-20260306-01: N-14 Phase 2 shipped — OpaModeratorCheck two-tier moderation (pattern + OPA threshold), moderator_check Rego rule, ControlEngine.initialize() (CoS Q2), scripts/build-policy.sh (CoS Q1). 25 new tests. 1044 total, 0 failed. |
 | 2026-03-06 | Q3+Q4 fixes: build-policy.sh entrypoints corrected to voice_jib_jab/policy/result + voice_jib_jab/policy/moderator_check (Q3). OPA singleton wired end-to-end — async startServer(), initializeOpa(), config.opa section, VoiceWebSocketServer constructor threaded to ControlEngine (Q4). 1044 tests, 0 failed. |
 | 2026-03-07 | DIRECTIVE-NXTG-20260307-02: Gate 8.3 mock justification (voice-pipeline.test.ts ws mock) + SessionManager flaky timer fix (jest.clearAllTimers() before useRealTimers()). 1044 tests, 0 failed. |
+| 2026-03-07 | DIRECTIVE-NXTG-20260307-03: N-14 Phase 3 SHIPPED — OpaClaimsCheck (VectorStore TF-IDF cosine + Rego claims_check threshold rule). getSimilarityScore() independent of matchText() for backward compat. 18 new tests. 1062 total, 0 failed. N-14 → SHIPPED (11/14). |
 
 ---
 
@@ -233,7 +242,19 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Standing auth for all items. Plan mode recommended for item 2 (architecture decision on vector store).
 
 **Response** (filled by project team):
+> **COMPLETE — 2026-03-07**
 >
+> All 5 action items delivered. N-14 → SHIPPED.
+>
+> **Deliverables:**
+> 1. **`policy.rego` extended** — `claims_check` rule: `similarity_score >= threshold → allow`, else `→ refuse` with `CLAIMS:UNVERIFIED`. Third WASM entrypoint.
+> 2. **`AllowedClaimsRegistry.getSimilarityScore()`** — TF-IDF cosine similarity via existing `VectorStore`. Independent of `matchText()` (backward compat preserved — existing `ClaimsCheck` tests unaffected). VectorStore indexed at construction after claims load.
+> 3. **`OpaClaimsCheck`** (`opa_claims.ts`) — two-tier: Tier 1 `getSimilarityScore()`, Tier 2 `OpaEvaluator.evaluateClaimsCheck()`. Falls back to direct threshold compare when OPA uninitialised. Disallowed patterns checked before similarity.
+> 4. **`ControlEngine` wired** — `opaClaimsThreshold` config field; `OpaClaimsCheck` replaces `ClaimsChecker` when `opaEvaluator` provided.
+> 5. **`build-policy.sh`** — third entrypoint `voice_jib_jab/policy/claims_check` added.
+> 6. **18 new tests** (`OpaClaimsCheck.test.ts`): lifecycle (4), disallowed patterns (2), OPA allow (3), OPA refuse (2), threshold edge cases (5), integration (2).
+> 7. **N-14 → SHIPPED**. Dashboard: 11/14 SHIPPED, 0 BUILDING.
+> 8. Tests: **1062 passed, 0 failed**. Commit: `755e145`.
 
 ---
 
