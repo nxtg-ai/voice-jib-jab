@@ -24,6 +24,7 @@
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | IDEA | P1 | — |
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | IDEA | P1 | — |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
+| N-15 | Dense Embedding Similarity for Claims | GOVERNANCE | IDEA | P2 | — |
 
 ---
 
@@ -137,6 +138,10 @@
 ### N-13: Multi-Tenant Isolation
 **Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P1
 **What**: Org-scoped knowledge, policy, audit. Admin console. RBAC (admin, agent, viewer).
+
+### N-15: Dense Embedding Similarity for Claims
+**Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P2
+**What**: Replace `AllowedClaimsRegistry.getSimilarityScore()` TF-IDF internals with `all-MiniLM-L6-v2` ONNX (22MB, in-process, offline). Handles paraphrasing that TF-IDF misses ("response is instant" ≈ "latency is near zero"). `OpaClaimsCheck` interface unchanged — swap is internal to `getSimilarityScore()`. Must work offline (no OpenAI embeddings API — policy engine must be local-first).
 
 ### N-14: Lane C v2: Semantic Governance
 **Pillar**: GOVERNANCE | **Status**: BUILDING | **Priority**: P2
@@ -487,6 +492,41 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 ---
 
 ## Team Feedback
+
+> Session: 2026-03-07 (check-in 26) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+No new code. Q7 resolved by CoS. Created N-15 (Dense Embedding Similarity) as IDEA in dashboard. Dashboard now: **11/14 SHIPPED, 0 BUILDING, 4 IDEA** (N-11, N-12, N-13, N-15).
+
+---
+
+### 2. What surprised me?
+
+**"Don't reopen shipped initiatives" is a clean governance principle.** The instinct when finding a gap in a shipped feature is to open a sub-ticket or Phase 4. CoS Wolf's decision to make it N-15 instead is cleaner: N-14 has a clear definition of done, N-15 has a separate one. Shipped means shipped. This also keeps NEXUS readable — initiative scope stays bounded.
+
+**"Policy engines must work offline" is a useful constraint to encode explicitly.** The recommendation to use `all-MiniLM-L6-v2` ONNX instead of OpenAI embeddings wasn't obvious from the architecture. A policy/moderation engine should never have a runtime dependency on an external API — if the API is down, moderation fails open. Local-first is a safety property, not just a cost optimization.
+
+---
+
+### 3. Cross-project signals
+
+**Local-first policy engines: ONNX over API.** Any ASIF project using OPA or a similar policy engine for moderation/claims should follow the same principle: embeddings computation must be local-first. `all-MiniLM-L6-v2` ONNX at 22MB is the portfolio recommendation. API-based embeddings (OpenAI, Cohere) are for retrieval/RAG where degraded behavior is acceptable; policy is not that context.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-11 SIP Telephony** or **N-13 Multi-Tenant Isolation** — both P1 IDEAS, both required for enterprise deployment. CoS direction needed on which comes first.
+2. **N-15** when prioritized: swap `getSimilarityScore()` internals to ONNX. The `OpaClaimsCheck` interface is already clean for it — estimated S/M effort.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+No blockers. No new questions. Ready for next directive.
+
+---
 
 > Session: 2026-03-07 (check-in 25) | Author: Claude Sonnet 4.6
 
