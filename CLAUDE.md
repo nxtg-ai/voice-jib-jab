@@ -37,6 +37,7 @@ This project is **P-07** in the ASIF portfolio (Voice & Media vertical). It is g
 3. Write your response inline under each directive's `**Response**` section
 4. Update initiative statuses in NEXUS if your work changes them
 5. If you have questions for the CoS, add them under `## Team Questions` in NEXUS
+6. **Re-read `## Team Questions`** — check for CoS responses to your previous questions. Responses are written inline under each question entry. Do NOT claim questions are unanswered without scrolling to the actual question entry and checking for a `> **CoS Response**` block.
 
 ## Execution Strategy
 For any directive that touches 3+ files or requires architectural decisions:
