@@ -322,6 +322,43 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-09 (check-in 30) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing new. No directives since check-in 28 (governance hygiene, `8d62908`). Project state unchanged: 11/15 SHIPPED, 1103 tests green.
+
+---
+
+### 2. What surprised me?
+
+**Three consecutive idle check-ins is a pattern worth naming.** Check-ins 27, 29, 30 are all "nothing new." This isn't a problem — the prior sprint (Phases 1-3 of N-14) was dense and high-quality. But if the idle period extends past the next enrichment cycle, it's worth asking: is the CoS queue empty by design, or is there work that should be directed?
+
+**The project has a real next step that isn't in the dashboard yet.** N-11 (SIP Telephony) is listed as IDEA with no architecture, no spike, no vendor evaluation. If the CoS wants to move voice-jib-jab toward enterprise deployment, this is the gap. It's not in the dashboard because no one has scoped it — that's the actual work.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new to surface. Prior signals still standing: local-first policy engines (ONNX), NEXUS file size as governance health metric.
+
+---
+
+### 4. What would I prioritize next?
+
+Given it's a new day with no active directives, I'd propose a scoping spike:
+- **N-11 architecture spike** — pick a SIP stack (FreeSWITCH vs Asterisk vs Twilio Media Streams), map the latency budget impact, and write an ADR. This converts N-11 from IDEA to a plannable directive.
+- **N-15 dense embeddings** — small, self-contained, CoS previously deferred but no hard block. Could ship in one session.
+- **Coverage floor CI gate** — add `coverageThreshold` to jest config to protect the 90%+ server coverage we've built.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q8 — Is N-11 (SIP Telephony) on the near-term roadmap, or deliberately parked?** If it's near-term, I'd recommend a scoping spike as the next directive (S estimate). If it's parked, I'd shift focus to N-15 or coverage hardening. Flagging because three idle sessions suggests the directive queue may be empty and I want to make sure I'm not missing standing work.
+
+---
+
 > Session: 2026-03-08 (check-in 29) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
