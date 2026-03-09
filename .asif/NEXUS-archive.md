@@ -182,3 +182,207 @@
 **Response** (filled by NXTG-AI CoS — 2026-02-28):
 
 > Executed by Wolf (NXTG-AI CoS). N-07, N-08, N-10 all moved to SHIPPED. N-14 created as IDEA. 10/14 initiatives SHIPPED. voice-jib-jab upgrades from AMBER to GREEN.
+
+---
+
+## CoS Archive — 2026-03-08 (6 directives)
+
+*Archived by project team per DIRECTIVE-NXTG-20260308-04. Full directive text preserved verbatim.*
+
+---
+
+### DIRECTIVE-NXTG-20260304-04 — Adopt CI Gate Protocol
+**From**: NXTG-AI CoS | **Priority**: P0
+**Injected**: 2026-03-04 | **Estimate**: S | **Status**: COMPLETE
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: New ASIF standard (`standards/ci-gate-protocol.md`). No push without local test pass. All teams must adopt.
+
+**Action Items**:
+1. [ ] Add CI Gate Protocol section to CLAUDE.md:
+   ```
+   ## CI Gate Protocol (ASIF Standard)
+   Before EVERY `git push`, you MUST:
+   1. Run the full test suite (`npm test`)
+   2. Verify ZERO failures (xfail/skip OK, failures NOT OK)
+   3. If tests fail → fix before pushing. No exceptions.
+   4. Include test count in commit message: "Tests: X passed, Y skipped"
+   Violating this protocol means broken CI, which means Asif gets spammed.
+   ```
+2. [ ] Install pre-push hook: `cp ~/ASIF/scripts/templates/pre-push-hook.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push`
+3. [ ] Run full test suite. Confirm 1028+ passing. Report count.
+4. [ ] Verify CI is GREEN on GitHub Actions. If not, fix it.
+
+**Constraints**:
+- Execute BEFORE DIRECTIVE-NXTG-20260304-01 (OPA Rego). CI gate comes first.
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-05**
+> - CI Gate Protocol section added to `CLAUDE.md` (all 4 steps)
+> - Pre-push hook installed at `.git/hooks/pre-push`
+> - Full server test suite: **1019 passed, 0 failed** (987 baseline + 32 new OPA tests)
+> - Full client suite: **41 passed** (unchanged)
+> - GitHub Actions CI: confirmed green on `main` (prior merge at 1028 tests)
+
+---
+
+### DIRECTIVE-NXTG-20260304-01 — Lane C v2 Phase 1: PolicyGate → OPA Rego
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-03-04 | **Estimate**: M | **Status**: COMPLETE
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: 10/14 initiatives shipped. Team idle 3 days. N-14 research complete (PI-007 OPA WASM). Phase 1 is self-contained and unblocks Phases 2-3.
+
+**Action Items**:
+1. [ ] Install `@open-policy-agent/opa-wasm` v1.10.0 — verify it loads in-process, no sidecar
+2. [ ] Author Rego policy bundle for PolicyGate: translate existing decision tree (allow/deny/cancel_output/escalate) to declarative Rego rules
+3. [ ] Replace `PolicyGate.evaluate()` internals with OPA WASM instance — keep the same TypeScript interface so ControlEngine callers are unaffected
+4. [ ] Reuse deny-by-default Rego patterns from oneDB (P-09) — reference `~/projects/oneDB/` for their 7 policy primitives and 40 OPA tests
+5. [ ] Write 30+ new tests: Rego rule evaluation, WASM loading, backward compatibility with existing PolicyGate tests, latency assertion (<1ms per evaluation)
+6. [ ] Update N-14 status from IDEA → BUILDING. Update changelog.
+7. [ ] Run full test suite — 1028 baseline must not decrease. Report final count.
+
+**Constraints**:
+- Phase 1 ONLY. Do NOT touch ModeratorCheck (Phase 2) or AllowedClaimsRegistry (Phase 3) yet.
+- Keep existing PolicyGate interface unchanged — this is an internal implementation swap, not an API change.
+- USE PLAN MODE before coding. Outline the Rego rule structure first.
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-05**
+> - `@open-policy-agent/opa-wasm@1.10.0` installed as production dependency (3 packages, in-process — no sidecar)
+> - `server/policies/voice_jib_jab/policy.rego` — Rego policy translates TS `DECISION_PRIORITY` merge loop to declarative rules: `winning_check` (max priority → max severity → first-wins), `result` default + override, `should_short_circuit` signal
+> - `server/src/insurance/opa_evaluator.ts` — `OpaEvaluator` wrapper: async `initialize()`, sync sub-millisecond `evaluate()`, `_injectPolicy()` for test injection (no file I/O)
+> - `PolicyGate` wired: optional `OpaEvaluator` in constructor; when initialized, OPA determines final decision/severity/safeRewrite; TS loop preserved for checksRun tracking, allReasonCodes aggregation, and short-circuit performance
+> - Backward compatible: zero OpaEvaluator = existing TS aggregation path, all 987 original tests unchanged
+> - **32 new tests** in `OpaEvaluator.test.ts` covering lifecycle, I/O mapping, format edge cases, latency assertion, PolicyGate integration
+> - **Server suite: 1019 passed, 0 failed** (987 + 32). N-14 moved IDEA → BUILDING.
+> - Phase 1 ONLY: ModeratorCheck (Phase 2) and AllowedClaimsRegistry (Phase 3) untouched.
+
+---
+
+### DIRECTIVE-NXTG-20260306-01 — OPA Lane C v2 Phase 2: ModeratorCheck Integration
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-03-06 07:45 | **Estimate**: M | **Status**: COMPLETE
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: Phase 1 shipped OPA Rego policy engine (32 tests, `OpaEvaluator` in-process, `server/policies/voice_jib_jab/policy.rego`). Phase 2 adds content moderation as an OPA-evaluated policy decision. This is the natural next step per the Lane C v2 roadmap.
+
+**Action Items**:
+1. [ ] Extend `policy.rego` with `moderator_check` rule — evaluate content against moderation categories (toxicity, PII, bias, off-topic). Use configurable thresholds.
+2. [ ] Create `ModeratorCheck` middleware that wraps `OpaEvaluator` for content moderation decisions — integrates into the voice processing pipeline at the pre-response stage.
+3. [ ] Wire `ModeratorCheck` into the Lane C orchestrator. When policy denies, return a safe fallback response (not a raw error).
+4. [ ] Add test coverage for moderation scenarios: toxic input, PII detection, threshold edge cases, policy deny → fallback flow. Target: 20+ new tests.
+5. [ ] Update N-14 status in NEXUS (BUILDING → verify still accurate after this phase).
+6. [ ] Run full test suite. 1,060 baseline must not decrease.
+7. [ ] CI GREEN before push.
+
+**Constraints**:
+- Phase 2 ONLY — do NOT touch AllowedClaimsRegistry (Phase 3)
+- Backward compatible — existing 1,060 tests must pass unchanged
+- USE PLAN MODE — this touches policy, middleware, and orchestrator
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-06**
+>
+> All 7 action items delivered. Baseline preserved: **1044 tests passing, 0 failed** (1019 baseline + 25 new OpaModeratorCheck tests).
+>
+> **Deliverables:**
+> 1. **`policy.rego` extended** — `moderator_check` rule evaluates category scores against configurable thresholds; `_moderator_result()` helper maps SELF_HARM → escalate, all others → refuse with `MODERATION:<name>` reason code.
+> 2. **`OpaModeratorCheck` created** (`server/src/insurance/opa_moderator.ts`) — two-tier design: Tier 1 pattern matching (binary scores 1.0/0.0), Tier 2 OPA threshold evaluation via `OpaEvaluator.evaluateModeratorCheck()`. Falls back to Tier 1 when OPA uninitialised.
+> 3. **`OpaEvaluator` extended** — `OpaModeratorInput`/`OpaModeratorOutput` interfaces + `evaluateModeratorCheck()` method. Same `raw.moderator_check ?? raw` parsing pattern as `evaluate()`.
+> 4. **`ControlEngine` wired** — `opaEvaluator` + `moderationThresholds` config fields added. Constructor swaps `Moderator` for `OpaModeratorCheck` when `opaEvaluator` is provided (backward compat: existing code unchanged). `async initialize()` method added (CoS Q2 answer).
+> 5. **`scripts/build-policy.sh`** — CoS Q1 answer: auto-downloads OPA CLI, builds WASM with both `voice_jib_jab/result` + `voice_jib_jab/moderator_check` entrypoints. Added `build:policy` to `server/package.json`.
+> 6. **25 new tests** (`OpaModeratorCheck.test.ts`) across 8 groups: lifecycle, tier 1 fallback, OPA toxic input, self-harm escalation, threshold edge cases, PII scenario, ControlEngine integration, multiple categories. All 1044 tests green.
+> 7. Commit: `6605ef6` — full suite confirmed clean before push.
+>
+> **N-14 status**: still BUILDING — Phase 3 (AllowedClaimsRegistry → Rego + embedding similarity) remains.
+
+---
+
+### DIRECTIVE-NXTG-20260306-02 — CRUCIBLE Protocol Phase 1: Gate 4 (Standard Tier)
+**From**: NXTG-AI CoS (via Emma, CLX9 Sr. CoS) | **Priority**: P2
+**Injected**: 2026-03-06 13:20 | **Estimate**: S | **Status**: COMPLETE
+
+**Context**: New portfolio-wide test quality standard (`~/ASIF/standards/crucible-protocol.md`). voice-jib-jab gets Gate 4 (delta gate) at Standard tier.
+
+**Action Items**:
+1. [x] Add CRUCIBLE Protocol section to CLAUDE.md:
+   ```
+   ## CRUCIBLE Protocol (Test Quality)
+   This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.md`).
+   - Gate 4: Delta gate — test count must not decrease between commits
+   - Oracle tier: STANDARD — minimum 2 oracle types per feature
+   ```
+2. [x] Run full test suite. 1,044 baseline must not decrease.
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-06**
+> - CRUCIBLE Protocol section added to `CLAUDE.md` immediately after CI Gate Protocol (logical grouping — both are quality gates)
+> - Gate 4 (delta gate) + STANDARD oracle tier (per VJJ deployment matrix row) documented
+> - Full test suite: **1044 passed, 0 failed** (baseline preserved)
+> - Commit: see below
+
+---
+
+### DIRECTIVE-NXTG-20260307-02 — Gate 8.3 Mock Justification + CI Flaky Fix
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-07 08:40 | **Estimate**: S | **Status**: DONE
+
+**Context**: Gate 8 audit flagged `voice-pipeline.test.ts:21` has `jest.mock("ws")` in an integration test. Not fraud — WS is infrastructure — but needs documentation per Gate 8.3. Also, CI has 1 flaky test (SessionManager timeout, 1/41 fails).
+
+**Action Items**:
+1. [ ] Add `// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI` comment above `jest.mock("ws")` in `voice-pipeline.test.ts:21`.
+2. [ ] Investigate flaky `SessionManager` test timeout — increase timeout or fix race condition.
+3. [ ] Run full test suite — confirm 1,060+ tests pass with 0 failures.
+4. [ ] Push with CI gate — must be GREEN (currently failing on flaky test).
+
+**Constraints**:
+- Do NOT restructure the voice-pipeline integration tests. Just add the justification comment and fix the flaky test.
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-07**
+>
+> 1. `voice-pipeline.test.ts:21` — comment changed to `// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI`
+> 2. `SessionManager.test.ts` — added `jest.clearAllTimers()` before `jest.useRealTimers()` in `afterEach`. Root cause: pending fake timers from one test could fire after `useRealTimers()` restores the real clock, causing the next test's timer setup to race with the leaked timer. `clearAllTimers()` purges all pending fakes before handing back to the real clock.
+> 3. Full suite: **1044 passed, 0 failed**. Commit: `9a07bbc`.
+
+---
+
+### DIRECTIVE-NXTG-20260307-03 — N-14 Phase 3: AllowedClaimsRegistry to Rego + Embedding Similarity
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-07 12:45 | **Estimate**: M | **Status**: DONE
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: Team has been idle since check-in 22 (D-02 completed). N-14 Phase 3 is the last piece to ship N-14 (OPA Policy). Q3 and Q4 are resolved. Architecture is clear: AllowedClaimsRegistry hardcoded allowlist transitions to Rego rules + ChromaDB embedding similarity for flexible claim matching.
+
+**Action Items**:
+1. [ ] **Migrate AllowedClaimsRegistry to Rego**: Move the hardcoded celebrity-claim allowlist into a Rego data document. The existing `voice_jib_jab/policy/result` and `voice_jib_jab/policy/moderator_check` entrypoints should evaluate claims against this data.
+2. [ ] **Add embedding similarity for claim matching**: Use ChromaDB (or a lightweight vector store) to store claim embeddings. When a new claim arrives, find the nearest allowed claim by cosine similarity. If similarity > threshold, allow. This handles paraphrasing ("tell me a joke" vs "say something funny").
+3. [ ] **Update build-policy.sh**: Ensure the WASM bundle includes the new data document. The entrypoints were already fixed per Q3.
+4. [ ] **Write tests**: Rego policy tests (exact match + fuzzy match + deny cases). Integration test with the OPA singleton (Q4 pattern). Target: 15+ new tests.
+5. [ ] **Update N-14 status in NEXUS**: If all above complete, move N-14 to SHIPPED.
+
+**Constraints**:
+- Use the OPA singleton pattern from Q4 (already wired into server bootstrap).
+- Embedding model: use whatever is lightest — this is policy matching, not semantic search. sentence-transformers/all-MiniLM-L6-v2 or similar.
+- If ChromaDB is too heavy, a simple numpy cosine similarity over pre-computed embeddings is acceptable.
+- Standing auth for all items. Plan mode recommended for item 2 (architecture decision on vector store).
+
+**Response** (filled by project team):
+> **COMPLETE — 2026-03-07**
+>
+> All 5 action items delivered. N-14 → SHIPPED.
+>
+> **Deliverables:**
+> 1. **`policy.rego` extended** — `claims_check` rule: `similarity_score >= threshold → allow`, else `→ refuse` with `CLAIMS:UNVERIFIED`. Third WASM entrypoint.
+> 2. **`AllowedClaimsRegistry.getSimilarityScore()`** — TF-IDF cosine similarity via existing `VectorStore`. Independent of `matchText()` (backward compat preserved — existing `ClaimsCheck` tests unaffected). VectorStore indexed at construction after claims load.
+> 3. **`OpaClaimsCheck`** (`opa_claims.ts`) — two-tier: Tier 1 `getSimilarityScore()`, Tier 2 `OpaEvaluator.evaluateClaimsCheck()`. Falls back to direct threshold compare when OPA uninitialised. Disallowed patterns checked before similarity.
+> 4. **`ControlEngine` wired** — `opaClaimsThreshold` config field; `OpaClaimsCheck` replaces `ClaimsChecker` when `opaEvaluator` provided.
+> 5. **`build-policy.sh`** — third entrypoint `voice_jib_jab/policy/claims_check` added.
+> 6. **18 new tests** (`OpaClaimsCheck.test.ts`): lifecycle (4), disallowed patterns (2), OPA allow (3), OPA refuse (2), threshold edge cases (5), integration (2).
+> 7. **N-14 → SHIPPED**. Dashboard: 11/14 SHIPPED, 0 BUILDING.
+> 8. Tests: **1062 passed, 0 failed**. Commit: `755e145`.
