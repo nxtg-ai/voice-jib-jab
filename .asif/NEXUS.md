@@ -224,33 +224,17 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md). 6 directives archived 2026-03-08.
-
-### DIRECTIVE-NXTG-20260308-04 — Governance Hygiene: Archive DONE Directives + Initiative Audit
-**From**: NXTG-AI CoS | **Priority**: P2
-**Injected**: 2026-03-08 09:55 | **Estimate**: S | **Status**: DONE
-
-**Action Items**:
-1. [x] Archive all DONE directives from this `## CoS Directives` section into `NEXUS-archive.md` (or create a `## CoS Archive` section at the bottom of NEXUS-archive.md if it doesn't have one). Move the full directive text (header, metadata, action items, response) — do not summarize.
-2. [x] Leave only PENDING directives (if any) in the `## CoS Directives` section. Add an updated archive note with the count and date.
-3. [x] Audit all initiative statuses in the Executive Dashboard section of NEXUS: verify each initiative marked IN PROGRESS is actually in progress (has recent commits or open work). Flag any that should be SHIPPED or DONE based on actual state.
-4. [x] If any initiative status changes, update them in the Executive Dashboard and note the change in the response below.
-
-**Constraints**:
-- Do NOT modify directive content when archiving — preserve exactly as written (including team responses).
-- Do NOT change initiative statuses without verifying actual project state (check git log, test results, etc.).
-
-**Response** (filled by project team):
-> **COMPLETE — 2026-03-08**
+> 7 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> - Batch 1: 6 directives (2026-03-08, team)
+> - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 >
-> 1. **6 DONE/COMPLETE directives archived** verbatim to `NEXUS-archive.md` (`## CoS Archive — 2026-03-08` section): DIRECTIVE-NXTG-20260304-04, DIRECTIVE-NXTG-20260304-01, DIRECTIVE-NXTG-20260306-01, DIRECTIVE-NXTG-20260306-02, DIRECTIVE-NXTG-20260307-02, DIRECTIVE-NXTG-20260307-03.
-> 2. `## CoS Directives` section now contains only this directive. Archive note updated: "6 directives archived 2026-03-08."
-> 3. **Initiative audit** — all 15 initiatives verified against git log and changelog:
->    - N-01 through N-10: SHIPPED ✓ (confirmed by changelog entries through 2026-03-07)
->    - N-11, N-12, N-13: IDEA ✓ (no active work — status correct)
->    - N-14: SHIPPED ✓ (Lane C v2 all 3 phases complete, last commit 2026-03-07)
->    - N-15: IDEA ✓ (deferred per CoS Q7 response)
-> 4. No status changes — all initiative statuses are accurate.
+> No active directives. Team has standing auth for coverage gate + N-15 (per Q8 response).
+
+### Directive Summary (Recently Completed)
+
+| ID | Title | Completed |
+|----|-------|-----------|
+| NXTG-20260308-04 | Governance Hygiene: Archive + Initiative Audit | 2026-03-08 |
 
 ---
 
