@@ -364,4 +364,50 @@ describe("AllowedClaimsRegistry", () => {
       expect(registry.size).toBe(0);
     });
   });
+
+  // ── getSimilarityScore ────────────────────────────────────────────
+
+  describe("getSimilarityScore", () => {
+    it("should return 0 for empty registry (no claims indexed)", () => {
+      const registry = makeRegistry();
+      expect(registry.getSimilarityScore("any text at all")).toBe(0);
+    });
+
+    it("should return a score > 0 for text with word overlap against a claim", () => {
+      const registry = makeRegistry([FDA_CLAIM]); // "Our product is FDA approved"
+      // Query shares significant content words with the claim
+      const score = registry.getSimilarityScore("FDA approved product");
+      expect(score).toBeGreaterThan(0);
+    });
+
+    it("should return score 1.0 for text identical to a single indexed claim", () => {
+      const registry = makeRegistry([TRIAL_CLAIM]); // "Clinical trials showed 85% efficacy"
+      const score = registry.getSimilarityScore("Clinical trials showed 85% efficacy");
+      expect(score).toBe(1.0);
+    });
+
+    it("should return score between 0 and 1 inclusive for any input", () => {
+      const registry = makeRegistry([FDA_CLAIM, TRIAL_CLAIM, SAFETY_CLAIM]);
+      const score = registry.getSimilarityScore("partial overlap with clinical trials");
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(1);
+    });
+
+    it("should return 0 for text with no token overlap against the corpus", () => {
+      // SAFETY_CLAIM text: "No serious adverse effects were reported"
+      // All meaningful words differ from a numeric/symbol-only query
+      const registry = makeRegistry([SAFETY_CLAIM]);
+      // After tokenization stop-words are removed; numeric-only tokens (length≤1 are dropped too)
+      // Use a query whose non-stop, non-trivial tokens do not appear in SAFETY_CLAIM
+      const score = registry.getSimilarityScore("xyz123 quantum blockchain zork");
+      expect(score).toBe(0);
+    });
+
+    it("should return the top-1 score (highest match) across multiple claims", () => {
+      const registry = makeRegistry([FDA_CLAIM, TRIAL_CLAIM, SAFETY_CLAIM]);
+      // Query is an exact duplicate of TRIAL_CLAIM — should score 1.0 against that claim
+      const score = registry.getSimilarityScore("Clinical trials showed 85% efficacy");
+      expect(score).toBe(1.0);
+    });
+  });
 });

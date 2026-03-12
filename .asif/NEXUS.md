@@ -232,26 +232,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260312-01 — P2: Test Coverage Push — Governance/OPA Modules
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: DONE
 
 **Context**: N-14 Lane C v2 Phase 3 shipped new governance code (AllowedClaimsRegistry.getSimilarityScore, OpaEvaluator.evaluateClaimsCheck, OPA WASM build). Current test count is 1,103 (1,062 server + 41 client), 91% cov. The new OPA/claims modules may have thin coverage.
 
 **Action Items**:
-1. [ ] Run `npm test -- --coverage` and identify coverage gaps in governance/OPA modules specifically.
-2. [ ] Add tests for `AllowedClaimsRegistry.getSimilarityScore()` — verify TF-IDF cosine similarity produces correct scores for known input pairs.
-3. [ ] Add tests for `OpaEvaluator.evaluateClaimsCheck()` — verify score threshold logic (allow vs refuse).
-4. [ ] Add tests for `build-policy.sh` entrypoints (verify correct paths after Q3 fix).
-5. [ ] Run full suite. Report final test count (must be ≥1,103).
+1. [x] Run `npm test -- --coverage` and identify coverage gaps in governance/OPA modules specifically.
+2. [x] Add tests for `AllowedClaimsRegistry.getSimilarityScore()` — verify TF-IDF cosine similarity produces correct scores for known input pairs.
+3. [x] Add tests for `OpaEvaluator.evaluateClaimsCheck()` — verify score threshold logic (allow vs refuse).
+4. [x] Add tests for `build-policy.sh` entrypoints (verify correct paths after Q3 fix).
+5. [x] Run full suite. Report final test count (must be ≥1,103).
 
 **Constraints**:
 - S-sized — governance modules only, not a full coverage push.
 - Real assertions only — CRUCIBLE Gate 2 standards.
 - If you hit non-trivial errors, search/research online before asking CoS.
 
+**Response** (2026-03-12):
+- `getSimilarityScore()` had zero tests — added 6 in `AllowedClaimsRegistry.test.ts`: empty registry→0, word overlap→score>0, identical text→1.0, score range 0–1, no-token-overlap→0, top-1 across multiple claims.
+- `evaluateClaimsCheck()` had zero tests — added 10 in `OpaEvaluator.test.ts`: throws-when-uninit, empty-results fallback (refuse/3/CLAIMS:UNVERIFIED), null-value fallback, allow path, refuse path, custom reasonCode, claims_check key unwrap, non-number severity→3, non-string reasonCode→default, input passthrough.
+- `build-policy.sh` entrypoints confirmed correct (voice_jib_jab/policy/result, voice_jib_jab/policy/moderator_check, voice_jib_jab/policy/claims_check) — no change needed.
+- Final test count: **1,119** (1,078 server + 41 client). +16 net new tests. All pass.
+
 ### Directive Summary (Recently Completed)
 
 | ID | Title | Completed |
 |----|-------|-----------|
+| NXTG-20260312-01 | Test Coverage Push — Governance/OPA Modules | 2026-03-12 |
 | NXTG-20260308-04 | Governance Hygiene: Archive + Initiative Audit | 2026-03-08 |
 
 ---

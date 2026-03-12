@@ -10,7 +10,8 @@
  *   3. Policy return format variations (4 tests)
  *   4. Latency assertion               (1 test)
  *   5. PolicyGate + OpaEvaluator       (8 tests)
- *   6. Edge cases                      (6 tests)
+ *   6. evaluateClaimsCheck()           (9 tests)
+ *   7. Edge cases                      (6 tests)
  */
 
 // ── Module mock (hoisted before imports) ──────────────────────────────────
@@ -383,7 +384,116 @@ describe("PolicyGate + OpaEvaluator integration", () => {
   });
 });
 
-// ── Group 6: Edge cases ───────────────────────────────────────────────────
+// ── Group 6: evaluateClaimsCheck() ───────────────────────────────────────
+
+describe("OpaEvaluator — evaluateClaimsCheck()", () => {
+  test("throws when not initialized", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    expect(() =>
+      ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.8, threshold: 0.6 } }),
+    ).toThrow("OpaEvaluator not initialized");
+  });
+
+  test("returns refuse/3/CLAIMS:UNVERIFIED when policy returns empty results", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy({ evaluate: jest.fn().mockReturnValue([]) });
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.8, threshold: 0.6 } });
+    expect(out.decision).toBe("refuse");
+    expect(out.severity).toBe(3);
+    expect(out.reasonCode).toBe("CLAIMS:UNVERIFIED");
+  });
+
+  test("returns refuse/3/CLAIMS:UNVERIFIED when policy returns null value", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy({ evaluate: jest.fn().mockReturnValue([{ expressions: [{ value: null }] }]) });
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.5, threshold: 0.6 } });
+    expect(out.decision).toBe("refuse");
+    expect(out.severity).toBe(3);
+    expect(out.reasonCode).toBe("CLAIMS:UNVERIFIED");
+  });
+
+  test("returns allow when OPA decides allow (score above threshold)", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({ decision: "allow", severity: 0, reason_code: null }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.9, threshold: 0.6 } });
+    expect(out.decision).toBe("allow");
+    expect(out.severity).toBe(0);
+    expect(out.reasonCode).toBe("CLAIMS:UNVERIFIED"); // null reason_code → default
+  });
+
+  test("returns refuse with CLAIMS:UNVERIFIED when OPA decides refuse", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({ decision: "refuse", severity: 3, reason_code: "CLAIMS:UNVERIFIED" }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.1, threshold: 0.6 } });
+    expect(out.decision).toBe("refuse");
+    expect(out.severity).toBe(3);
+    expect(out.reasonCode).toBe("CLAIMS:UNVERIFIED");
+  });
+
+  test("propagates custom reason_code from OPA result", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({ decision: "refuse", severity: 3, reason_code: "CLAIMS:CUSTOM_CODE" }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.2, threshold: 0.6 } });
+    expect(out.reasonCode).toBe("CLAIMS:CUSTOM_CODE");
+  });
+
+  test("unwraps result from claims_check key when present", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({
+        claims_check: { decision: "allow", severity: 0, reason_code: null },
+      }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.8, threshold: 0.6 } });
+    expect(out.decision).toBe("allow");
+    expect(out.severity).toBe(0);
+  });
+
+  test("non-number severity defaults to 3", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({ decision: "refuse", severity: "high", reason_code: "CLAIMS:UNVERIFIED" }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.1, threshold: 0.6 } });
+    expect(out.severity).toBe(3);
+  });
+
+  test("non-string reason_code defaults to CLAIMS:UNVERIFIED", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(
+      makeMockPolicy({ decision: "refuse", severity: 3, reason_code: 42 }),
+    );
+
+    const out = ev.evaluateClaimsCheck({ claims_check: { similarity_score: 0.1, threshold: 0.6 } });
+    expect(out.reasonCode).toBe("CLAIMS:UNVERIFIED");
+  });
+
+  test("input is passed through to policy.evaluate()", () => {
+    const mockPolicy = makeMockPolicy({ decision: "allow", severity: 0, reason_code: null });
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+
+    const input = { claims_check: { similarity_score: 0.75, threshold: 0.5 } };
+    ev.evaluateClaimsCheck(input);
+
+    expect(mockPolicy.evaluate).toHaveBeenCalledWith(input);
+  });
+});
+
+// ── Group 7: Edge cases ───────────────────────────────────────────────────
 
 describe("OpaEvaluator — edge cases", () => {
   test("opaEvaluator.evaluate() throws → error propagates from PolicyGate", () => {
