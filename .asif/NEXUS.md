@@ -228,7 +228,25 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 >
-> No active directives. Team has standing auth for coverage gate + N-15 (per Q8 response).
+> Standing auth for coverage gate + N-15 (per Q8 response).
+
+### DIRECTIVE-NXTG-20260312-01 — P2: Test Coverage Push — Governance/OPA Modules
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: PENDING
+
+**Context**: N-14 Lane C v2 Phase 3 shipped new governance code (AllowedClaimsRegistry.getSimilarityScore, OpaEvaluator.evaluateClaimsCheck, OPA WASM build). Current test count is 1,103 (1,062 server + 41 client), 91% cov. The new OPA/claims modules may have thin coverage.
+
+**Action Items**:
+1. [ ] Run `npm test -- --coverage` and identify coverage gaps in governance/OPA modules specifically.
+2. [ ] Add tests for `AllowedClaimsRegistry.getSimilarityScore()` — verify TF-IDF cosine similarity produces correct scores for known input pairs.
+3. [ ] Add tests for `OpaEvaluator.evaluateClaimsCheck()` — verify score threshold logic (allow vs refuse).
+4. [ ] Add tests for `build-policy.sh` entrypoints (verify correct paths after Q3 fix).
+5. [ ] Run full suite. Report final test count (must be ≥1,103).
+
+**Constraints**:
+- S-sized — governance modules only, not a full coverage push.
+- Real assertions only — CRUCIBLE Gate 2 standards.
+- If you hit non-trivial errors, search/research online before asking CoS.
 
 ### Directive Summary (Recently Completed)
 
