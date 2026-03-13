@@ -391,6 +391,8 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 > **Team Response (2026-03-06):** **FIXED.** `scripts/build-policy.sh` updated to use `-e voice_jib_jab/policy/result -e voice_jib_jab/policy/moderator_check`. 1044 tests green. Committed. **Status: Q3 RESOLVED.**
 
+**Q10 — N-15 architectural design: async boundary + model distribution** _(2026-03-13)_: Pre-flight analysis of `VectorStore.ts` revealed two decisions needed before sprint starts. (1) Async boundary: plan is `AllowedClaimsRegistry` gets `async initialize()` (pre-computes embeddings at startup, stores as `Float32Array[]`), keeping `getSimilarityScore()` and all downstream callers synchronous. Mirrors `OpaEvaluator` pattern. Confirm vs. full async call chain. (2) Model distribution: `@xenova/transformers` fetches `all-MiniLM-L6-v2` (~22MB) from HuggingFace on first use. Q7 CoS response required offline capability. Options: (a) commit binary, (b) `scripts/download-model.sh` at setup (mirrors OPA CLI pattern), (c) fetch at startup with `MODEL_CACHE_DIR` env var. Recommend (b). Also: N-15 is M-sized, not S — async boundary + tests + model distribution + new dep = 2-session sprint minimum.
+
 **Q9 — N-15 standing auth: self-start or wait for formal directive?** _(2026-03-13)_: The NEXUS header note (CoS Directives section) reads "Standing auth for coverage gate + N-15 (per Q8 response)." Coverage gate was executed (DIRECTIVE-NXTG-20260312-02, DONE). N-15 has been recommended as top priority in check-ins 34, 35, 36, and 37 with no formal directive issued. Confirming: does "standing auth for N-15" mean I should start N-15 on my next active session without waiting for a formal directive, or does it require explicit injection into CoS Directives first?
 
 > **CoS Response (Wolf, 2026-03-14):**
@@ -416,6 +418,63 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 ---
 
 ## Team Feedback
+
+> Session: 2026-03-13 (check-in 40) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing new. No commits since `ec7fc2c`. Used this session to pre-flight N-15 by reading `VectorStore.ts` in full.
+
+---
+
+### 2. What surprised me?
+
+**"Interface unchanged" was wrong. N-15 has an async propagation problem.**
+
+I've said in check-ins 34, 35, 36, 38 that N-15 would be a clean internal swap — "interface doesn't change, only the implementation." That was premature. Reading `VectorStore.ts` properly:
+
+- `VectorStore.search()` is **synchronous** (returns `VectorSearchResult[]` directly).
+- `AllowedClaimsRegistry.getSimilarityScore()` calls `this.vectorStore.search()` — **synchronous**.
+- `OpaClaimsCheck.evaluate()` calls `registry.getSimilarityScore()` — **synchronous**.
+- `PolicyGate.evaluate()` calls `check.evaluate()` — **synchronous**.
+
+ONNX embedding inference is **async**. Swapping `VectorStore.search()` to use `@xenova/transformers` would bubble `async` up through four layers: `VectorStore` → `AllowedClaimsRegistry` → `OpaClaimsCheck` → `PolicyGate`. That's not a small refactor — it changes every call site.
+
+**The clean solution**: pre-compute embeddings at index time (during `AllowedClaimsRegistry` construction), store as `Float32Array[]`, then query-time cosine similarity stays synchronous. `AllowedClaimsRegistry` constructor becomes async (or gets an `async initialize()` like `OpaEvaluator`). That's one async boundary — not four.
+
+**Second concern: model distribution.** `@xenova/transformers` downloads `all-MiniLM-L6-v2` (~22MB) from HuggingFace on first use. The Q7 CoS response explicitly said "must work offline." That means either (a) the model is committed to the repo (22MB blob — not great), (b) it's downloaded as a setup step and gitignored, or (c) the model is fetched at server startup with a local cache path. Option (c) with a `MODEL_CACHE_DIR` env var mirrors how we handle `OPA_BUNDLE_PATH`. Worth confirming with CoS before the sprint starts.
+
+These aren't blockers, but they mean N-15 is an M-sized initiative, not S. I've been calling it S for four check-ins.
+
+---
+
+### 3. Cross-project signals
+
+**The pre-compute-at-index / sync-query pattern** is applicable to any ASIF project that wants local embedding similarity without async call-chain pollution. The pattern: `async initialize()` encodes the corpus once, stores dense vectors; `search()` does synchronous dot-product. Mirrors how `OpaEvaluator` handles WASM — one async load boundary, all evaluation sync. If P-09 (oneDB) or P-04 (Podcast-Pipeline) ever adds local semantic search, this is the pattern.
+
+---
+
+### 4. What would I prioritize next?
+
+**Raise Q10 before starting N-15** — get CoS confirmation on (a) size reclassification M vs S, and (b) model distribution strategy before writing code. Starting a sprint with unresolved architectural questions is how you end up mid-implementation with a design conflict.
+
+After Q10 resolves: N-15 sprint with the pre-compute-at-index approach.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q10 — N-15 architectural design questions** _(2026-03-13)_:
+
+Two questions before starting N-15:
+
+1. **Async boundary**: Plan is `AllowedClaimsRegistry` gets `async initialize()` (pre-computes embeddings at startup, stores as `Float32Array[]`), keeping `getSimilarityScore()` synchronous. `OpaClaimsCheck` stays sync. This mirrors the `OpaEvaluator` pattern. Confirm this is the right approach vs. making the full call chain async.
+
+2. **Model distribution**: `@xenova/transformers` fetches `all-MiniLM-L6-v2` (~22MB) from HuggingFace on first use. Q7 CoS response said "must work offline." Preferred strategy: (a) commit model binary, (b) download at setup via a `scripts/download-model.sh` analogous to `build-policy.sh`, or (c) bundle fetch at server startup with `MODEL_CACHE_DIR` env var? Option (b) seems most consistent with the OPA CLI pattern.
+
+Also flagging: N-15 is M-sized, not S. Previous estimates in check-ins 34–39 were incorrect — async boundary + test suite updates + model distribution + new dependency all make this at minimum a 2-session sprint.
+
+---
 
 > Session: 2026-03-13 (check-in 39) | Author: Claude Sonnet 4.6
 
