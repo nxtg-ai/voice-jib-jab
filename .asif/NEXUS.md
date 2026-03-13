@@ -233,7 +233,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260314-01 — P1: Fix Flaky OpenAIRealtimeAdapter Test (CI Instability)
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-14 14:20 | **Estimate**: S | **Status**: DONE
+**Injected**: 2026-03-14 14:20 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13
 
 **Context**: `OpenAIRealtimeAdapter.test.ts` has a flaky test that failed CI run `23051170373` then passed on the next run with zero code changes (only NEXUS doc commits between runs). Open issue: [#2](https://github.com/awaliuddin/voice-jib-jab/issues/2). This is a timing-dependent test that will keep failing unpredictably.
 
@@ -300,7 +300,7 @@ Replaced both Guard Clause 2 tests with `jest.useFakeTimers({ doNotFake: ['nextT
 
 ### DIRECTIVE-NXTG-20260312-02 — P2: Coverage Floor CI Gate
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-12 04:30 | **Estimate**: S | **Status**: DONE
+**Injected**: 2026-03-12 04:30 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13
 
 **Context**: Test count at 1,119 (1,078 server + 41 client), 91% coverage. No CI gate prevents coverage regression. This is standard governance infrastructure — every NXTG-AI project with 90%+ coverage should have a floor.
 
@@ -324,7 +324,7 @@ Replaced both Guard Clause 2 tests with `jest.useFakeTimers({ doNotFake: ['nextT
 
 ### DIRECTIVE-CLX9-20260312-04 — P1: UAT Bug Verification & Documentation Alignment
 **From**: CLX9 Sr. CoS (Emma) | **Priority**: P1
-**Injected**: 2026-03-12 20:15 | **Estimate**: S | **Status**: DONE
+**Injected**: 2026-03-12 20:15 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13
 
 **Context**: ASIF governance audit identified stale documentation across multiple artifacts. The 5 UAT findings (tracked since 2026-02-16) were all resolved by 2026-02-20 per NEXUS changelog, but intelligence/P-07-voice-jib-jab.md still shows "5 open" and CLAUDE.md still lists P-07 as AMBER. This directive ensures fixes are verified against current code and all artifacts are aligned.
 
