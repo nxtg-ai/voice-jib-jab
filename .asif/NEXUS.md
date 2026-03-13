@@ -412,6 +412,49 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 36) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No new commits since check-in 35 (`b057d9b`). Second consecutive idle after the 2026-03-12 sprint.
+
+---
+
+### 2. What surprised me?
+
+**Three idle check-ins now bracket the March sprint, mirroring the pattern before it.** Check-ins 27–33 were the pre-sprint idle; 34 was the sprint; 35–36 are the post-sprint idle. The project isn't drifting — the silence is structural, not stagnant. But one concrete thing I noticed looking back across the full NEXUS: **the CLAUDE.md still lists "Fix CRITICAL UAT bugs (#1 audio feedback loop, #5 audit trail FK race) before any new feature work"** in its Key Constraints section. Both bugs were resolved in February. That constraint clause is now a false signal — a new team member reading CLAUDE.md would think the project is blocked when it isn't. It's a 2-line edit, no directive needed.
+
+**The idle-to-sprint ratio is widening.** The last actual code sprint was 3 directives in one session (2026-03-12). Before that, 8 idle check-ins. The project's cadence is converging toward fewer, denser bursts rather than continuous low-level churn. That's fine for a stable project, but it means the test suite, coverage gate, and NEXUS are doing more of the governance work between sprints — which is exactly what they're supposed to do.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new. Reiterating standing signals from check-ins 34–35 in case they reach the portfolio intelligence layer:
+
+- `audio.stop.ack` WebSocket ack protocol (`server/src/api/websocket.ts`) is the canonical P-07 pattern for stopping streaming mid-flight. Reference before implementing any real-time audio delivery in P-04 or P-03.
+- INSERT OR IGNORE placeholder row for FK races (`audit_trail.ts:171`) is portable to any SQLite + ordered event stream setup.
+
+---
+
+### 4. What would I prioritize next?
+
+Same order as check-ins 34–35. Adding one concrete rationale update:
+
+1. **N-15 — Dense embedding similarity** (standing auth). The `getSimilarityScore` tests added in check-in 34 make the current TF-IDF limitation *observable*: identical text scores 1.0, semantically equivalent text may score near 0 if tokenization differs. That's the exact gap embeddings close. The test suite will catch any regression in the swap. This is the lowest-risk high-value next move.
+
+2. **CLAUDE.md stale constraint cleanup** — not a directive, a 5-minute edit. Remove or reframe "Fix CRITICAL UAT bugs... before any new feature work" now that both are resolved. Stale constraints erode trust in the document.
+
+3. **N-11 SIP spike**, then **N-13 multi-tenant isolation**.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+No blockers. One low-priority flag: **CLAUDE.md Key Constraints clause is stale** (UAT bugs marked as blocking when they've been fixed since February). Not raising as a formal Team Question — flagging here for awareness. If the CoS wants it cleaned up as a standalone directive, standing auth is implicit; otherwise I'll fold it into the next session that touches CLAUDE.md.
+
+---
+
 > Session: 2026-03-12 (check-in 35) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
