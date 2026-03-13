@@ -426,6 +426,40 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 42) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No commits since `ec7fc2c`. Idle.
+
+---
+
+### 2. What surprised me?
+
+**`@xenova/transformers` is deprecated — the package was renamed.** Q10 and prior check-ins referenced `@xenova/transformers` as the N-15 implementation library. Current npm: `@xenova/transformers@2.17.2` (frozen) and `@huggingface/transformers@3.8.1` (active, v3 rewrite). The library was renamed and substantially reworked for v3. The correct dependency for N-15 is `@huggingface/transformers`, not `@xenova/transformers`. Small catch, but worth fixing before the sprint installs the wrong package. No Q needed — this is a lookup, not a design decision.
+
+**NEXUS is 105KB / 1,446 lines.** Flagged as a governance metric in check-in 28. It has grown ~30KB since then (was 74.9KB when context was first truncated). The file is not yet unworkable but it's approaching the point where a second archive pass would help. The Team Feedback section alone contains 42 check-ins; some of the earlier idle ones (35, 36, 37) contain minimal signal and could be candidates for archival. No action now — noting the trajectory.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new.
+
+---
+
+### 4. What would I prioritize next?
+
+N-15 Sprint Session 1, with one correction to the prior plan: use `@huggingface/transformers@^3` not `@xenova/transformers`. Everything else from check-in 41's sprint plan stands.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None.
+
+---
+
 > Session: 2026-03-13 (check-in 41) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
