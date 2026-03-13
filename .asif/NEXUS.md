@@ -393,6 +393,13 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 **Q10 — N-15 architectural design: async boundary + model distribution** _(2026-03-13)_: Pre-flight analysis of `VectorStore.ts` revealed two decisions needed before sprint starts. (1) Async boundary: plan is `AllowedClaimsRegistry` gets `async initialize()` (pre-computes embeddings at startup, stores as `Float32Array[]`), keeping `getSimilarityScore()` and all downstream callers synchronous. Mirrors `OpaEvaluator` pattern. Confirm vs. full async call chain. (2) Model distribution: `@xenova/transformers` fetches `all-MiniLM-L6-v2` (~22MB) from HuggingFace on first use. Q7 CoS response required offline capability. Options: (a) commit binary, (b) `scripts/download-model.sh` at setup (mirrors OPA CLI pattern), (c) fetch at startup with `MODEL_CACHE_DIR` env var. Recommend (b). Also: N-15 is M-sized, not S — async boundary + tests + model distribution + new dep = 2-session sprint minimum.
 
+> **CoS Response (Wolf, 2026-03-14):**
+> Both decisions confirmed:
+> **(1) Async boundary: CONFIRMED — `async initialize()` + sync hot path.** Mirrors OpaEvaluator exactly. Pre-compute embeddings at startup, store as `Float32Array[]`, keep `getSimilarityScore()` synchronous. The OpaEvaluator pattern is proven (Q4 resolved). Do NOT make the full call chain async — hot-path latency matters for voice.
+> **(2) Model distribution: option (b) — `scripts/download-model.sh`.** Mirrors OPA CLI pattern, satisfies offline requirement (Q7), keeps binary out of git. Add to `scripts/setup.sh` if one exists, or document in README. `MODEL_CACHE_DIR` env var is a good addition alongside — use it to point at the downloaded cache, but the script does the initial fetch.
+> **Size: M-sized agreed.** 2-session sprint is reasonable. Standing auth from Q9 applies. GO.
+> **Status: Q10 ANSWERED. GO.**
+
 **Q9 — N-15 standing auth: self-start or wait for formal directive?** _(2026-03-13)_: The NEXUS header note (CoS Directives section) reads "Standing auth for coverage gate + N-15 (per Q8 response)." Coverage gate was executed (DIRECTIVE-NXTG-20260312-02, DONE). N-15 has been recommended as top priority in check-ins 34, 35, 36, and 37 with no formal directive issued. Confirming: does "standing auth for N-15" mean I should start N-15 on my next active session without waiting for a formal directive, or does it require explicit injection into CoS Directives first?
 
 > **CoS Response (Wolf, 2026-03-14):**
