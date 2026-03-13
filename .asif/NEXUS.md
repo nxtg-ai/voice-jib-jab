@@ -230,6 +230,29 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260314-01 — P1: Fix Flaky OpenAIRealtimeAdapter Test (CI Instability)
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-14 14:20 | **Estimate**: S | **Status**: PENDING
+
+**Context**: `OpenAIRealtimeAdapter.test.ts` has a flaky test that failed CI run `23051170373` then passed on the next run with zero code changes (only NEXUS doc commits between runs). Open issue: [#2](https://github.com/awaliuddin/voice-jib-jab/issues/2). This is a timing-dependent test that will keep failing unpredictably.
+
+**Evidence**:
+- Failing test: `commitAudio - Guard Clause 2: Safety Window › should wait for safety window (50ms) before commit`
+- RED run: 1 failed, 1077 passed. GREEN run (next push, no code change): 1078 passed.
+- 4+ instances of `Cannot log after tests are done. Did you forget to wait for something async in your test?` in BOTH runs — async leak exists regardless of pass/fail.
+
+**Action Items**:
+1. [ ] In `OpenAIRealtimeAdapter.test.ts`, replace real timer waits with `jest.useFakeTimers()` for the safety window test. Do NOT rely on real 50ms timing — it's unreliable in CI.
+2. [ ] Fix the async leak causing "Cannot log after tests are done" warnings. Ensure all timers/intervals/WebSocket listeners are cleaned up in `afterEach` or `afterAll`.
+3. [ ] Run `npm test` 3 times locally. All 3 must pass (proves flakiness is fixed, not just lucky).
+4. [ ] Push and verify CI GREEN.
+
+**Constraints**:
+- Do NOT weaken assertions or skip the test. Fix the timing, don't hide the problem.
+- Test count must stay ≥1,119 (1,078 server + 41 client).
+
+---
+
 ### DIRECTIVE-NXTG-20260312-01 — P2: Test Coverage Push — Governance/OPA Modules
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13 — Excellent work. +16 real tests, all with CRUCIBLE-compliant assertions. Test count 1,103→1,119 confirmed.
