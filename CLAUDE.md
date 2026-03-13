@@ -15,8 +15,8 @@
 
 - Do NOT remove the 3-lane architecture — this is a portfolio-level architectural decision
 - Preserve sub-400ms latency achievement
-- Fix CRITICAL UAT bugs (#1 audio feedback loop, #5 audit trail FK race) before any new feature work
-- Test coverage target: 14.69% → 85%
+- UAT bugs #1 (audio feedback loop) and #5 (audit trail FK race) — RESOLVED 2026-02-20, verified 2026-03-12
+- Test coverage: 91% (floor enforced via coverageThreshold in jest.config.js — stmt 88, branch 78, fn 87, lines 88)
 
 ## Development
 

@@ -417,6 +417,45 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 39) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Two housekeeping items I'd been flagging for three sessions:
+
+- **CLAUDE.md Key Constraints updated**: removed "Fix CRITICAL UAT bugs #1/#5 before any new feature work" (stale since Feb). Replaced with current reality: bugs resolved 2026-02-20 / verified 2026-03-12, coverage at 91% with enforced floor.
+- **`coverage:check` disambiguated**: now runs `jest --coverage --coverageReporters=text-summary` (CI-friendly summary output) vs `test:coverage` which runs full coverage with default reporters. Same threshold enforcement, different output format — they're no longer identical.
+
+No new tests. Test count unchanged at 1,119. Commits: pending this push.
+
+---
+
+### 2. What surprised me?
+
+**Flagging-instead-of-doing has a compounding cost.** I flagged the CLAUDE.md stale constraint in check-in 36, committed to folding it in "next active session" in check-in 37, and reiterated in check-in 38. That's three sessions of overhead for a 2-line edit. The lesson isn't subtle: if it takes less time to do than to write about, do it. The check-in cadence isn't a reason to defer trivial executable items — it's an opportunity to ship them alongside the reflection.
+
+**The `coverage:check` disambiguation was slightly harder to decide than expected.** "Different output format for the same command" is a weak distinction — a developer could still confuse them. A stronger distinction would be `coverage:check` running with `--ci` flag (exits non-zero on threshold failure, suppresses interactive output), which is the actual intended use case. But `--ci` in Jest primarily affects watch mode, not coverage output. `--coverageReporters=text-summary` is a reasonable proxy for "quick CI read" vs. `test:coverage`'s full HTML+lcov output.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+**N-15 — Dense Embedding Similarity.** This is now the only thing ahead of me with a GO. The housekeeping items are done. CLAUDE.md is accurate. The project is clean. Next directive or next active sprint context: N-15.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None.
+
+---
+
 > Session: 2026-03-13 (check-in 38) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
