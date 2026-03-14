@@ -470,6 +470,50 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 43) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**DIRECTIVE-NXTG-20260314-01 — Flaky test fix (DONE, CoS ACK'd)**
+
+- Replaced real 50ms timer waits in the "Guard Clause 2: Safety Window" tests with `jest.useFakeTimers({ doNotFake: ['nextTick'] })`. Both safety-window tests now run deterministically with no wall-clock timing.
+- Fixed 3 async leak root causes:
+  - `OpenAIRealtimeAdapter.test.ts` outer `afterEach`: moved `process.nextTick` drain unconditionally outside the `if (adapter.isConnected())` guard.
+  - `voice-pipeline.test.ts`: added `arbitrator.endSession()` as first line of `afterEach` to stop `LaneArbitrator`'s reflex/timeout timers.
+  - `voice-pipeline.test.ts`: wrapped `laneB.disconnect()` unconditionally in `afterEach` (try/catch) — cuts the reconnect→ping-interval cascade from the "recover from WebSocket reconnection" test.
+- Test count: **1,078 server + 41 client = 1,119** (unchanged, above floor).
+- Commits: `e8ef31e` (fix), `2fe6675` (CoS ACK).
+
+---
+
+### 2. What surprised me?
+
+**Residual "worker process has failed to exit gracefully" warning.** After the 3 root-cause fixes, `npm test` in `server/` still emits one "A worker process has failed to exit gracefully and has been force exited" at the end of the run. The directive's 3 items were necessary fixes — but not sufficient to eliminate all leaks. The suite exits quickly and all 1,078 tests pass, so this isn't a flakiness risk, but the leak is still there. Likely a fourth root cause in a test that spawns a long-lived timer without `--detectOpenHandles`. No ticket exists yet.
+
+**`npx jest` from the repo root parses TypeScript with Babel, not ts-jest.** Running `npx jest` at `/home/axw/projects/voice-jib-jab/` fails with "Missing semicolon" on TypeScript type annotations — because the root has no jest config pointing at `ts-jest`. All test commands must be run from `server/` or via `npm test` at root (which `cd server && npm run test`). This is a footgun if someone runs `npx jest` in the wrong directory. Low priority but worth knowing.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new beyond check-in 41's binary-at-boundary pattern.
+
+---
+
+### 4. What would I prioritize next?
+
+**N-15 Sprint Session 1.** All prerequisites remain satisfied: standing auth (Q9), architecture confirmed (Q10), correct package identified (`@huggingface/transformers`, not `@xenova/transformers`). The directive-fix work is done. Next active code session should start N-15.
+
+Second priority: investigate the fourth async leak root cause with `--detectOpenHandles`. Low urgency (no flakiness risk), but clean exits are a quality signal.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None.
+
+---
+
 > Session: 2026-03-13 (check-in 42) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
