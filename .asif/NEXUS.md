@@ -520,6 +520,55 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-14 (check-in 67) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**DIRECTIVE-NXTG-20260314-05 — N-15 Session 1 (DONE)**
+
+- `@huggingface/transformers` v3 installed in `server/`
+- `scripts/download-model.sh` — pre-downloads `Xenova/all-MiniLM-L6-v2` ONNX offline; mirrors `build-policy.sh` pattern; respects `MODEL_CACHE_DIR` and `EMBEDDING_MODEL` env vars
+- `AllowedClaimsRegistry.initialize()` — async, idempotent; dynamic-imports `@huggingface/transformers` (Jest-mockable); batch-encodes all claim texts; stores `Float32Array[]`
+- `AllowedClaimsRegistry.getEmbeddingSimilarityScore()` — async dense embedding cosine path; falls back to TF-IDF when not initialized
+- `AllowedClaimsRegistry.isEmbeddingInitialized` getter
+- `cosineSimilarity()` module-level helper
+- `npm audit fix` — `flatted` (high) fixed; `esbuild`/`minimatch` skipped (require `--force` breaking changes)
+- 4 new CRUCIBLE-compliant tests with deterministic mock embeddings — no network I/O in CI
+- Test count: **1,082 server + 41 client = 1,123** (+4 above previous floor)
+- Commits: `938afcc` (feat), `5589b78` (NEXUS ACK)
+
+---
+
+### 2. What surprised me?
+
+**The `PolicyCheck.evaluate()` sync constraint blocked the "swap getSimilarityScore() internals" action item.** The directive said to swap `getSimilarityScore()` to dense embeddings while keeping it synchronous "because embeddings are pre-computed." This is only half-true: claim embeddings CAN be pre-computed, but QUERY embeddings cannot — they require an async model inference call per query. The entire `PolicyGate` → `OpaClaimsCheck` → `getSimilarityScore()` chain is synchronous (no `async/await` in sight). Making `getSimilarityScore()` async propagates through `PolicyCheck.evaluate()`, `PolicyGate.evaluate()`, and all four check implementations. That's M-sized scope, not S-sized.
+
+The resolution (add `getEmbeddingSimilarityScore()` as a separate async method) is the right call for S-scope — the dense embedding infra is now wired and tested, and the OpaClaimsCheck wiring is a clean, bounded Phase 2 task.
+
+**`@huggingface/transformers` v3 pipeline API accepts both string and string[] for batch encoding.** This allowed a single batch encode of all claim texts in `initialize()` — one pipeline call instead of N calls. More efficient than the OPA pattern (which loads one bundle). Good to know for any project adding local inference.
+
+---
+
+### 3. Cross-project signals
+
+**The `PolicyCheck` sync constraint is a portfolio-level pattern to document.** Any ASIF project using a synchronous policy/check interface that wants to add async ML inference will hit the same wall. The solution (pre-compute at startup, expose async path separately, wire in Phase 2) is now a proven pattern from this project. Worth a portfolio standards note.
+
+**`scripts/download-model.sh` is now the second setup script alongside `build-policy.sh`.** The pattern is stable: check cache → download binary/model → verify. If other projects (P-04 podcast pipeline, P-09 oneDB) add local inference, they can copy this script structure directly.
+
+---
+
+### 4. What would I prioritize next?
+
+**N-15 Phase 2**: Make `PolicyCheck.evaluate()` async → update `OpaClaimsCheck.evaluate()` to call `getEmbeddingSimilarityScore()` → update `PolicyGate.evaluate()` → update all 4 check implementations. This is the wiring that completes N-15 and delivers dense embeddings into the live policy gate. M-sized, 1-2 session sprint.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 (Dependabot) and Q12 (branch protection) still pending — raised in check-ins 62 and 64 respectively. No new questions.
+
+---
+
 > Session: 2026-03-14 (check-in 66) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
