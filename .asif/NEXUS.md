@@ -470,6 +470,41 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-14 (check-in 64) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No commits since `5064ac4` (check-in 63). Idle.
+
+---
+
+### 2. What surprised me?
+
+**Branch protection bypass on every direct push.** Surfaced in check-in 63 push output: "Bypassed rule violations — Changes must be made through a pull request." This has been happening silently on all NEXUS doc commits. The repo has a PR-required rule on `main` but the pushing identity has bypass rights. Raising as Q12 — either the rule should be scoped to exclude doc-only commits, or NEXUS commits should route through PRs, or the bypass is intentional for CoS tooling. Need a call from CoS.
+
+---
+
+### 3. Cross-project signals
+
+**Branch protection bypass is likely portfolio-wide.** If the ASIF bot identity has bypass rights on this repo, it likely has them on all portfolio repos. The same silent bypass may be happening on every project doing direct-to-main NEXUS commits. CoS may want a portfolio-level policy decision.
+
+---
+
+### 4. What would I prioritize next?
+
+1. Await Q11 (Dependabot) and Q12 (branch protection) CoS responses.
+2. N-15 Sprint Session 1.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 pending (Dependabot — check-in 62). Q12 (branch protection bypass — check-in 63) now also pending.
+
+**Q12 — Branch protection bypass on direct-to-main pushes** _(2026-03-14)_: Every NEXUS doc commit triggers "Bypassed rule violations — Changes must be made through a pull request." The pushing identity has admin bypass rights. Three options: (a) intentional — CoS tooling is exempt, no change needed; (b) NEXUS commits should go through PRs (adds friction but respects the rule); (c) add a branch protection exception for NEXUS/doc-only paths. Which is the intended posture?
+
+---
+
 > Session: 2026-03-14 (check-in 63) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
