@@ -231,6 +231,27 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260314-05 — P1: N-15 Sprint Session 1 — Dense Embedding Similarity
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-14 | **Estimate**: S | **Status**: PENDING
+
+**Context**: N-15 has been the team's top priority for 20+ check-ins. Standing auth confirmed (Q8/Q9). Architecture confirmed (Q10): async `initialize()` at startup, sync `getSimilarityScore()` at runtime, `scripts/download-model.sh` for model distribution. Q11 (Dependabot triage) and Q12 (branch protection) both answered. No blockers remain. This directive formalizes what standing auth already authorized.
+
+**Action Items**:
+1. [ ] **Install `@huggingface/transformers`** (v3+, not `@xenova/transformers`). Add `scripts/download-model.sh` to fetch `all-MiniLM-L6-v2` ONNX (~22MB) on first setup.
+2. [ ] **Add `async initialize()` to `AllowedClaimsRegistry`** — pre-compute embeddings for all registered claims at startup. Store as `Float32Array[]`. Mirror the `OpaEvaluator.initialize()` pattern.
+3. [ ] **Swap `getSimilarityScore()` internals** from TF-IDF cosine to dense embedding cosine similarity. Keep the method signature synchronous (embeddings are pre-computed).
+4. [ ] **Run `npm audit`** and apply `npm audit fix` for the 3 Dependabot vulns (Q11). If any require breaking changes, document and skip.
+5. [ ] Tests: existing `getSimilarityScore()` tests must still pass. Add at least 3 new tests proving semantic similarity ("response is instant" ~ "latency is near zero" should score higher than TF-IDF). Test count must stay >=1,119.
+6. [ ] Commit with message: `feat: N-15 dense embedding similarity (DIRECTIVE-NXTG-20260314-05)`
+
+**Constraints**:
+- S-sized (Session 1 scope). If async propagation requires touching more than `AllowedClaimsRegistry` + `OpaClaimsCheck`, stop and report — that makes it M-sized and needs a Phase 2 directive.
+- Model must work offline. No runtime API calls to HuggingFace or OpenAI for embeddings.
+- `OpaClaimsCheck` interface must not change — the swap is internal to `getSimilarityScore()`.
+
+---
+
 ### DIRECTIVE-NXTG-20260314-01 — P1: Fix Flaky OpenAIRealtimeAdapter Test (CI Instability)
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-14 14:20 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13
