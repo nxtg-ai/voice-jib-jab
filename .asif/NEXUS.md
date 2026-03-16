@@ -518,7 +518,72 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ---
 
+## Self-Improvement Log
+
+### CRUCIBLE Gates 1-7 Audit — 2026-03-16
+
+**Trigger**: Idle Time Protocol (no pending directives). Full CRUCIBLE self-audit per protocol.
+**Test baseline**: 1082 server + 41 client = **1123 total** (floor: 1119 ✅ +4 headroom)
+**Coverage** (server, post-N-15): Stmts 91.07% | Branches 81.70% | Fns 89.70% | Lines 91.46% — all above thresholds ✅
+
+| Gate | Name | Result | Evidence |
+|------|------|--------|----------|
+| G1 | xfail Governance | ✅ PASS | Zero `.skip`, `xfail`, `.todo`, `xit`, `xdescribe` in test files. "skipped" references are event type strings only. |
+| G2 | Non-Empty Result Assertions | ✅ PASS | Integration tests use state-machine assertions (`toBe("B_PLAYING")`), `.toContain()`, `.objectContaining()`. No hollow `isinstance(result, list)` patterns found. |
+| G3 | Mock Drift Detection | ✅ PASS | Only 1 mock in integration tests: `jest.mock("ws")` in `voice-pipeline.test.ts:21`. Inline justification comment present: "MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI". No commit modifies mock + implementation simultaneously. |
+| G4 | Test Count Delta Gate | ✅ PASS | Current 1123 = last committed 1123 (N-15 delivery, `938afcc`). Delta: 0. |
+| G5 | Silent Exception Audit | ✅ NEAR-PASS | 20+ catch blocks reviewed. 19/20 log errors or re-throw. 1 accepted silent catch: `OpenAIRealtimeAdapter.ts:517` — `catch { // Best-effort — connection may already be closing }`. This is WebSocket `close()` during graceful teardown; failure is irrelevant when already disconnecting. Comment explains intent. Acceptable. |
+| G6 | Mutation Testing | ⚠️ GAP | Stryker not installed. 1082 server tests exceed the 500-test threshold requiring this gate per protocol. No prior session has run mutation testing on this codebase. Flagged for future directive. |
+| G7 | Spec-Test Traceability | ⚠️ PARTIAL | `lane-c-policy.test.ts` has T-012 trace in describe name. `voice-pipeline.test.ts` has comprehensive header doc but no `NEXUS N-XX AC-Y` markers. Per protocol: "apply to new integration tests only — no retrofit burden." N-14/N-15 additions were unit tests (exempt). No regression vs. prior state. |
+
+**Additional — Gate 8.1 (Coverage Omit Audit)**:
+- `!src/**/*.d.ts` — standard declaration file exclusion. No inline comment. Low severity.
+- `!src/index.ts` — entry point with bootstrap wiring only (express, server, OPA init). No business logic. Omission appropriate; inline comment missing from jest.config.js.
+- **Action taken**: None (both omissions are justified; commentary in this log is the audit trail).
+
+**Summary**: 5/7 gates fully pass. 2 gaps (G6 mutation testing, G7 partial traceability). No P0 issues. No hollow assertions found. No silent swallowed errors in business logic paths.
+
+---
+
 ## Team Feedback
+
+> Session: 2026-03-16 (check-in 173) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+CRUCIBLE Gates 1-7 self-audit (Idle Time Protocol). Results written to Self-Improvement Log above. No code changes — audit only. Test suite confirmed: **1123/1123 passing** (1082 server + 41 client). Coverage: Stmts 91.07%, Branches 81.70%, Fns 89.70%, Lines 91.46% — all above CI thresholds.
+
+---
+
+### 2. What surprised me?
+
+G5 silent exception audit found 20+ catch blocks to review — all accounted for. The one bare `catch {}` (OpenAIRealtimeAdapter teardown) is genuinely best-effort and has a justification comment. Clean result.
+
+G6 (mutation testing) has never been run on this project despite 1082 tests exceeding the 500-test threshold. This is the largest structural gap — we have high line coverage but no mutation score to prove the tests actually detect regressions.
+
+---
+
+### 3. Cross-project signals
+
+None new. G6 gap (mutation testing not run) likely applies across the portfolio — this may be a portfolio-wide blind spot worth a CoS directive.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **G6 gap closure**: Install Stryker, run mutation testing on critical paths (PolicyGate, AllowedClaimsRegistry, LaneArbitrator). Establish baseline mutation score.
+2. **N-15 Phase 2**: Async `PolicyCheck.evaluate()` interface — enables OpaClaimsCheck to use dense embedding path (currently blocked on sync interface).
+3. **NEXUS archival**: 5 completed directives in active section; archive to reduce NEXUS size.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 and Q12 still pending (no CoS response yet). No new blockers.
+
+**New question Q13 — G6 mutation testing authorization**: CRUCIBLE Gate 6 is triggered (1082 > 500 tests). Running Stryker on critical paths (PolicyGate, AllowedClaimsRegistry, LaneArbitrator — ~300 LOC combined) would take an estimated S-M session. Requesting standing auth to install `@stryker-mutator/core @stryker-mutator/jest-runner` and run mutation testing on those 3 files. Target: establish baseline mutation score; flag any tests below 40% threshold.
+
+---
 
 > Session: 2026-03-16 (check-in 172) | Author: Claude Sonnet 4.6
 
