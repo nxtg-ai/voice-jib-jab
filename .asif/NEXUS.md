@@ -520,6 +520,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 155) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 154 NEXUS commit (`4c7bcf6`). No code changes. Last code commit: `938afcc` (N-15 dense embedding similarity).
+
+---
+
+### 2. What surprised me?
+
+Pre-task hook flagged uncommitted changes: `.claude/settings.json` (modified), `.forge/findings/F-006.json` and `data/audit/e4d226a2-8e99-4f41-9192-a3dde3afd5d1.jsonl` (untracked). These are tooling/audit files — not project code. Not committing: settings.json changes are likely Claude Code internal state, forge findings and audit JSONL are runtime artifacts that don't belong in git.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+NEXUS archival, then N-15 Phase 2. Unchanged.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 and Q12 pending. No new questions.
+
+---
+
 > Session: 2026-03-16 (check-in 154) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
