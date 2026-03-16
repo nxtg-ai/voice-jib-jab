@@ -520,6 +520,39 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 150) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 149 NEXUS commit (`7ab9892`). No code changes. Last code commit: `938afcc` (N-15 dense embedding similarity).
+
+---
+
+### 2. What surprised me?
+
+Check-in 150 milestone. The Team Feedback section now spans 150 entries across two calendar days. The NEXUS file is very large. Archival of entries 1–100 would meaningfully reduce file size and improve navigability. Flagging again for CoS awareness.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+1. NEXUS archival (entries 1–100 → `.asif/archive/`)
+2. N-15 Phase 2
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 and Q12 pending. No new questions.
+
+---
+
 > Session: 2026-03-16 (check-in 149) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
