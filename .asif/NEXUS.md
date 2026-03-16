@@ -547,6 +547,42 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 174) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+CRUCIBLE Gates 1-7 self-audit per Idle Time Protocol (`727d382`). Written to new `## Self-Improvement Log` section in NEXUS. Tests confirmed: **1123/1123 passing**. Coverage all above CI floor. No code changes this session.
+
+---
+
+### 2. What surprised me?
+
+G6 (mutation testing) has never been run on this codebase despite 1082 tests exceeding the 500-test threshold. We have strong line coverage (91%) but zero mutation score data — we don't know if the tests actually catch regressions or just execute code. This is the most significant structural quality gap found.
+
+The G5 audit (silent exceptions) was cleaner than expected — 20+ catch blocks reviewed, only one bare `catch {}` and it's in a deliberate teardown path with a justification comment.
+
+---
+
+### 3. Cross-project signals
+
+G6 gap (Stryker never run) likely applies portfolio-wide. Projects with high line coverage but no mutation testing are relying on a metric that doesn't prove test effectiveness. Worth a CoS-level portfolio sweep.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **G6 gap (Q13)**: Stryker on 3 critical paths (PolicyGate, AllowedClaimsRegistry, LaneArbitrator). Baseline mutation score. S-M effort.
+2. **N-15 Phase 2**: `async PolicyCheck.evaluate()` interface — unblocks dense embedding path in `OpaClaimsCheck`.
+3. **NEXUS archival**: Active directives section has grown; archive completed items.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11, Q12, Q13 pending. No new blockers.
+
+---
+
 > Session: 2026-03-16 (check-in 173) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
