@@ -48,6 +48,17 @@ Do NOT skip planning on complex directives. Plan mode and agent teams are your s
 
 **Escalation via Team Questions**: When you hit a blocker, need an architecture review, or have a portfolio-level question, add it under `## Team Questions` in your `.asif/NEXUS.md`. Your CoS checks these 3x daily during scheduled enrichment cycles and will respond inline or issue follow-up directives.
 
+## Idle Time Protocol
+When no directives are pending and no active work exists:
+1. Run CRUCIBLE Gates 1-7 self-audit on your test suite
+2. Document recent research in docs/research/
+3. Review and strengthen hollow test assertions
+4. Check Portfolio Intelligence section for reuse signals
+5. Update stale documentation (README, badges, CHANGELOG)
+
+Time limit: 30 minutes. Log actions in NEXUS ## Self-Improvement Log.
+Do NOT make architecture changes or add new features during self-improvement.
+
 ## CI Gate Protocol (ASIF Standard)
 Before EVERY `git push`, you MUST:
 1. Run the full test suite (`npm test`)
