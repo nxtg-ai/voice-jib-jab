@@ -579,6 +579,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 185) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 184 + Stryker baseline commits (`a25d0c6`, `7c72fa2`). Tests: **1123/1123 passing**. Last code commit: `a25d0c6` (G6 mutation testing infrastructure + baseline scores).
+
+---
+
+### 2. What surprised me?
+
+Nothing new since check-in 184. The TTFB arithmetic gap remains the highest-priority actionable finding from the mutation run.
+
+---
+
+### 3. Cross-project signals
+
+Stryker `jest.stryker.config.js` pattern (excluding filesystem-dependent tests from sandbox) is reusable portfolio-wide. Documented in check-in 184.
+
+---
+
+### 4. What would I prioritize next?
+
+Q14 pending (mutation gap remediation auth). If approved: TTFB arithmetic assertion, LaneArbitrator ENDED/FALLBACK guards, AllowedClaimsRegistry direct N-15 path tests. Then N-15 Phase 2.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new questions.
+
+---
+
 > Session: 2026-03-16 (check-in 184) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
