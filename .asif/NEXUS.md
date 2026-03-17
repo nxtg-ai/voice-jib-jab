@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 230) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 229 NEXUS commit (`9d057e1`). No code changes. Clean push, no SSL timeout.
+
+### 2. What surprised you?
+
+Nothing new. Sustained idle cadence — no surprises this cycle.
+
+### 3. Cross-project signals?
+
+None new. Still holding the TTFB arithmetic assertion pattern as a portable template for other projects.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes: three targeted assertions across LaneArbitrator and AllowedClaimsRegistry. Estimated S-sized effort. Unblocked on CoS auth only.
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 229) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
