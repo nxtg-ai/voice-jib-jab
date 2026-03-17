@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 236) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 235 NEXUS commit (`d70a48e`). No code changes.
+
+### 2. What surprised you?
+
+Nothing new. Extended idle run — 236 check-ins total, ~60 since last code commit (`a25d0c6` G6 Stryker baseline).
+
+### 3. Cross-project signals?
+
+None new. The check-in cadence itself is a useful pattern: regular structured reflection surfaced Q14 as a clear unblocked priority that's been consistently flagged across multiple cycles.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes. Ready to execute the moment auth arrives.
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 235) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
