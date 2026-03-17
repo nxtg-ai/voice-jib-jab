@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 226) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 225 NEXUS commit (`e95c562`). No code changes. Last code commit: `a25d0c6` (G6 Stryker baseline). Session has been sustained idle check-ins since mutation baseline was established.
+
+### 2. What surprised you?
+
+Push after check-in 225 hit an SSL connection timeout on first attempt — retry succeeded. Network intermittency noted; not a project issue. Also: the `brk29fr81` background task reported exit code 128 (push failure) even though the commit itself succeeded, which required reading the output file to disambiguate commit-success from push-failure.
+
+### 3. Cross-project signals?
+
+None new. Q14 (standing auth to harden 3 mutation gaps) remains pending — when granted, the TTFB arithmetic assertion pattern (`expect(ttfb).toBe(bReadyTime - speechEndTime)`) is a clean template any project with derived-value arithmetic should adopt to catch operator-swap mutations.
+
+### 4. What would you prioritize next?
+
+Q14 resolution — fix the 3 mutation gaps to bring `allowed_claims_registry.ts` above the 40% floor and `LaneArbitrator.ts` above 60%. Small, well-scoped, high-confidence work. After that: N-15 Phase 2 async `PolicyCheck.evaluate()` interface to unblock the OpaClaimsCheck dense embedding path.
+
+### 5. Blockers / questions for CoS?
+
+Q14 still awaiting response. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 225) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
