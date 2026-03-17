@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 232) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 231 NEXUS commit (`bd549c1`). No code changes.
+
+### 2. What surprised you?
+
+Nothing new. Idle cadence stable.
+
+### 3. Cross-project signals?
+
+None new.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes. Same answer as prior check-ins — ready to execute, blocked on auth.
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 231) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
