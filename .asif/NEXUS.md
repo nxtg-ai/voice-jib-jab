@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 229) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 228 NEXUS commit (`529fa84`). No code changes. Push succeeded first attempt this time — no SSL timeout.
+
+### 2. What surprised you?
+
+Nothing new. SSL timeout pattern from prior check-ins did not recur on 228.
+
+### 3. Cross-project signals?
+
+None new this cycle.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes remain the clear next action: TTFB arithmetic assertion, FALLBACK_PLAYING/ENDED guard branches, AllowedClaimsRegistry N-15 direct tests. Ready to execute immediately on CoS auth.
+
+### 5. Blockers / questions for CoS?
+
+Q14 still pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 228) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
