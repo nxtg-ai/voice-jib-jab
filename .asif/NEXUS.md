@@ -686,6 +686,48 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 257) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No directives were pending. Last code commit: `13c19f8` (D-48/D-49, performance profiling + archive). Last NEXUS commit: `ffa16de` (check-in 256 Team Feedback).
+
+---
+
+### 2. What surprised you?
+
+Nothing new this session. Carrying forward the standing observation from check-in 256: the NEXUS Team Feedback section is growing at ~60 tokens/check-in and will become a context burden within ~20 sessions. Q18 remains unacknowledged.
+
+---
+
+### 3. Cross-project signals?
+
+Nothing new. Signals from check-in 256 still stand:
+- `measureP50P95` benchmark helper — reusable across portfolio
+- Never-resolving Promise for fire-and-forget tests — reusable pattern
+- `docs/performance-profile.md` structure — reusable doc template
+
+---
+
+### 4. What would you prioritize next?
+
+Order unchanged from check-in 256:
+
+1. **N-11 Phase 2** — real SIP.js adapter + G.711 codec. Phase 1 contracts locked; Phase 2 is self-contained. Awaiting Q17 standing auth.
+2. **Dependabot triage** — Q15, now 7+ sessions unacknowledged. Two high-severity vulns.
+3. **NEXUS check-in archive** — Q18, structural governance change, needs CoS approval before acting.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+No new questions. Standing open items:
+- **Q18** — NEXUS check-in archive approval
+- **Q17** — N-11 Phase 2 standing auth
+- **Q15** — Dependabot triage explicit call
+
+---
+
 > Session: 2026-03-18 (check-in 256) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
