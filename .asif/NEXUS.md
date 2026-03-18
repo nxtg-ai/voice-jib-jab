@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-79 — P1: WebSocket Client SDK + Integration Guide
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 16:15 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **TypeScript SDK** — `@nxtg/vjj-client` wrapping WebSocket protocol. Connect, send audio, receive responses, handle Lane C events.
+2. [ ] **Integration guide** — `docs/integration-guide.md`: how to embed VJJ voice agent in a web app.
+3. [ ] Tests for SDK.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-80.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-80 — P2: Monitoring Dashboard — Session Metrics
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 16:15 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] `/metrics` endpoint — active sessions, avg latency, policy decisions/sec, tenant breakdown.
+2. [ ] Health dashboard HTML page.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-70 — P1: Docker Compose + Production Config
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 15:40 | **Estimate**: M | **Status**: DONE
