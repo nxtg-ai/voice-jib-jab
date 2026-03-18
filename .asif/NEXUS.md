@@ -231,6 +231,50 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-09 — P1: N-12 Ticketing Integration via MCP
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 10:00 | **Estimate**: M | **Status**: PENDING
+
+**Context**: 15/15 SHIPPED. Docs done. CRUCIBLE clean. N-12 is the next initiative — MCP-based ticketing integration for enterprise support workflows. When a voice agent detects an issue, it creates a ticket.
+
+**Action Items**:
+1. [ ] **Research MCP ticketing integration** — assess Linear, Jira, and GitHub Issues as targets. Which has the best MCP server?
+2. [ ] **Implement MCP client** in the voice agent — connect to a ticketing MCP server. Create tickets when `ControlEngine` detects escalation (Lane C `escalate_to_human` verdict).
+3. [ ] **Ticket schema** — incident summary, transcript excerpt, severity, customer context. Auto-populated from voice session.
+4. [ ] **Tests**: 2,251 → 2,300+ target. Mock MCP server for testing.
+5. [ ] Update N-12 status to BUILDING in Executive Dashboard.
+
+**Constraints**:
+- USE PLAN MODE — M-sized, new integration pattern
+- Start with ONE ticketing provider, not all three
+- MCP client pattern should be reusable for other integrations
+
+**CHAIN**: When you complete this, immediately start DIRECTIVE-NXTG-20260318-10 below.
+
+**Response** (filled by team):
+>
+
+---
+
+### DIRECTIVE-NXTG-20260318-10 — P2: N-13 Multi-Tenant Isolation Research
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 10:00 | **Estimate**: S | **Status**: PENDING
+
+**Context**: Chain directive. After N-12, research N-13 Multi-Tenant Isolation.
+
+**Action Items**:
+1. [ ] **Research doc** at `docs/multi-tenant-research.md` — how to isolate voice sessions per tenant: separate ChromaDB collections, OPA policy namespacing, session-scoped claims registries.
+2. [ ] **Architecture proposal** — Mermaid diagram showing tenant isolation boundaries.
+3. [ ] Update N-13 status to RESEARCHED in Executive Dashboard.
+
+**Constraints**:
+- Research only — no implementation. This informs the next directive.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-07 — P2: Documentation + Architecture Diagram + Changelog
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-03-18 09:00 | **Estimate**: S | **Status**: DONE
