@@ -40,11 +40,24 @@ export const ALPHA_DISALLOWED_PATTERNS = [
   /no side effects/i,
 ];
 
+/**
+ * String-based disallowed patterns for AllowedClaimsRegistry (substring match).
+ * Mirrors ALPHA_DISALLOWED_PATTERNS as plain strings for registry compatibility.
+ */
+export const ALPHA_DISALLOWED_PATTERN_STRINGS = [
+  "guarantees a cure",
+  "guarantee a cure",
+  "cures all",
+  "cure all",
+  "100% effective",
+  "no side effects",
+];
+
 /** Pre-built claims registry for TENANT_DEMO_ALPHA */
 export function buildAlphaClaimsRegistry(): AllowedClaimsRegistry {
   return new AllowedClaimsRegistry({
     claims: ALPHA_CLAIMS,
-    disallowedPatterns: ALPHA_DISALLOWED_PATTERNS,
+    disallowedPatterns: ALPHA_DISALLOWED_PATTERN_STRINGS,
     enableFileLoad: false,
   });
 }
@@ -87,11 +100,23 @@ export const BETA_DISALLOWED_PATTERNS = [
   /cannot lose/i,
 ];
 
+/**
+ * String-based disallowed patterns for AllowedClaimsRegistry (substring match).
+ * Mirrors BETA_DISALLOWED_PATTERNS as plain strings for registry compatibility.
+ */
+export const BETA_DISALLOWED_PATTERN_STRINGS = [
+  "guaranteed returns",
+  "guaranteed return",
+  "risk-free investment",
+  "risk free investment",
+  "cannot lose",
+];
+
 /** Pre-built claims registry for TENANT_DEMO_BETA */
 export function buildBetaClaimsRegistry(): AllowedClaimsRegistry {
   return new AllowedClaimsRegistry({
     claims: BETA_CLAIMS,
-    disallowedPatterns: BETA_DISALLOWED_PATTERNS,
+    disallowedPatterns: BETA_DISALLOWED_PATTERN_STRINGS,
     enableFileLoad: false,
   });
 }

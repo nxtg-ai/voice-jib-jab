@@ -242,28 +242,37 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-130 — P1: Analytics Pipeline — Session Metrics + Quality Scores
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 21:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 21:00 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Session metrics** — per-session: duration, turns, policy decisions, escalations, latency percentiles.
-2. [ ] **Quality score** — compute per-session quality (response relevance, policy compliance rate, latency SLA).
-3. [ ] **`GET /analytics/sessions`** — aggregate metrics. Filter by tenant, date range.
-4. [ ] Tests.
+1. [x] **Session metrics** — per-session: duration, turns, policy decisions, escalations, latency percentiles.
+2. [x] **Quality score** — compute per-session quality (response relevance, policy compliance rate, latency SLA).
+3. [x] **`GET /analytics/sessions`** — aggregate metrics. Filter by tenant, date range.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-131.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Three files:
+> - `AnalyticsService.ts` — derives metrics from `SessionRecorder.listRecordings()` (no separate store); quality score = latency SLA (30pts, <60s→30/60-120s→20/>120s→10/null→20) + compliance rate (40pts, allow+rewrite/total) + engagement (30pts, min(turns/5,1)×30); `getAggregateMetrics(filter?)` supports tenantId/date/limit/offset filtering, tenantBreakdown, decisionBreakdown, escalationRate
+> - `api/analytics.ts` — `GET /analytics/sessions` (filtered+paginated), `GET /analytics/sessions/:id`, `GET /analytics/summary`
+> - `AnalyticsService.test.ts` — 31 tests: quality score edge cases, filter/pagination, aggregation math, HTTP endpoints
+> **Tests: 2637/2637, 84 suites, 0 failures.**
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-131 — P2: Automated Regression Test Suite
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 21:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 21:00 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Regression fixtures** — 10 known-good voice session transcripts with expected policy decisions.
-2. [ ] **Regression runner** — replay fixtures, compare policy outputs, flag regressions.
+1. [x] **Regression fixtures** — 10 known-good voice session transcripts with expected policy decisions.
+2. [x] **Regression runner** — replay fixtures, compare policy outputs, flag regressions.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Two files:
+> - `regressionFixtures.ts` — 10 fixtures: REG-001–010 across Alpha (medical/strict) + Beta (fintech/permissive) tenants, covering allow/rewrite/escalate decisions with reason code assertions. Also fixed `buildAlphaClaimsRegistry()`/`buildBetaClaimsRegistry()` in demoFixtures.ts — disallowedPatterns must be `string[]` not `RegExp[]` (ClaimsChecker uses substring `.includes()` matching)
+> - `RegressionRunner.test.ts` — 16 tests: 10 policy decision assertions (one per fixture, using `it.each`) + 6 metadata validations (unique IDs, valid decisions, count=10, tag format). Key insight: `ClaimsChecker` returns `rewrite` (not `refuse`) for disallowed patterns — only `OpaClaimsCheck` returns `refuse`. Fixtures encode the correct runtime-verified behavior.
+> **Tests: 2637/2637, 84 suites, 0 failures.**
 
 ---
 

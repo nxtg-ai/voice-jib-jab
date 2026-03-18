@@ -14,6 +14,8 @@ import { SessionRecorder } from "./services/SessionRecorder.js";
 import { createSessionsRouter } from "./api/sessions.js";
 import { createAdminRouter } from "./api/admin.js";
 import { createVoiceRouter } from "./api/voice.js";
+import { AnalyticsService } from "./services/AnalyticsService.js";
+import { createAnalyticsRouter } from "./api/analytics.js";
 import { tenantRegistry, initTenantRegistry } from "./services/TenantRegistry.js";
 import { systemConfigStore } from "./services/SystemConfigStore.js";
 import { VoiceTriggerService } from "./services/VoiceTriggerService.js";
@@ -192,6 +194,10 @@ export const sessionRecorder = new SessionRecorder({
 // Mount sessions API
 app.use("/sessions", createSessionsRouter(sessionRecorder));
 
+// ── Analytics Service + API ───────────────────────────────────────────
+const analyticsService = new AnalyticsService(sessionRecorder);
+app.use("/analytics", createAnalyticsRouter(analyticsService));
+
 // ── Tenant Registry + Admin API ──────────────────────────────────────
 initTenantRegistry(resolve(dirname(config.storage.databasePath), "tenants.json"));
 app.use("/admin", createAdminRouter(tenantRegistry, systemConfigStore));
@@ -239,6 +245,7 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Metrics: http://localhost:${config.port}/metrics`);
     console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard`);
     console.log(`[Server] Sessions: http://localhost:${config.port}/sessions`);
+    console.log(`[Server] Analytics: http://localhost:${config.port}/analytics/sessions`);
     console.log(`[Server] Admin API: http://localhost:${config.port}/admin`);
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger\n`);
 
