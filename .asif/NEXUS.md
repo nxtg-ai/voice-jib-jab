@@ -235,6 +235,39 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-36 — P1: N-13 Phase 3 — ChromaDB Collection-Per-Tenant
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 13:00 | **Estimate**: M | **Status**: PENDING
+
+**Context**: N-13 Phases 1+2 SHIPPED. Phase 3: ChromaDB collection-per-tenant for isolated vector stores.
+
+**Action Items**:
+1. [ ] **VectorStore interface swap** — `getCollectionForTenant(tenantId)` returns tenant-scoped ChromaDB collection.
+2. [ ] **Migration path** — existing shared collection becomes `default` tenant.
+3. [ ] **Embedding isolation test** — prove tenant A's embeddings invisible to tenant B.
+4. [ ] Tests: +30 new isolation tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-37.
+
+**Response** (filled by team):
+>
+
+---
+
+### DIRECTIVE-NXTG-20260318-37 — P2: Full Multi-Tenant E2E Integration Test
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 13:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Full E2E: two tenants, different claims/policies/embeddings. Verify complete isolation.
+2. [ ] Performance benchmark: single vs multi-tenant overhead.
+3. [ ] Update N-13 to SHIPPED if all 3 phases pass.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-26 — P1: N-13 Phase 1 — Per-Tenant AllowedClaimsRegistry
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 12:00 | **Estimate**: S | **Status**: DONE
