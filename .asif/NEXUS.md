@@ -233,6 +233,43 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-26 — P1: N-13 Phase 1 — Per-Tenant AllowedClaimsRegistry
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 12:00 | **Estimate**: S | **Status**: PENDING
+
+**Context**: N-13 research done. Phase 1 = lowest-risk isolation: per-tenant `AllowedClaimsRegistry` via `ControlEngineConfig`. Already injectable.
+
+**Action Items**:
+1. [ ] **`tenantId` field** on `ControlEngineConfig` — optional string, defaults to `"default"`.
+2. [ ] **Per-tenant claims registry** — factory/map pattern: `getRegistryForTenant(tenantId)` returns isolated `AllowedClaimsRegistry` instance.
+3. [ ] **Wire into ControlEngine** — use tenant registry instead of shared singleton.
+4. [ ] **Tests**: Verify two tenants get isolated claim sets. 2,251 → 2,280+ target.
+5. [ ] Update N-13 status to BUILDING.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-27.
+
+**Response** (filled by team):
+>
+
+---
+
+### DIRECTIVE-NXTG-20260318-27 — P2: N-13 Phase 2 — OPA Namespace Isolation
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 12:00 | **Estimate**: M | **Status**: PENDING
+
+**Context**: Per your research: OPA input namespacing preferred over per-tenant WASM bundles.
+
+**Action Items**:
+1. [ ] **Namespace OPA input** — prefix data paths with `tenantId` so Rego rules are tenant-scoped.
+2. [ ] **Per-tenant policy loading** — `OpaEvaluator` accepts tenant context, loads tenant-specific policy data.
+3. [ ] **Integration tests**: two tenants, different policies, verify isolation.
+4. [ ] Tests: 2,280 → 2,320+ target.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-09 — P1: N-12 Ticketing Integration via MCP
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 10:00 | **Estimate**: M | **Status**: DONE
