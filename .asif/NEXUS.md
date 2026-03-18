@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-148 — P1: Conversation Memory — Cross-Session Context
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 22:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Session memory store** — persist key conversation facts per tenant across sessions (ChromaDB or KV).
+2. [ ] **Memory recall** — at session start, load relevant context from previous sessions for this tenant.
+3. [ ] **Memory API** — `GET /tenants/:id/memory`, `DELETE /tenants/:id/memory`.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-149.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-149 — P2: Final Day Summary
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 22:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Final test count. 2. [ ] All features shipped today. 3. [ ] NEXUS update.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-138 — P1: Voice SDK — Browser + Node.js Client Library
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 21:45 | **Estimate**: M | **Status**: DONE
