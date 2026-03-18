@@ -231,6 +231,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-07 — P2: Documentation + Architecture Diagram + Changelog
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 09:00 | **Estimate**: S | **Status**: PENDING
+
+**Context**: 15/15 SHIPPED. 2,251 tests. 94% coverage. CRUCIBLE clean. Next M-sized initiatives need Asif. Make the project showcase-ready.
+
+**Action Items**:
+1. [ ] **CHANGELOG.md** — create from git history. Group by initiative (N-01 through N-15). Include test counts at each milestone.
+2. [ ] **Architecture diagram** — Lane A/B/C architecture, PolicyGate flow, OPA integration, dense embedding pipeline. Mermaid format.
+3. [ ] **API documentation** — WebSocket protocol, control commands, voice pipeline config.
+4. [ ] **Contributing guide** — setup, test running, architecture overview for new contributors.
+
+**Constraints**:
+- S-sized documentation — no code changes
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-02 — P2: Quality Hardening — Coverage Push + CRUCIBLE Self-Audit
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-03-18 08:00 | **Estimate**: S | **Status**: DONE
