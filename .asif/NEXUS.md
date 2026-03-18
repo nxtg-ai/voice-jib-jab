@@ -231,6 +231,30 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260317-01 — P1: N-15 Sprint 2 — Async PolicyCheck + Dense Embedding Wiring
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-17 19:15 | **Estimate**: M | **Status**: PENDING
+
+**Context**: Sprint 1 shipped the dense embedding model (`getEmbeddingSimilarityScore()`), but the sync `PolicyCheck.evaluate()` interface prevents wiring it into the live check chain. Your Sprint 1 response (Item 4) flagged this as Phase 2: "To route OpaClaimsCheck through dense embeddings, `PolicyCheck.evaluate()` must become `async evaluate(): Promise<CheckResult>`." 252 idle check-ins since Sprint 1 — time to ship this.
+
+**Action Items**:
+1. [ ] **Make `PolicyCheck.evaluate()` async** — change interface from `evaluate(): CheckResult` to `evaluate(): Promise<CheckResult>`. Update all 4 implementations: `OpaClaimsCheck`, `ModeratorCheck`, `ClaimsCheck`, `PIIRedactorCheck`.
+2. [ ] **Make `PolicyGate.evaluate()` async** — update the orchestrator to `await` each check's evaluate call. Preserve short-circuit behavior.
+3. [ ] **Wire `OpaClaimsCheck` to dense path** — when `AllowedClaimsRegistry.isEmbeddingInitialized`, call `getEmbeddingSimilarityScore()` instead of `getSimilarityScore()`. Fall back to TF-IDF when embeddings not loaded.
+4. [ ] **Update `ControlEngine`** — ensure `AllowedClaimsRegistry.initialize()` is called at startup (alongside `OpaEvaluator.initialize()`).
+5. [ ] **Tests**: All existing 1,119+ tests pass. Add integration tests proving: (a) dense path used when initialized, (b) TF-IDF fallback when not initialized, (c) semantic paraphrase detection ("response is instant" ≈ "near-zero latency") via real embedding path (not mock).
+6. [ ] **Update N-15 status** in NEXUS Executive Dashboard: if all phases complete, change to SHIPPED.
+
+**Constraints**:
+- Do NOT change the `CheckResult` type — only the sync/async contract
+- Do NOT break existing Lane C v1 tests — every existing assertion must still pass
+- USE PLAN MODE — this touches 5+ files and changes an interface contract
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260314-05 — P1: N-15 Sprint Session 1 — Dense Embedding Similarity
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-14 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-14
