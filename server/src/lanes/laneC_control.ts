@@ -361,6 +361,9 @@ export class ControlEngine extends EventEmitter {
     if (this.config.opaEvaluator && !this.config.opaEvaluator.isInitialized) {
       await this.config.opaEvaluator.initialize();
     }
+    if (!this.config.claimsRegistry.isEmbeddingInitialized) {
+      await this.config.claimsRegistry.initialize();
+    }
   }
 
   /**
@@ -368,9 +371,9 @@ export class ControlEngine extends EventEmitter {
    * Can be called directly (e.g., before a tool call) in addition to
    * the automatic event-driven path.
    */
-  evaluate(ctx: EvaluationContext): GateResult {
+  async evaluate(ctx: EvaluationContext): Promise<GateResult> {
     const evaluationId = uuidv4();
-    const result = this.gate.evaluate(ctx);
+    const result = await this.gate.evaluate(ctx);
     this.recordMetrics(result);
     this.emitAuditEvent(ctx, result, evaluationId);
     this.override.act(result, ctx, evaluationId);
@@ -430,34 +433,36 @@ export class ControlEngine extends EventEmitter {
   // ── Event subscriptions ────────────────────────────────────────────
 
   private subscribeToEvents(): void {
-    // Listen for events on this session via the global event bus
-    eventBus.onSession(this.sessionId, (event: Event) => {
-      this.handleEvent(event);
+    // Listen for events on this session via the global event bus.
+    // The lambda is async so tests can await the captured handler;
+    // the event bus itself does not await the callback (fire-and-forget).
+    eventBus.onSession(this.sessionId, async (event: Event) => {
+      await this.handleEvent(event);
     });
   }
 
-  private handleEvent(event: Event): void {
+  private async handleEvent(event: Event): Promise<void> {
     switch (event.type) {
       case "transcript.final":
-        this.onTranscript(event, true);
+        await this.onTranscript(event, true);
         break;
 
       case "transcript.delta":
         if (this.config.evaluateDeltas) {
-          this.onTranscript(event, false);
+          await this.onTranscript(event, false);
         }
         break;
 
       // Assistant transcript from Lane B
       case "transcript":
         if (event.source === "laneB") {
-          this.onAssistantTranscript(event);
+          await this.onAssistantTranscript(event);
         }
         break;
 
       // User transcript relayed via Lane B
       case "user_transcript":
-        this.onUserTranscript(event);
+        await this.onUserTranscript(event);
         break;
 
       case "response.metadata":
@@ -466,7 +471,7 @@ export class ControlEngine extends EventEmitter {
     }
   }
 
-  private onTranscript(event: Event, isFinal: boolean): void {
+  private async onTranscript(event: Event, isFinal: boolean): Promise<void> {
     const payload = event.payload as {
       text?: string;
       confidence?: number;
@@ -474,7 +479,7 @@ export class ControlEngine extends EventEmitter {
     };
     if (!payload.text) return;
 
-    this.evaluate({
+    await this.evaluate({
       sessionId: this.sessionId,
       role: "user",
       text: payload.text,
@@ -482,7 +487,7 @@ export class ControlEngine extends EventEmitter {
     });
   }
 
-  private onAssistantTranscript(event: Event): void {
+  private async onAssistantTranscript(event: Event): Promise<void> {
     const payload = event.payload as {
       text?: string;
       isFinal?: boolean;
@@ -490,7 +495,7 @@ export class ControlEngine extends EventEmitter {
     };
     if (!payload.text) return;
 
-    this.evaluate({
+    await this.evaluate({
       sessionId: this.sessionId,
       role: "assistant",
       text: payload.text,
@@ -501,7 +506,7 @@ export class ControlEngine extends EventEmitter {
     });
   }
 
-  private onUserTranscript(event: Event): void {
+  private async onUserTranscript(event: Event): Promise<void> {
     const payload = event.payload as {
       text?: string;
       isFinal?: boolean;
@@ -509,7 +514,7 @@ export class ControlEngine extends EventEmitter {
     };
     if (!payload.text) return;
 
-    this.evaluate({
+    await this.evaluate({
       sessionId: this.sessionId,
       role: "user",
       text: payload.text,

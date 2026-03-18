@@ -32,7 +32,7 @@ export class OpaClaimsCheck implements PolicyCheck {
     this.threshold = config.threshold;
   }
 
-  evaluate(ctx: EvaluationContext): CheckResult {
+  async evaluate(ctx: EvaluationContext): Promise<CheckResult> {
     // Disallowed patterns take priority — checked before similarity scoring.
     const disallowed = this.registry.matchDisallowedPatterns(ctx.text);
     if (disallowed.matched) {
@@ -43,9 +43,10 @@ export class OpaClaimsCheck implements PolicyCheck {
       };
     }
 
-    // Tier 1: TF-IDF cosine similarity from VectorStore index.
-    // getSimilarityScore() is independent of matchText() — no backward-compat impact.
-    const similarityScore = this.registry.getSimilarityScore(ctx.text);
+    // Tier 1: similarity scoring — dense embedding when initialized, TF-IDF fallback.
+    const similarityScore = this.registry.isEmbeddingInitialized
+      ? await this.registry.getEmbeddingSimilarityScore(ctx.text)
+      : this.registry.getSimilarityScore(ctx.text);
 
     // When OPA is not initialized, fall back to threshold comparison directly.
     if (!this.evaluator.isInitialized) {

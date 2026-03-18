@@ -45,7 +45,7 @@ export class OpaModeratorCheck implements PolicyCheck {
     this.config = config;
   }
 
-  evaluate(ctx: EvaluationContext): CheckResult {
+  async evaluate(ctx: EvaluationContext): Promise<CheckResult> {
     // ── Tier 1: pattern matching ──────────────────────────────────────
     // Find the first category whose patterns match the input text.
     const text = ctx.text.toLowerCase();

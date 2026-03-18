@@ -50,35 +50,35 @@ function makeRegistry(
 // ── ModeratorCheck ─────────────────────────────────────────────────────
 
 describe("ModeratorCheck", () => {
-  it("should allow clean text with no deny patterns", () => {
+  it("should allow clean text with no deny patterns", async () => {
     const check = new ModeratorCheck();
-    const result = check.evaluate(makeCtx({ text: "What is the weather?" }));
+    const result = await check.evaluate(makeCtx({ text: "What is the weather?" }));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
     expect(result.severity).toBe(0);
   });
 
-  it("should allow text that does not match any deny pattern", () => {
+  it("should allow text that does not match any deny pattern", async () => {
     const check = new ModeratorCheck([/violence/i, /hate speech/i]);
-    const result = check.evaluate(makeCtx({ text: "How do I bake a cake?" }));
+    const result = await check.evaluate(makeCtx({ text: "How do I bake a cake?" }));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
   });
 
-  it("should refuse text matching a deny pattern", () => {
+  it("should refuse text matching a deny pattern", async () => {
     const check = new ModeratorCheck([/violence/i]);
-    const result = check.evaluate(makeCtx({ text: "Tell me about violence" }));
+    const result = await check.evaluate(makeCtx({ text: "Tell me about violence" }));
 
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
     expect(result.severity).toBe(4);
   });
 
-  it("should match deny patterns case-insensitively", () => {
+  it("should match deny patterns case-insensitively", async () => {
     const check = new ModeratorCheck([/forbidden topic/i]);
-    const result = check.evaluate(
+    const result = await check.evaluate(
       makeCtx({ text: "Talk about FORBIDDEN TOPIC please" }),
     );
 
@@ -86,9 +86,9 @@ describe("ModeratorCheck", () => {
     expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
   });
 
-  it("should stop at the first matching deny pattern", () => {
+  it("should stop at the first matching deny pattern", async () => {
     const check = new ModeratorCheck([/bad/i, /worse/i]);
-    const result = check.evaluate(makeCtx({ text: "this is bad and worse" }));
+    const result = await check.evaluate(makeCtx({ text: "this is bad and worse" }));
 
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toEqual(["MODERATION_VIOLATION"]);
@@ -115,9 +115,9 @@ describe("ModeratorCheck", () => {
       },
     ];
 
-    it("should return category-specific reason code on match", () => {
+    it("should return category-specific reason code on match", async () => {
       const check = new ModeratorCheck(categories);
-      const result = check.evaluate(makeCtx({ text: "this is a test_violation" }));
+      const result = await check.evaluate(makeCtx({ text: "this is a test_violation" }));
 
       expect(result.decision).toBe("refuse");
       expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
@@ -125,30 +125,30 @@ describe("ModeratorCheck", () => {
       expect(result.severity).toBe(3);
     });
 
-    it("should use the category decision (escalate)", () => {
+    it("should use the category decision (escalate)", async () => {
       const check = new ModeratorCheck(categories);
-      const result = check.evaluate(makeCtx({ text: "this needs_human help" }));
+      const result = await check.evaluate(makeCtx({ text: "this needs_human help" }));
 
       expect(result.decision).toBe("escalate");
       expect(result.reasonCodes).toContain("MODERATION:ESCALATE_CATEGORY");
       expect(result.severity).toBe(4);
     });
 
-    it("should allow clean text", () => {
+    it("should allow clean text", async () => {
       const check = new ModeratorCheck(categories);
-      const result = check.evaluate(makeCtx({ text: "perfectly fine text" }));
+      const result = await check.evaluate(makeCtx({ text: "perfectly fine text" }));
 
       expect(result.decision).toBe("allow");
       expect(result.reasonCodes).toEqual([]);
     });
 
-    it("should stop at the first matching category", () => {
+    it("should stop at the first matching category", async () => {
       const overlapping = [
         { name: "FIRST", patterns: [/overlap/i], severity: 3, decision: "refuse" as const },
         { name: "SECOND", patterns: [/overlap/i], severity: 4, decision: "escalate" as const },
       ];
       const check = new ModeratorCheck(overlapping);
-      const result = check.evaluate(makeCtx({ text: "this has overlap content" }));
+      const result = await check.evaluate(makeCtx({ text: "this has overlap content" }));
 
       expect(result.reasonCodes).toContain("MODERATION:FIRST");
       expect(result.reasonCodes).not.toContain("MODERATION:SECOND");
@@ -172,10 +172,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("user role bypass", () => {
-    it("should allow all user-role input without claim checks", () => {
+    it("should allow all user-role input without claim checks", async () => {
       const registry = makeRegistry([FDA_CLAIM], ["guaranteed cure"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ role: "user", text: "guaranteed cure for everything" }),
       );
 
@@ -186,10 +186,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("exact match", () => {
-    it("should allow text that exactly matches an approved claim", () => {
+    it("should allow text that exactly matches an approved claim", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Our product is FDA approved" }),
       );
 
@@ -197,20 +197,20 @@ describe("ClaimsCheck", () => {
       expect(result.reasonCodes).toEqual([]);
     });
 
-    it("should match case-insensitively for exact match", () => {
+    it("should match case-insensitively for exact match", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "our product is fda approved" }),
       );
 
       expect(result.decision).toBe("allow");
     });
 
-    it("should include requiredDisclaimerId on exact match when present", () => {
+    it("should include requiredDisclaimerId on exact match when present", async () => {
       const registry = makeRegistry([SAFE_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Our product has been tested in clinical trials" }),
       );
 
@@ -220,12 +220,12 @@ describe("ClaimsCheck", () => {
   });
 
   describe("partial match", () => {
-    it("should rewrite text that partially matches an approved claim", () => {
+    it("should rewrite text that partially matches an approved claim", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
 
       // Enough word overlap to trigger partial match (>= 0.6 threshold)
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Our product is FDA approved and highly effective" }),
       );
 
@@ -235,12 +235,12 @@ describe("ClaimsCheck", () => {
       expect(result.safeRewrite).toBe("Our product is FDA approved");
     });
 
-    it("should include requiredDisclaimerId on partial match when present", () => {
+    it("should include requiredDisclaimerId on partial match when present", async () => {
       const registry = makeRegistry([SAFE_CLAIM]);
       const check = new ClaimsCheck(registry);
 
       // Partial overlap with the clinical trials claim
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Our product has been tested in clinical trials and is great",
         }),
@@ -252,10 +252,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("no match (unverified claim)", () => {
-    it("should flag unverified claim when registry is non-empty", () => {
+    it("should flag unverified claim when registry is non-empty", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Our product cures everything instantly" }),
       );
 
@@ -264,10 +264,10 @@ describe("ClaimsCheck", () => {
       expect(result.severity).toBe(1);
     });
 
-    it("should allow text without flag when registry is empty", () => {
+    it("should allow text without flag when registry is empty", async () => {
       const registry = makeRegistry();
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Our product cures everything instantly" }),
       );
 
@@ -278,10 +278,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("disallowed patterns", () => {
-    it("should rewrite text matching a disallowed pattern", () => {
+    it("should rewrite text matching a disallowed pattern", async () => {
       const registry = makeRegistry([FDA_CLAIM], ["guaranteed cure"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "guaranteed cure for all ailments" }),
       );
 
@@ -290,10 +290,10 @@ describe("ClaimsCheck", () => {
       expect(result.severity).toBe(3);
     });
 
-    it("should include formatted pattern name in reason codes", () => {
+    it("should include formatted pattern name in reason codes", async () => {
       const registry = makeRegistry([FDA_CLAIM], ["guaranteed cure"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "guaranteed cure" }),
       );
 
@@ -304,10 +304,10 @@ describe("ClaimsCheck", () => {
       expect(patternCodes[0]).toBe("DISALLOWED_PATTERN:GUARANTEED_CURE");
     });
 
-    it("should match disallowed patterns case-insensitively", () => {
+    it("should match disallowed patterns case-insensitively", async () => {
       const registry = makeRegistry([], ["banned phrase"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "This is a BANNED PHRASE in the output" }),
       );
 
@@ -317,10 +317,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("metadata claim extraction", () => {
-    it("should extract claim IDs from metadata.claims array of objects", () => {
+    it("should extract claim IDs from metadata.claims array of objects", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "",
           metadata: {
@@ -332,10 +332,10 @@ describe("ClaimsCheck", () => {
       expect(result.decision).toBe("allow");
     });
 
-    it("should extract claim IDs from metadata.claim_ids string array", () => {
+    it("should extract claim IDs from metadata.claim_ids string array", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "",
           metadata: {
@@ -347,10 +347,10 @@ describe("ClaimsCheck", () => {
       expect(result.decision).toBe("allow");
     });
 
-    it("should flag unverified claim IDs when registry has claims", () => {
+    it("should flag unverified claim IDs when registry has claims", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "",
           metadata: {
@@ -362,10 +362,10 @@ describe("ClaimsCheck", () => {
       expect(result.reasonCodes).toContain("UNVERIFIED_CLAIM_ID");
     });
 
-    it("should extract claims from nested metadata.response.claims", () => {
+    it("should extract claims from nested metadata.response.claims", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "",
           metadata: {
@@ -379,10 +379,10 @@ describe("ClaimsCheck", () => {
       expect(result.decision).toBe("allow");
     });
 
-    it("should extract claim text from metadata claims", () => {
+    it("should extract claim text from metadata claims", async () => {
       const registry = makeRegistry([FDA_CLAIM], ["guaranteed cure"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "",
           metadata: {
@@ -395,10 +395,10 @@ describe("ClaimsCheck", () => {
       expect(result.reasonCodes).toContain("CLAIMS_DISALLOWED");
     });
 
-    it("should allow empty text with no metadata", () => {
+    it("should allow empty text with no metadata", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "", metadata: undefined }),
       );
 
@@ -406,10 +406,10 @@ describe("ClaimsCheck", () => {
       expect(result.reasonCodes).toEqual([]);
     });
 
-    it("should handle whitespace-only text as empty", () => {
+    it("should handle whitespace-only text as empty", async () => {
       const registry = makeRegistry([FDA_CLAIM]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "   ", metadata: undefined }),
       );
 
@@ -418,10 +418,10 @@ describe("ClaimsCheck", () => {
   });
 
   describe("non-final transcripts", () => {
-    it("should skip transcript text checks when isFinal is false", () => {
+    it("should skip transcript text checks when isFinal is false", async () => {
       const registry = makeRegistry([FDA_CLAIM], ["guaranteed cure"]);
       const check = new ClaimsCheck(registry);
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "guaranteed cure", isFinal: false }),
       );
 
@@ -440,9 +440,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("phone number detection", () => {
-    it("should detect US phone number with dashes", () => {
+    it("should detect US phone number with dashes", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(makeCtx({ text: "Call me at 123-456-7890" }));
+      const result = await check.evaluate(makeCtx({ text: "Call me at 123-456-7890" }));
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED");
@@ -451,17 +451,17 @@ describe("PIIRedactorCheck", () => {
       expect(result.safeRewrite).not.toContain("123-456-7890");
     });
 
-    it("should detect US phone number with dots", () => {
+    it("should detect US phone number with dots", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(makeCtx({ text: "Call me at 123.456.7890" }));
+      const result = await check.evaluate(makeCtx({ text: "Call me at 123.456.7890" }));
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED:PHONE_US");
     });
 
-    it("should detect US phone number without separators", () => {
+    it("should detect US phone number without separators", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(makeCtx({ text: "Call me at 1234567890" }));
+      const result = await check.evaluate(makeCtx({ text: "Call me at 1234567890" }));
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED:PHONE_US");
@@ -469,9 +469,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("email detection", () => {
-    it("should detect email addresses", () => {
+    it("should detect email addresses", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "Email me at test@example.com" }),
       );
 
@@ -483,9 +483,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("SSN detection", () => {
-    it("should detect social security numbers", () => {
+    it("should detect social security numbers", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "My SSN is 123-45-6789" }),
       );
 
@@ -497,9 +497,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("credit card detection", () => {
-    it("should detect credit card numbers with spaces", () => {
+    it("should detect credit card numbers with spaces", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "My card is 1234 5678 9012 3456" }),
       );
 
@@ -509,9 +509,9 @@ describe("PIIRedactorCheck", () => {
       expect(result.safeRewrite).not.toContain("1234 5678 9012 3456");
     });
 
-    it("should detect credit card numbers with dashes", () => {
+    it("should detect credit card numbers with dashes", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "My card is 1234-5678-9012-3456" }),
       );
 
@@ -521,9 +521,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("multiple PII types", () => {
-    it("should detect all PII types in a single text", () => {
+    it("should detect all PII types in a single text", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Call 123-456-7890, email test@example.com, SSN 123-45-6789",
         }),
@@ -537,9 +537,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("clean text", () => {
-    it("should allow text with no PII", () => {
+    it("should allow text with no PII", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "What is the weather today?" }),
       );
 
@@ -550,9 +550,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("flag mode vs redact mode", () => {
-    it("should return rewrite decision in redact mode (default)", () => {
+    it("should return rewrite decision in redact mode (default)", async () => {
       const check = new PIIRedactorCheck({ mode: "redact" });
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "My email is test@example.com" }),
       );
 
@@ -561,9 +561,9 @@ describe("PIIRedactorCheck", () => {
       expect(result.safeRewrite).toBeDefined();
     });
 
-    it("should return allow decision in flag mode", () => {
+    it("should return allow decision in flag mode", async () => {
       const check = new PIIRedactorCheck({ mode: "flag" });
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({ text: "My email is test@example.com" }),
       );
 
@@ -576,9 +576,9 @@ describe("PIIRedactorCheck", () => {
   });
 
   describe("metadata scanning", () => {
-    it("should detect PII in metadata string values", () => {
+    it("should detect PII in metadata string values", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "No PII here",
           metadata: { email: "user@example.com" },
@@ -589,9 +589,9 @@ describe("PIIRedactorCheck", () => {
       expect(result.reasonCodes).toContain("PII_DETECTED:EMAIL");
     });
 
-    it("should detect PII in nested metadata objects", () => {
+    it("should detect PII in nested metadata objects", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Clean text",
           metadata: {
@@ -608,9 +608,9 @@ describe("PIIRedactorCheck", () => {
       expect(result.reasonCodes).toContain("PII_DETECTED:PHONE_US");
     });
 
-    it("should detect PII in metadata arrays", () => {
+    it("should detect PII in metadata arrays", async () => {
       const check = new PIIRedactorCheck();
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Clean text",
           metadata: {
@@ -623,10 +623,10 @@ describe("PIIRedactorCheck", () => {
       expect(result.reasonCodes).toContain("PII_DETECTED:EMAIL");
     });
 
-    it("should respect maxMetadataDepth and stop scanning deep objects", () => {
+    it("should respect maxMetadataDepth and stop scanning deep objects", async () => {
       const check = new PIIRedactorCheck({ maxMetadataDepth: 1 });
       // At depth 0 => metadata object, depth 1 => "level1" object, depth 2 => too deep
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Clean text",
           metadata: {
@@ -643,9 +643,9 @@ describe("PIIRedactorCheck", () => {
       expect(result.reasonCodes).not.toContain("PII_DETECTED:EMAIL");
     });
 
-    it("should skip metadata scanning when includeMetadata is false", () => {
+    it("should skip metadata scanning when includeMetadata is false", async () => {
       const check = new PIIRedactorCheck({ includeMetadata: false });
-      const result = check.evaluate(
+      const result = await check.evaluate(
         makeCtx({
           text: "Clean text",
           metadata: { email: "secret@example.com" },
@@ -683,9 +683,9 @@ describe("PIIRedactorCheck", () => {
 // ── PolicyGate (pipeline orchestration) ────────────────────────────────
 
 describe("PolicyGate", () => {
-  it("should return allow when no checks are configured", () => {
+  it("should return allow when no checks are configured", async () => {
     const gate = new PolicyGate();
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
@@ -693,27 +693,27 @@ describe("PolicyGate", () => {
     expect(result.checkDurationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("should run all checks and track their names", () => {
+  it("should run all checks and track their names", async () => {
     const alwaysAllow: PolicyCheck = {
       name: "test_allow",
-      evaluate: () => ({ decision: "allow", reasonCodes: [], severity: 0 }),
+      evaluate: async () => ({ decision: "allow", reasonCodes: [], severity: 0 }),
     };
 
     const alwaysAllow2: PolicyCheck = {
       name: "test_allow_2",
-      evaluate: () => ({ decision: "allow", reasonCodes: [], severity: 0 }),
+      evaluate: async () => ({ decision: "allow", reasonCodes: [], severity: 0 }),
     };
 
     const gate = new PolicyGate([alwaysAllow, alwaysAllow2]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.checksRun).toEqual(["test_allow", "test_allow_2"]);
   });
 
-  it("should select the highest-severity decision when multiple checks disagree", () => {
+  it("should select the highest-severity decision when multiple checks disagree", async () => {
     const lowSeverity: PolicyCheck = {
       name: "low",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "allow",
         reasonCodes: ["LOW_RISK"],
         severity: 1,
@@ -722,7 +722,7 @@ describe("PolicyGate", () => {
 
     const highSeverity: PolicyCheck = {
       name: "high",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "refuse",
         reasonCodes: ["HIGH_RISK"],
         severity: 4,
@@ -730,16 +730,16 @@ describe("PolicyGate", () => {
     };
 
     const gate = new PolicyGate([lowSeverity, highSeverity]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.decision).toBe("refuse");
     expect(result.severity).toBe(4);
   });
 
-  it("should aggregate reason codes from all checks", () => {
+  it("should aggregate reason codes from all checks", async () => {
     const check1: PolicyCheck = {
       name: "check1",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "allow",
         reasonCodes: ["REASON_A"],
         severity: 0,
@@ -748,7 +748,7 @@ describe("PolicyGate", () => {
 
     const check2: PolicyCheck = {
       name: "check2",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "rewrite",
         reasonCodes: ["REASON_B"],
         severity: 2,
@@ -756,16 +756,16 @@ describe("PolicyGate", () => {
     };
 
     const gate = new PolicyGate([check1, check2]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.reasonCodes).toContain("REASON_A");
     expect(result.reasonCodes).toContain("REASON_B");
   });
 
-  it("should prefer higher-priority decision type even at lower severity", () => {
+  it("should prefer higher-priority decision type even at lower severity", async () => {
     const rewriteCheck: PolicyCheck = {
       name: "rewrite",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "rewrite",
         reasonCodes: ["REWRITE"],
         severity: 3,
@@ -775,7 +775,7 @@ describe("PolicyGate", () => {
 
     const refuseCheck: PolicyCheck = {
       name: "refuse",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "refuse",
         reasonCodes: ["REFUSE"],
         severity: 2,
@@ -783,16 +783,16 @@ describe("PolicyGate", () => {
     };
 
     const gate = new PolicyGate([rewriteCheck, refuseCheck]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     // "refuse" has higher priority than "rewrite" in DECISION_PRIORITY
     expect(result.decision).toBe("refuse");
   });
 
-  it("should carry safeRewrite from the winning check result", () => {
+  it("should carry safeRewrite from the winning check result", async () => {
     const rewriteCheck: PolicyCheck = {
       name: "rewrite",
-      evaluate: () => ({
+      evaluate: async () => ({
         decision: "rewrite",
         reasonCodes: ["CLAIMS_RISK"],
         severity: 2,
@@ -801,25 +801,25 @@ describe("PolicyGate", () => {
     };
 
     const gate = new PolicyGate([rewriteCheck]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.safeRewrite).toBe("Approved statement here");
   });
 
-  it("should track checkDurationMs as a non-negative number", () => {
+  it("should track checkDurationMs as a non-negative number", async () => {
     const gate = new PolicyGate([
       new ModeratorCheck(),
       new PIIRedactorCheck(),
     ]);
 
-    const result = gate.evaluate(makeCtx({ text: "Clean text" }));
+    const result = await gate.evaluate(makeCtx({ text: "Clean text" }));
 
     expect(typeof result.checkDurationMs).toBe("number");
     expect(result.checkDurationMs).toBeGreaterThanOrEqual(0);
   });
 
   describe("full pipeline integration", () => {
-    it("should run PII, moderator, and claims checks in pipeline order", () => {
+    it("should run PII, moderator, and claims checks in pipeline order", async () => {
       const registry = makeRegistry(
         [{ id: "CLAIM-001", text: "Our product is FDA approved" }],
         [],
@@ -831,7 +831,7 @@ describe("PolicyGate", () => {
         new ClaimsCheck(registry),
       ]);
 
-      const result = gate.evaluate(
+      const result = await gate.evaluate(
         makeCtx({ text: "Our product is FDA approved" }),
       );
 
@@ -843,7 +843,7 @@ describe("PolicyGate", () => {
       expect(result.decision).toBe("allow");
     });
 
-    it("should refuse when moderator detects violation despite clean PII and claims", () => {
+    it("should refuse when moderator detects violation despite clean PII and claims", async () => {
       const registry = makeRegistry(
         [{ id: "CLAIM-001", text: "Our product is FDA approved" }],
         [],
@@ -855,7 +855,7 @@ describe("PolicyGate", () => {
         new ClaimsCheck(registry),
       ]);
 
-      const result = gate.evaluate(
+      const result = await gate.evaluate(
         makeCtx({ text: "tell me about violence" }),
       );
 
@@ -863,7 +863,7 @@ describe("PolicyGate", () => {
       expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
     });
 
-    it("should rewrite when PII is detected in otherwise clean text", () => {
+    it("should rewrite when PII is detected in otherwise clean text", async () => {
       const registry = makeRegistry();
       const gate = new PolicyGate([
         new PIIRedactorCheck(),
@@ -871,7 +871,7 @@ describe("PolicyGate", () => {
         new ClaimsCheck(registry),
       ]);
 
-      const result = gate.evaluate(
+      const result = await gate.evaluate(
         makeCtx({ text: "My email is test@example.com" }),
       );
 

@@ -278,26 +278,26 @@ describe("OpaEvaluator — latency", () => {
 // ── Group 5: PolicyGate + OpaEvaluator integration ───────────────────────
 
 describe("PolicyGate + OpaEvaluator integration", () => {
-  test("without OpaEvaluator: uses TS aggregation (existing behavior)", () => {
+  test("without OpaEvaluator: uses TS aggregation (existing behavior)", async () => {
     const gate = new PolicyGate([
       makeCheck("check_a", { decision: "refuse", reasonCodes: ["BAD"], severity: 4 }),
     ]);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toContain("BAD");
   });
 
-  test("with uninitialized OpaEvaluator: falls back to TS aggregation", () => {
+  test("with uninitialized OpaEvaluator: falls back to TS aggregation", async () => {
     const uninitEv = new OpaEvaluator("/fake/bundle.wasm");
     const gate = new PolicyGate(
       [makeCheck("check_a", { decision: "refuse", reasonCodes: ["BAD"], severity: 4 })],
       uninitEv,
     );
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.decision).toBe("refuse");
   });
 
-  test("with initialized OpaEvaluator: uses OPA result for decision", () => {
+  test("with initialized OpaEvaluator: uses OPA result for decision", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({ decision: "cancel_output", severity: 4 }));
 
@@ -305,13 +305,13 @@ describe("PolicyGate + OpaEvaluator integration", () => {
       [makeCheck("check_a", { decision: "refuse", reasonCodes: ["BAD"], severity: 3 })],
       opaEv,
     );
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     // OPA says cancel_output; TS loop would have returned refuse
     expect(result.decision).toBe("cancel_output");
     expect(result.severity).toBe(4);
   });
 
-  test("checksRun is still tracked when OPA is used", () => {
+  test("checksRun is still tracked when OPA is used", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({ decision: "allow" }));
 
@@ -322,11 +322,11 @@ describe("PolicyGate + OpaEvaluator integration", () => {
       ],
       opaEv,
     );
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.checksRun).toEqual(["pii_redactor", "moderator"]);
   });
 
-  test("allReasonCodes still aggregated from checks when OPA is used", () => {
+  test("allReasonCodes still aggregated from checks when OPA is used", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({ decision: "refuse" }));
 
@@ -337,21 +337,21 @@ describe("PolicyGate + OpaEvaluator integration", () => {
       ],
       opaEv,
     );
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.reasonCodes).toContain("CODE_A");
     expect(result.reasonCodes).toContain("CODE_B");
   });
 
-  test("checkDurationMs is measured when OPA is used", () => {
+  test("checkDurationMs is measured when OPA is used", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({}));
 
     const gate = new PolicyGate([makeCheck("check_a", {})], opaEv);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.checkDurationMs).toBeGreaterThanOrEqual(0);
   });
 
-  test("short-circuit still limits checks passed to OPA", () => {
+  test("short-circuit still limits checks passed to OPA", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     const mockPolicy = policyReturning({ decision: "cancel_output", severity: 4 });
     opaEv._injectPolicy(mockPolicy);
@@ -360,7 +360,7 @@ describe("PolicyGate + OpaEvaluator integration", () => {
     const check2 = makeCheck("second", {});
     const gate = new PolicyGate([check1, check2], opaEv);
 
-    gate.evaluate(makeCtx());
+    await gate.evaluate(makeCtx());
 
     // Short-circuit: second check never ran
     expect(check2.evaluate).not.toHaveBeenCalled();
@@ -370,7 +370,7 @@ describe("PolicyGate + OpaEvaluator integration", () => {
     expect(opaInput.checks[0].name).toBe("first");
   });
 
-  test("safeRewrite from OPA output flows through to GateResult", () => {
+  test("safeRewrite from OPA output flows through to GateResult", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({ decision: "rewrite", safeRewrite: "safe text" }));
 
@@ -378,7 +378,7 @@ describe("PolicyGate + OpaEvaluator integration", () => {
       [makeCheck("pii_redactor", { decision: "rewrite", safeRewrite: "raw safe text" })],
       opaEv,
     );
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     // OPA's safeRewrite wins over the TS check's safeRewrite
     expect(result.safeRewrite).toBe("safe text");
   });
@@ -496,7 +496,7 @@ describe("OpaEvaluator — evaluateClaimsCheck()", () => {
 // ── Group 7: Edge cases ───────────────────────────────────────────────────
 
 describe("OpaEvaluator — edge cases", () => {
-  test("opaEvaluator.evaluate() throws → error propagates from PolicyGate", () => {
+  test("opaEvaluator.evaluate() throws → error propagates from PolicyGate", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy({
       evaluate: jest.fn().mockImplementation(() => {
@@ -505,7 +505,7 @@ describe("OpaEvaluator — edge cases", () => {
     });
 
     const gate = new PolicyGate([makeCheck("check_a", {})], opaEv);
-    expect(() => gate.evaluate(makeCtx())).toThrow("OPA internal error");
+    await expect(gate.evaluate(makeCtx())).rejects.toThrow("OPA internal error");
   });
 
   test("non-string safeRewrite in OPA result → null", () => {
@@ -532,13 +532,13 @@ describe("OpaEvaluator — edge cases", () => {
     expect(out.severity).toBe(0);
   });
 
-  test("PolicyGate with zero checks and OPA initialized → OPA sees empty checks", () => {
+  test("PolicyGate with zero checks and OPA initialized → OPA sees empty checks", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     const mockPolicy = policyReturning({ decision: "allow" });
     opaEv._injectPolicy(mockPolicy);
 
     const gate = new PolicyGate([], opaEv);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
 
     expect(result.decision).toBe("allow");
     expect(result.checksRun).toHaveLength(0);
@@ -546,12 +546,12 @@ describe("OpaEvaluator — edge cases", () => {
     expect(opaInput.checks).toHaveLength(0);
   });
 
-  test("OPA null safeRewrite maps to undefined in GateResult", () => {
+  test("OPA null safeRewrite maps to undefined in GateResult", async () => {
     const opaEv = new OpaEvaluator("/fake/bundle.wasm");
     opaEv._injectPolicy(policyReturning({ safeRewrite: null, requiredDisclaimerId: null }));
 
     const gate = new PolicyGate([makeCheck("check_a", {})], opaEv);
-    const result = gate.evaluate(makeCtx());
+    const result = await gate.evaluate(makeCtx());
     expect(result.safeRewrite).toBeUndefined();
     expect(result.requiredDisclaimerId).toBeUndefined();
   });

@@ -61,7 +61,7 @@ export interface GateResult {
 
 export interface PolicyCheck {
   readonly name: string;
-  evaluate(ctx: EvaluationContext): CheckResult;
+  evaluate(ctx: EvaluationContext): Promise<CheckResult>;
 }
 
 // ── Moderator check ───────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export class ModeratorCheck implements PolicyCheck {
     }
   }
 
-  evaluate(ctx: EvaluationContext): CheckResult {
+  async evaluate(ctx: EvaluationContext): Promise<CheckResult> {
     const text = ctx.text.toLowerCase();
 
     // Check categorized patterns first (named, with per-category decisions)
@@ -145,7 +145,7 @@ export class ClaimsCheck implements PolicyCheck {
     this.registry = registry;
   }
 
-  evaluate(ctx: EvaluationContext): CheckResult {
+  async evaluate(ctx: EvaluationContext): Promise<CheckResult> {
     // Only check assistant output (not user input)
     if (ctx.role !== "assistant") {
       return { decision: "allow", reasonCodes: [], severity: 0 };
@@ -493,7 +493,7 @@ export class PIIRedactorCheck implements PolicyCheck {
     };
   }
 
-  evaluate(ctx: EvaluationContext): CheckResult {
+  async evaluate(ctx: EvaluationContext): Promise<CheckResult> {
     const textResult = this.redactText(ctx.text);
     const metadataResult = this.includeMetadata
       ? this.redactMetadataValue(ctx.metadata, 0, new WeakSet())
@@ -635,7 +635,7 @@ export class PolicyGate {
    * decision/severity/safeRewrite from the completed check results.
    * The TS loop still runs for checksRun/allReasonCodes tracking and short-circuit.
    */
-  evaluate(ctx: EvaluationContext): GateResult {
+  async evaluate(ctx: EvaluationContext): Promise<GateResult> {
     const start = Date.now();
     const checksRun: string[] = [];
     const allReasonCodes: string[] = [];
@@ -649,7 +649,7 @@ export class PolicyGate {
 
     for (const check of this.checks) {
       checksRun.push(check.name);
-      const result = check.evaluate(ctx);
+      const result = await check.evaluate(ctx);
 
       allReasonCodes.push(...result.reasonCodes);
       completedCheckInputs.push({

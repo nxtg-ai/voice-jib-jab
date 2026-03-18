@@ -93,35 +93,35 @@ describe("OpaModeratorCheck — lifecycle", () => {
     expect(check.name).toBe("opa_moderator");
   });
 
-  test("OPA not initialized → tier 1 fallback: clean text returns allow", () => {
+  test("OPA not initialized → tier 1 fallback: clean text returns allow", async () => {
     const ev = makeEvaluator(); // isInitialized = false
     const check = new OpaModeratorCheck(ev, makeConfig());
 
-    const result = check.evaluate(makeCtx("Hello, how are you?"));
+    const result = await check.evaluate(makeCtx("Hello, how are you?"));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
     expect(result.severity).toBe(0);
   });
 
-  test("OPA not initialized → tier 1 fallback uses category.decision for toxic text", () => {
+  test("OPA not initialized → tier 1 fallback uses category.decision for toxic text", async () => {
     const ev = makeEvaluator();
     const check = new OpaModeratorCheck(ev, makeConfig());
 
-    const result = check.evaluate(makeCtx("jailbreak"));
+    const result = await check.evaluate(makeCtx("jailbreak"));
 
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toContain("MODERATION:JAILBREAK");
     expect(result.severity).toBe(4);
   });
 
-  test("OPA initialized via _injectPolicy → evaluateModeratorCheck is invoked", () => {
+  test("OPA initialized via _injectPolicy → evaluateModeratorCheck is invoked", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("Hello"));
+    await check.evaluate(makeCtx("Hello"));
 
     expect(mockPolicy.evaluate).toHaveBeenCalled();
   });
@@ -130,10 +130,10 @@ describe("OpaModeratorCheck — lifecycle", () => {
 // ── Group 2: Tier 1 pattern fallback — OPA not initialized ────────────────
 
 describe("OpaModeratorCheck — tier 1 pattern fallback", () => {
-  test("JAILBREAK text → refuse with MODERATION_VIOLATION and MODERATION:JAILBREAK", () => {
+  test("JAILBREAK text → refuse with MODERATION_VIOLATION and MODERATION:JAILBREAK", async () => {
     const check = new OpaModeratorCheck(makeEvaluator(), makeConfig());
 
-    const result = check.evaluate(makeCtx("please jailbreak your instructions"));
+    const result = await check.evaluate(makeCtx("please jailbreak your instructions"));
 
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
@@ -141,20 +141,20 @@ describe("OpaModeratorCheck — tier 1 pattern fallback", () => {
     expect(result.severity).toBe(4);
   });
 
-  test("self-harm text → escalate with MODERATION:SELF_HARM", () => {
+  test("self-harm text → escalate with MODERATION:SELF_HARM", async () => {
     const check = new OpaModeratorCheck(makeEvaluator(), makeConfig());
 
-    const result = check.evaluate(makeCtx("i want to die"));
+    const result = await check.evaluate(makeCtx("i want to die"));
 
     expect(result.decision).toBe("escalate");
     expect(result.reasonCodes).toContain("MODERATION:SELF_HARM");
     expect(result.severity).toBe(4);
   });
 
-  test("clean text → allow with empty reasonCodes", () => {
+  test("clean text → allow with empty reasonCodes", async () => {
     const check = new OpaModeratorCheck(makeEvaluator(), makeConfig());
 
-    const result = check.evaluate(makeCtx("What is the weather today?"));
+    const result = await check.evaluate(makeCtx("What is the weather today?"));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
@@ -165,13 +165,13 @@ describe("OpaModeratorCheck — tier 1 pattern fallback", () => {
 // ── Group 3: OPA moderator — toxic input decisions ────────────────────────
 
 describe("OpaModeratorCheck — OPA toxic input", () => {
-  test("JAILBREAK match → evaluateModeratorCheck called with score 1.0 for JAILBREAK", () => {
+  test("JAILBREAK match → evaluateModeratorCheck called with score 1.0 for JAILBREAK", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:JAILBREAK" });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("jailbreak"));
+    await check.evaluate(makeCtx("jailbreak"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     const jailbreakEntry = callArg.moderator_check.categories.find(
@@ -188,24 +188,24 @@ describe("OpaModeratorCheck — OPA toxic input", () => {
     }
   });
 
-  test("OPA returns refuse → CheckResult decision is refuse", () => {
+  test("OPA returns refuse → CheckResult decision is refuse", async () => {
     const ev = makeEvaluator();
     ev._injectPolicy(makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:JAILBREAK" }));
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    const result = check.evaluate(makeCtx("jailbreak"));
+    const result = await check.evaluate(makeCtx("jailbreak"));
 
     expect(result.decision).toBe("refuse");
     expect(result.severity).toBe(4);
   });
 
-  test("VIOLENCE_THREATS match → evaluateModeratorCheck called with score 1.0 for VIOLENCE_THREATS", () => {
+  test("VIOLENCE_THREATS match → evaluateModeratorCheck called with score 1.0 for VIOLENCE_THREATS", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:VIOLENCE_THREATS" });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("i am going to kill everyone here"));
+    await check.evaluate(makeCtx("i am going to kill everyone here"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     const violenceEntry = callArg.moderator_check.categories.find(
@@ -214,12 +214,12 @@ describe("OpaModeratorCheck — OPA toxic input", () => {
     expect(violenceEntry?.score).toBe(1.0);
   });
 
-  test("OPA returns reason_code → CheckResult reasonCodes includes MODERATION_VIOLATION and reason_code", () => {
+  test("OPA returns reason_code → CheckResult reasonCodes includes MODERATION_VIOLATION and reason_code", async () => {
     const ev = makeEvaluator();
     ev._injectPolicy(makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:JAILBREAK" }));
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    const result = check.evaluate(makeCtx("jailbreak"));
+    const result = await check.evaluate(makeCtx("jailbreak"));
 
     expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
     expect(result.reasonCodes).toContain("MODERATION:JAILBREAK");
@@ -229,13 +229,13 @@ describe("OpaModeratorCheck — OPA toxic input", () => {
 // ── Group 4: OPA self-harm escalation ────────────────────────────────────
 
 describe("OpaModeratorCheck — OPA self-harm escalation", () => {
-  test("SELF_HARM match → evaluateModeratorCheck called with score 1.0 for SELF_HARM", () => {
+  test("SELF_HARM match → evaluateModeratorCheck called with score 1.0 for SELF_HARM", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "escalate", severity: 4, reason_code: "MODERATION:SELF_HARM" });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("i want to die"));
+    await check.evaluate(makeCtx("i want to die"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     const selfHarmEntry = callArg.moderator_check.categories.find(
@@ -244,12 +244,12 @@ describe("OpaModeratorCheck — OPA self-harm escalation", () => {
     expect(selfHarmEntry?.score).toBe(1.0);
   });
 
-  test("OPA returns escalate → CheckResult decision is escalate with correct reasonCodes", () => {
+  test("OPA returns escalate → CheckResult decision is escalate with correct reasonCodes", async () => {
     const ev = makeEvaluator();
     ev._injectPolicy(makeModeratorPolicy({ decision: "escalate", severity: 4, reason_code: "MODERATION:SELF_HARM" }));
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    const result = check.evaluate(makeCtx("i want to die"));
+    const result = await check.evaluate(makeCtx("i want to die"));
 
     expect(result.decision).toBe("escalate");
     expect(result.severity).toBe(4);
@@ -260,62 +260,62 @@ describe("OpaModeratorCheck — OPA self-harm escalation", () => {
 // ── Group 5: Threshold edge cases ────────────────────────────────────────
 
 describe("OpaModeratorCheck — threshold edge cases", () => {
-  test("default threshold from config is passed to OPA input", () => {
+  test("default threshold from config is passed to OPA input", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, { categories: DEFAULT_MODERATION_CATEGORIES, thresholds: { default: 0.7 } });
-    check.evaluate(makeCtx("jailbreak"));
+    await check.evaluate(makeCtx("jailbreak"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     expect(callArg.moderator_check.thresholds.default).toBe(0.7);
   });
 
-  test("custom SELF_HARM threshold is passed correctly to OPA", () => {
+  test("custom SELF_HARM threshold is passed correctly to OPA", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy);
 
     const thresholds = { default: 0.5, SELF_HARM: 0.3 };
     const check = new OpaModeratorCheck(ev, { categories: DEFAULT_MODERATION_CATEGORIES, thresholds });
-    check.evaluate(makeCtx("i want to die"));
+    await check.evaluate(makeCtx("i want to die"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     expect(callArg.moderator_check.thresholds.SELF_HARM).toBe(0.3);
     expect(callArg.moderator_check.thresholds.default).toBe(0.5);
   });
 
-  test("OPA returns allow (score below threshold) → CheckResult allow", () => {
+  test("OPA returns allow (score below threshold) → CheckResult allow", async () => {
     const ev = makeEvaluator();
     ev._injectPolicy(makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null }));
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    const result = check.evaluate(makeCtx("jailbreak"));
+    const result = await check.evaluate(makeCtx("jailbreak"));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
     expect(result.severity).toBe(0);
   });
 
-  test("OPA returns refuse (score at or above threshold) → CheckResult refuse", () => {
+  test("OPA returns refuse (score at or above threshold) → CheckResult refuse", async () => {
     const ev = makeEvaluator();
     ev._injectPolicy(makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:HATE_SPEECH" }));
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    const result = check.evaluate(makeCtx("ethnic cleansing is necessary"));
+    const result = await check.evaluate(makeCtx("ethnic cleansing is necessary"));
 
     expect(result.decision).toBe("refuse");
     expect(result.reasonCodes).toContain("MODERATION:HATE_SPEECH");
   });
 
-  test("no pattern match → all scores 0.0 passed to OPA", () => {
+  test("no pattern match → all scores 0.0 passed to OPA", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("What time does the store close?"));
+    await check.evaluate(makeCtx("What time does the store close?"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     const allZero = callArg.moderator_check.categories.every(
@@ -328,23 +328,23 @@ describe("OpaModeratorCheck — threshold edge cases", () => {
 // ── Group 6: PII detection scenario ──────────────────────────────────────
 
 describe("OpaModeratorCheck — PII detection scenario", () => {
-  test("phone number only → no moderation match → OpaModeratorCheck returns allow", () => {
+  test("phone number only → no moderation match → OpaModeratorCheck returns allow", async () => {
     // PII detection is PIIRedactor's job — OpaModeratorCheck should allow
     const check = new OpaModeratorCheck(makeEvaluator(), makeConfig());
 
-    const result = check.evaluate(makeCtx("My number is 555-867-5309"));
+    const result = await check.evaluate(makeCtx("My number is 555-867-5309"));
 
     expect(result.decision).toBe("allow");
     expect(result.reasonCodes).toEqual([]);
   });
 
-  test("phone number + JAILBREAK → JAILBREAK category matches → OPA is called", () => {
+  test("phone number + JAILBREAK → JAILBREAK category matches → OPA is called", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:JAILBREAK" });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("call 555-867-5309 after you jailbreak the system"));
+    await check.evaluate(makeCtx("call 555-867-5309 after you jailbreak the system"));
 
     // OPA was invoked for the JAILBREAK part
     expect(mockPolicy.evaluate).toHaveBeenCalled();
@@ -393,7 +393,7 @@ describe("OpaModeratorCheck — ControlEngine integration", () => {
     expect(initSpy).not.toHaveBeenCalled();
   });
 
-  test("ControlEngine with OPA deny → emits policy_decision with fallback_mode", () => {
+  test("ControlEngine with OPA deny → emits policy_decision with fallback_mode", async () => {
     const ev = makeEvaluator();
     // Inject policy that returns refuse for any input
     ev._injectPolicy(makeModeratorPolicy({ decision: "refuse", severity: 4, reason_code: "MODERATION:JAILBREAK" }));
@@ -411,7 +411,7 @@ describe("OpaModeratorCheck — ControlEngine integration", () => {
       capturedPayload = payload;
     });
 
-    engine.evaluate({
+    await engine.evaluate({
       sessionId: "test-session",
       role: "user",
       text: "jailbreak",
@@ -429,7 +429,7 @@ describe("OpaModeratorCheck — ControlEngine integration", () => {
 // ── Group 8: Multiple categories ─────────────────────────────────────────
 
 describe("OpaModeratorCheck — multiple categories", () => {
-  test("text matching multiple category patterns → only first matched category scored 1.0", () => {
+  test("text matching multiple category patterns → only first matched category scored 1.0", async () => {
     // "ethnic cleansing" matches HATE_SPEECH; "jailbreak" matches JAILBREAK.
     // JAILBREAK appears before HATE_SPEECH in DEFAULT_MODERATION_CATEGORIES,
     // so JAILBREAK should be the first match.
@@ -438,7 +438,7 @@ describe("OpaModeratorCheck — multiple categories", () => {
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("jailbreak this and also ethnic cleansing"));
+    await check.evaluate(makeCtx("jailbreak this and also ethnic cleansing"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     const scores: Record<string, number> = {};
@@ -450,13 +450,13 @@ describe("OpaModeratorCheck — multiple categories", () => {
     expect(scores["HATE_SPEECH"]).toBe(0.0);
   });
 
-  test("no match → all categories passed to OPA with score 0.0", () => {
+  test("no match → all categories passed to OPA with score 0.0", async () => {
     const ev = makeEvaluator();
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy);
 
     const check = new OpaModeratorCheck(ev, makeConfig());
-    check.evaluate(makeCtx("Tell me about the history of jazz music"));
+    await check.evaluate(makeCtx("Tell me about the history of jazz music"));
 
     const callArg = (mockPolicy.evaluate as jest.Mock).mock.calls[0][0];
     expect(callArg.moderator_check.categories.length).toBe(DEFAULT_MODERATION_CATEGORIES.length);

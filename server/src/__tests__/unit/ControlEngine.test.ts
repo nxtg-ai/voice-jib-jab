@@ -85,10 +85,10 @@ describe("ControlEngine", () => {
   // ── evaluate: clean text ────────────────────────────────────────────
 
   describe("evaluate() with clean user text", () => {
-    it("should return allow for innocuous user input", () => {
+    it("should return allow for innocuous user input", async () => {
       const engine = createEngine();
       const ctx = makeContext({ text: "What is your return policy?" });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("allow");
       expect(result.severity).toBe(0);
@@ -97,10 +97,10 @@ describe("ControlEngine", () => {
       expect(result.checksRun).toContain("claims_checker");
     });
 
-    it("should emit control.audit event on evaluation", () => {
+    it("should emit control.audit event on evaluation", async () => {
       const engine = createEngine();
       const ctx = makeContext();
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       // eventBus.emit is called for:
       // 1. policy.decision (from OverrideController.act)
@@ -117,10 +117,10 @@ describe("ControlEngine", () => {
       );
     });
 
-    it("should emit policy.decision event on evaluation", () => {
+    it("should emit policy.decision event on evaluation", async () => {
       const engine = createEngine();
       const ctx = makeContext();
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const decisionCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "policy.decision",
@@ -133,25 +133,25 @@ describe("ControlEngine", () => {
   // ── evaluate: moderation violation ──────────────────────────────────
 
   describe("evaluate() with text matching moderation deny pattern", () => {
-    it("should return refuse for text containing a denied pattern", () => {
+    it("should return refuse for text containing a denied pattern", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "I want to discuss banned_word topics",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("refuse");
       expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
       expect(result.severity).toBe(4);
     });
 
-    it("should short-circuit and skip claims_checker after critical refuse", () => {
+    it("should short-circuit and skip claims_checker after critical refuse", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "I want to discuss banned_word topics",
         role: "assistant",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       // Moderator fires refuse at severity 4 → short-circuit skips claims_checker
       expect(result.decision).toBe("refuse");
@@ -159,12 +159,12 @@ describe("ControlEngine", () => {
       expect(result.checksRun).not.toContain("claims_checker");
     });
 
-    it("should be case-insensitive for deny patterns", () => {
+    it("should be case-insensitive for deny patterns", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "Something about HATE_SPEECH here",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("refuse");
     });
@@ -173,12 +173,12 @@ describe("ControlEngine", () => {
   // ── evaluate: PII detection ─────────────────────────────────────────
 
   describe("evaluate() with PII in text", () => {
-    it("should return rewrite when a phone number is detected", () => {
+    it("should return rewrite when a phone number is detected", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "My phone number is 555-123-4567",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED");
@@ -186,37 +186,37 @@ describe("ControlEngine", () => {
       expect(result.safeRewrite).toContain("[PHONE_REDACTED]");
     });
 
-    it("should return rewrite when an email is detected", () => {
+    it("should return rewrite when an email is detected", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "Contact me at user@example.com please",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED:EMAIL");
       expect(result.safeRewrite).toContain("[EMAIL_REDACTED]");
     });
 
-    it("should return rewrite when an SSN is detected", () => {
+    it("should return rewrite when an SSN is detected", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         text: "My social security number is 123-45-6789",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("PII_DETECTED:SSN");
     });
 
-    it("should handle PII in flag-only mode without rewriting", () => {
+    it("should handle PII in flag-only mode without rewriting", async () => {
       const engine = createEngine({
         piiRedactionMode: "flag",
       });
       const ctx = makeContext({
         text: "My phone number is 555-123-4567",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       // In flag mode PIIRedactor returns allow with severity 1
       // No safeRewrite because mode is "flag"
@@ -228,49 +228,49 @@ describe("ControlEngine", () => {
   // ── evaluate: disallowed claims ─────────────────────────────────────
 
   describe("evaluate() with assistant text matching disallowed claim pattern", () => {
-    it("should return rewrite for text containing a disallowed pattern", () => {
+    it("should return rewrite for text containing a disallowed pattern", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         role: "assistant",
         text: "This is a guaranteed cure for your condition",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("CLAIMS_DISALLOWED");
       expect(result.severity).toBeGreaterThanOrEqual(2);
     });
 
-    it("should return rewrite for 100% effective claim", () => {
+    it("should return rewrite for 100% effective claim", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         role: "assistant",
         text: "Our solution is 100% effective against all threats",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("rewrite");
       expect(result.reasonCodes).toContain("CLAIMS_DISALLOWED");
     });
 
-    it("should allow exact-match approved claims for assistant text", () => {
+    it("should allow exact-match approved claims for assistant text", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         role: "assistant",
         text: "Our product is FDA approved",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.decision).toBe("allow");
     });
 
-    it("should not check claims for user text (only assistant)", () => {
+    it("should not check claims for user text (only assistant)", async () => {
       const engine = createEngine();
       const ctx = makeContext({
         role: "user",
         text: "Is your product a guaranteed cure?",
       });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       // ClaimsChecker skips user role, so no claims-related reason codes
       expect(result.reasonCodes).not.toContain("CLAIMS_DISALLOWED");
@@ -294,15 +294,15 @@ describe("ControlEngine", () => {
       expect(metrics.maxDurationMs).toBe(0);
     });
 
-    it("should track correct counts after multiple evaluations", () => {
+    it("should track correct counts after multiple evaluations", async () => {
       const engine = createEngine();
 
       // Allow
-      engine.evaluate(makeContext({ text: "Hello there" }));
+      await engine.evaluate(makeContext({ text: "Hello there" }));
       // Refuse (moderation violation)
-      engine.evaluate(makeContext({ text: "Contains banned_word" }));
+      await engine.evaluate(makeContext({ text: "Contains banned_word" }));
       // Rewrite (PII)
-      engine.evaluate(
+      await engine.evaluate(
         makeContext({ text: "My number is 555-123-4567" }),
       );
 
@@ -318,9 +318,9 @@ describe("ControlEngine", () => {
   // ── flushMetrics ────────────────────────────────────────────────────
 
   describe("flushMetrics()", () => {
-    it("should emit control.metrics event to eventBus", () => {
+    it("should emit control.metrics event to eventBus", async () => {
       const engine = createEngine();
-      engine.evaluate(makeContext({ text: "Clean text" }));
+      await engine.evaluate(makeContext({ text: "Clean text" }));
 
       jest.clearAllMocks();
       engine.flushMetrics();
@@ -352,9 +352,9 @@ describe("ControlEngine", () => {
   // ── destroy ─────────────────────────────────────────────────────────
 
   describe("destroy()", () => {
-    it("should flush metrics before removing listeners", () => {
+    it("should flush metrics before removing listeners", async () => {
       const engine = createEngine();
-      engine.evaluate(makeContext({ text: "Test text" }));
+      await engine.evaluate(makeContext({ text: "Test text" }));
 
       jest.clearAllMocks();
       engine.destroy();
@@ -387,10 +387,34 @@ describe("ControlEngine", () => {
     });
   });
 
+  // ── initialize() ────────────────────────────────────────────────────
+
+  describe("initialize()", () => {
+    it('initialize() should call claimsRegistry.initialize() when opaEvaluator present', async () => {
+      const mockOpa = { isInitialized: true, initialize: jest.fn().mockResolvedValue(undefined) } as any;
+      const mockRegistry = {
+        isEmbeddingInitialized: false,
+        initialize: jest.fn().mockResolvedValue(undefined),
+        size: 0,
+        matchText: jest.fn().mockReturnValue({ matchType: 'none' }),
+        matchDisallowedPatterns: jest.fn().mockReturnValue({ matched: false, patterns: [] }),
+        getById: jest.fn().mockReturnValue(null),
+        getSimilarityScore: jest.fn().mockReturnValue(0),
+        getEmbeddingSimilarityScore: jest.fn().mockResolvedValue(0),
+      } as any;
+      const engine = new ControlEngine('sess-init', {
+        opaEvaluator: mockOpa,
+        claimsRegistry: mockRegistry,
+      });
+      await engine.initialize();
+      expect(mockRegistry.initialize).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // ── OverrideController ──────────────────────────────────────────────
 
   describe("OverrideController", () => {
-    it("should not escalate refuse when severity < cancelThreshold", () => {
+    it("should not escalate refuse when severity < cancelThreshold", async () => {
       // Default cancelThreshold = 4
       // A refuse with severity 3 should NOT be upgraded to cancel_output
       const engine = createEngine({
@@ -399,7 +423,7 @@ describe("ControlEngine", () => {
 
       // Moderation violation: severity 4, decision refuse
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       // With threshold 5, refuse at severity 4 should stay as refuse
       const decisionCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
@@ -408,14 +432,14 @@ describe("ControlEngine", () => {
       expect(decisionCalls[0][0].payload.decision).toBe("refuse");
     });
 
-    it("should upgrade refuse to cancel_output when severity >= cancelThreshold", () => {
+    it("should upgrade refuse to cancel_output when severity >= cancelThreshold", async () => {
       const engine = createEngine({
         cancelOutputThreshold: 4,
       });
 
       // Moderation violation: severity 4, decision refuse
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const decisionCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "policy.decision",
@@ -423,13 +447,13 @@ describe("ControlEngine", () => {
       expect(decisionCalls[0][0].payload.decision).toBe("cancel_output");
     });
 
-    it("should emit control.override when decision is upgraded", () => {
+    it("should emit control.override when decision is upgraded", async () => {
       const engine = createEngine({
         cancelOutputThreshold: 4,
       });
 
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const overrideCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "control.override",
@@ -443,13 +467,13 @@ describe("ControlEngine", () => {
       );
     });
 
-    it("should not emit control.override when decision is not upgraded", () => {
+    it("should not emit control.override when decision is not upgraded", async () => {
       const engine = createEngine({
         cancelOutputThreshold: 10,
       });
 
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const overrideCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "control.override",
@@ -457,7 +481,7 @@ describe("ControlEngine", () => {
       expect(overrideCalls.length).toBe(0);
     });
 
-    it("should emit cancel_output local event when upgraded", () => {
+    it("should emit cancel_output local event when upgraded", async () => {
       const engine = createEngine({
         cancelOutputThreshold: 4,
       });
@@ -466,18 +490,18 @@ describe("ControlEngine", () => {
       engine.on("cancel_output", cancelHandler);
 
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       expect(cancelHandler).toHaveBeenCalledTimes(1);
     });
 
-    it("should set fallback_mode to refuse_politely for cancel_output", () => {
+    it("should set fallback_mode to refuse_politely for cancel_output", async () => {
       const engine = createEngine({
         cancelOutputThreshold: 4,
       });
 
       const ctx = makeContext({ text: "Contains banned_word" });
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const decisionCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "policy.decision",
@@ -491,12 +515,12 @@ describe("ControlEngine", () => {
   // ── Audit event content ─────────────────────────────────────────────
 
   describe("audit event content", () => {
-    it("should truncate textSnippet to 200 characters", () => {
+    it("should truncate textSnippet to 200 characters", async () => {
       const engine = createEngine();
       const longText = "A".repeat(300);
       const ctx = makeContext({ text: longText });
 
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const auditCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "control.audit",
@@ -506,9 +530,9 @@ describe("ControlEngine", () => {
       );
     });
 
-    it("should include checksRun in audit payload", () => {
+    it("should include checksRun in audit payload", async () => {
       const engine = createEngine();
-      engine.evaluate(makeContext());
+      await engine.evaluate(makeContext());
 
       const auditCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "control.audit",
@@ -518,11 +542,11 @@ describe("ControlEngine", () => {
       expect(auditCalls[0][0].payload.checksRun).toContain("claims_checker");
     });
 
-    it("should redact PII in audit textSnippet", () => {
+    it("should redact PII in audit textSnippet", async () => {
       const engine = createEngine();
       const ctx = makeContext({ text: "Call me at 555-123-4567" });
 
-      engine.evaluate(ctx);
+      await engine.evaluate(ctx);
 
       const auditCalls = (eventBus.emit as jest.Mock).mock.calls.filter(
         (call) => call[0]?.type === "control.audit",
@@ -539,12 +563,12 @@ describe("ControlEngine", () => {
   // ── PII disabled ────────────────────────────────────────────────────
 
   describe("with PII redaction disabled", () => {
-    it("should skip PIIRedactor check entirely", () => {
+    it("should skip PIIRedactor check entirely", async () => {
       const engine = createEngine({
         enablePIIRedaction: false,
       });
       const ctx = makeContext({ text: "My number is 555-123-4567" });
-      const result = engine.evaluate(ctx);
+      const result = await engine.evaluate(ctx);
 
       expect(result.checksRun).not.toContain("pii_redactor");
       expect(result.decision).toBe("allow");
@@ -572,7 +596,7 @@ describe("ControlEngine", () => {
   // ── handleEvent (event-driven path) ─────────────────────────────────
 
   describe("handleEvent (event-driven path)", () => {
-    let capturedHandler: (event: Event) => void;
+    let capturedHandler: (event: Event) => Promise<void>;
 
     beforeEach(() => {
       jest.clearAllMocks();
@@ -586,8 +610,8 @@ describe("ControlEngine", () => {
 
     // ── transcript.final ──────────────────────────────────────────────
 
-    it("should evaluate transcript.final events as user role", () => {
-      capturedHandler({
+    it("should evaluate transcript.final events as user role", async () => {
+      await capturedHandler({
         event_id: "e1",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -653,12 +677,12 @@ describe("ControlEngine", () => {
       expect(decisions.length).toBe(0);
     });
 
-    it("should evaluate transcript.delta when evaluateDeltas is true", () => {
+    it("should evaluate transcript.delta when evaluateDeltas is true", async () => {
       jest.clearAllMocks();
       createEngine({ enabled: true, evaluateDeltas: true });
       const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
 
-      handler({
+      await handler({
         event_id: "e4",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -680,8 +704,8 @@ describe("ControlEngine", () => {
 
     // ── transcript (assistant from laneB) ─────────────────────────────
 
-    it("should evaluate transcript from laneB as assistant role", () => {
-      capturedHandler({
+    it("should evaluate transcript from laneB as assistant role", async () => {
+      await capturedHandler({
         event_id: "e5",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -746,8 +770,8 @@ describe("ControlEngine", () => {
 
     // ── user_transcript ───────────────────────────────────────────────
 
-    it("should evaluate user_transcript events", () => {
-      capturedHandler({
+    it("should evaluate user_transcript events", async () => {
+      await capturedHandler({
         event_id: "e8",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -842,7 +866,7 @@ describe("ControlEngine", () => {
 
     // ── metadata propagation through evaluation context ───────────────
 
-    it("should include response metadata in assistant evaluation context", () => {
+    it("should include response metadata in assistant evaluation context", async () => {
       jest.clearAllMocks();
       // Engine created for side effect: subscribes to eventBus.onSession
       void new ControlEngine(SESSION_ID, {
@@ -865,7 +889,7 @@ describe("ControlEngine", () => {
       } as Event);
 
       // Then send assistant transcript that will pick up the metadata
-      handler({
+      await handler({
         event_id: "t1",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -886,7 +910,7 @@ describe("ControlEngine", () => {
       expect(lastAudit[0].payload.role).toBe("assistant");
     });
 
-    it("should include response metadata in user_transcript evaluation context", () => {
+    it("should include response metadata in user_transcript evaluation context", async () => {
       jest.clearAllMocks();
       // Engine created for side effect: subscribes to eventBus.onSession
       void new ControlEngine(SESSION_ID, {
@@ -909,7 +933,7 @@ describe("ControlEngine", () => {
       } as Event);
 
       // Then send user_transcript that will include metadata in context
-      handler({
+      await handler({
         event_id: "t2",
         session_id: SESSION_ID,
         t_ms: Date.now(),
@@ -932,8 +956,8 @@ describe("ControlEngine", () => {
 
     // ── transcript.final with moderation violation ────────────────────
 
-    it("should refuse transcript.final containing banned content", () => {
-      capturedHandler({
+    it("should refuse transcript.final containing banned content", async () => {
+      await capturedHandler({
         event_id: "e12",
         session_id: SESSION_ID,
         t_ms: Date.now(),
