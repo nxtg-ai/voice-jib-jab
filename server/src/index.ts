@@ -13,8 +13,10 @@ import { OpaEvaluator } from "./insurance/opa_evaluator.js";
 import { SessionRecorder } from "./services/SessionRecorder.js";
 import { createSessionsRouter } from "./api/sessions.js";
 import { createAdminRouter } from "./api/admin.js";
+import { createVoiceRouter } from "./api/voice.js";
 import { tenantRegistry, initTenantRegistry } from "./services/TenantRegistry.js";
 import { systemConfigStore } from "./services/SystemConfigStore.js";
+import { VoiceTriggerService } from "./services/VoiceTriggerService.js";
 
 const app = express();
 const server = createServer(app);
@@ -194,13 +196,20 @@ app.use("/sessions", createSessionsRouter(sessionRecorder));
 initTenantRegistry(resolve(dirname(config.storage.databasePath), "tenants.json"));
 app.use("/admin", createAdminRouter(tenantRegistry, systemConfigStore));
 
+// ── Voice Trigger Service + Voice API ────────────────────────────────
+export const voiceTriggerService = new VoiceTriggerService(
+  `http://localhost:${config.port}`,
+  systemConfigStore,
+);
+app.use("/voice", createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
+
 async function startServer(): Promise<void> {
   // Initialize OPA singleton before accepting any sessions
   const opaEvaluator = await initializeOpa();
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder);
+  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService);
 
   server.listen(config.port, () => {
     console.log(
@@ -230,7 +239,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Metrics: http://localhost:${config.port}/metrics`);
     console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard`);
     console.log(`[Server] Sessions: http://localhost:${config.port}/sessions`);
-    console.log(`[Server] Admin API: http://localhost:${config.port}/admin\n`);
+    console.log(`[Server] Admin API: http://localhost:${config.port}/admin`);
+    console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger\n`);
 
     console.log("Features:");
     console.log(

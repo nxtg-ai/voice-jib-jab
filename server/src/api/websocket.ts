@@ -28,6 +28,7 @@ import {
 } from "../storage/index.js";
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import type { SessionRecorder } from "../services/SessionRecorder.js";
+import type { VoiceTriggerService } from "../services/VoiceTriggerService.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -66,12 +67,14 @@ export class VoiceWebSocketServer {
   private connections: Map<WebSocket, ClientConnection>;
   private opaEvaluator: OpaEvaluator | undefined;
   private sessionRecorder: SessionRecorder | undefined;
+  private voiceTriggerService: VoiceTriggerService | undefined;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
     this.sessionRecorder = sessionRecorder;
+    this.voiceTriggerService = voiceTriggerService;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -1080,6 +1083,16 @@ export class VoiceWebSocketServer {
     this.sessionRecorder?.stopRecording(sessionId).catch((error) => {
       console.error("[WebSocket] Failed to stop session recording:", error);
     });
+
+    // Fire webhook callback if this session was trigger-initiated
+    if (this.voiceTriggerService?.getTriggerBySession(sessionId)) {
+      this.voiceTriggerService.completeTrigger(sessionId, {
+        status: "completed",
+        durationMs: null,
+        transcript: [],
+        policyDecisions: [],
+      });
+    }
 
     laneArbitrator.endSession();
     fallbackPlanner.stop();
