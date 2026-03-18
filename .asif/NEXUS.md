@@ -240,6 +240,31 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-70 — P1: Docker Compose + Production Config
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 15:40 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] `docker-compose.yml` — PostgreSQL + ChromaDB + VJJ server + OPA.
+2. [ ] `Dockerfile` — multi-stage production build.
+3. [ ] Env var documentation. 4. [ ] Health check endpoint.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-71.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-71 — P2: Load Testing + Capacity Planning
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 15:40 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] 10/50/100 concurrent session test. 2. [ ] Memory/CPU per session doc. 3. [ ] `docs/capacity-planning.md`.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-56 — P0: E2E Smoke Test — Full Voice Pipeline
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P0
 **Injected**: 2026-03-18 15:00 | **Estimate**: S | **Status**: DONE
