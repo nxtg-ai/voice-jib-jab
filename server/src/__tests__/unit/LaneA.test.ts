@@ -354,4 +354,106 @@ describe("LaneA", () => {
       ]);
     });
   });
+
+  // ── initializeFallbackAudio (lines 95-129) ──────────────────────────
+
+  describe("initializeFallbackAudio fallback path", () => {
+    it("should initialize fallback audio when TTS preloadPhrases throws", async () => {
+      mockTTS.preloadPhrases.mockRejectedValue(new Error("TTS service down"));
+
+      jest.spyOn(console, "error").mockImplementation();
+      jest.spyOn(console, "warn").mockImplementation();
+      jest.spyOn(console, "log").mockImplementation();
+
+      const lane = createLaneA();
+      // Flush all microtasks so the catch branch runs and fallback initializes
+      await jest.runAllTimersAsync();
+
+      // After fallback initialization, isReady() should be true
+      expect(lane.isReady()).toBe(true);
+    });
+
+    it("should populate audio cache with tone data for each phrase after fallback", async () => {
+      mockTTS.preloadPhrases.mockRejectedValue(new Error("TTS service down"));
+
+      jest.spyOn(console, "error").mockImplementation();
+      jest.spyOn(console, "warn").mockImplementation();
+      jest.spyOn(console, "log").mockImplementation();
+
+      const lane = createLaneA();
+      await jest.runAllTimersAsync();
+
+      // After fallback, playing a reflex should work because cache is populated
+      // (no generateSpeech call needed — phrase already cached)
+      const stoppedHandler = jest.fn();
+      lane.on("stopped", stoppedHandler);
+
+      // Re-mock generateSpeech to ensure it is NOT called (cache hit)
+      mockTTS.generateSpeech.mockClear();
+
+      const audioChunks: unknown[] = [];
+      lane.on("audio", (chunk) => audioChunks.push(chunk));
+
+      await lane.playReflex();
+      jest.advanceTimersByTime(1000);
+
+      // Fallback audio should have been streamed — generateSpeech not needed
+      expect(mockTTS.generateSpeech).not.toHaveBeenCalled();
+    });
+
+    it("should warn and log when falling back to placeholder audio", async () => {
+      mockTTS.preloadPhrases.mockRejectedValue(new Error("TTS service down"));
+
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation();
+      jest.spyOn(console, "log").mockImplementation();
+
+      createLaneA();
+      await jest.runAllTimersAsync();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[LaneA] Failed to initialize TTS audio:",
+        expect.any(Error),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[LaneA] Using fallback placeholder audio",
+      );
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ── getAudio cache hit (line 205) ───────────────────────────────────
+
+  describe("getAudio() cache hit", () => {
+    it("should return cached audio without calling generateSpeech", async () => {
+      // Preload cache with a phrase via preloadPhrases so "mmhmm" is cached
+      const cachedBuffer = Buffer.alloc(9600);
+      mockTTS.preloadPhrases.mockResolvedValue(
+        new Map([["mmhmm", cachedBuffer]]),
+      );
+
+      const lane = createLaneA();
+      // Wait for initializeAudioCache to complete and populate cache
+      await jest.runAllTimersAsync();
+
+      mockTTS.generateSpeech.mockClear();
+
+      // playReflex will call getAudio("Mmhmm") — should find "mmhmm" in cache
+      const audioChunks: unknown[] = [];
+      lane.on("audio", (chunk) => audioChunks.push(chunk));
+
+      const playPromise = lane.playReflex();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // generateSpeech must NOT be called — cache hit on "mmhmm"
+      expect(mockTTS.generateSpeech).not.toHaveBeenCalled();
+      expect(audioChunks.length).toBeGreaterThanOrEqual(1);
+
+      lane.stop();
+      await playPromise;
+    });
+  });
 });

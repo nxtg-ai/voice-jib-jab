@@ -770,4 +770,592 @@ describe("OpenAIRealtimeAdapter", () => {
       // until AFTER commit confirmation, preventing the error
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Additional coverage tests — error paths, edge cases, uncovered branches
+  // ---------------------------------------------------------------------------
+
+  describe("WebSocket message parse error (line 165-166)", () => {
+    it("should emit error and not throw when incoming message is invalid JSON", () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      // Emit a raw message event that contains invalid JSON directly on the ws
+      mockWs.emit("message", Buffer.from("not-valid-json{{"));
+
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe("connect() error paths", () => {
+    it("should reject connect() promise when WebSocket constructor throws (line 203-204)", async () => {
+      // Disconnect existing adapter first
+      await adapter.disconnect();
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      const WebSocketMock = jest.requireMock("ws").default;
+      WebSocketMock.resetMock();
+
+      // Make constructor throw on next call
+      WebSocketMock.mockImplementationOnce(() => {
+        throw new Error("WebSocket constructor failed");
+      });
+
+      const freshAdapter = new OpenAIRealtimeAdapter(config);
+      await expect(freshAdapter.connect("session-err")).rejects.toThrow(
+        "WebSocket constructor failed",
+      );
+    });
+
+    it("should reject connect() promise when ws emits error before open (line 176)", async () => {
+      await adapter.disconnect();
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      const WebSocketMock = jest.requireMock("ws").default;
+      WebSocketMock.resetMock();
+
+      // Build a minimal EventEmitter-based stub that fires an error before open
+      WebSocketMock.mockImplementationOnce(() => {
+        const { EventEmitter } = require("events");
+        const stub = new EventEmitter() as any;
+        stub.readyState = 0; // CONNECTING
+        stub.send = jest.fn();
+        stub.close = jest.fn();
+        // Fire error on next tick — connected is still false at this point
+        process.nextTick(() => {
+          stub.emit("error", new Error("connection refused"));
+        });
+        return stub;
+      });
+
+      const freshAdapter = new OpenAIRealtimeAdapter(config);
+      // Must add an error listener so adapter.emit("error",...) doesn't throw
+      // uncaught — otherwise reject(error) on line 176 is never reached
+      freshAdapter.on("error", () => {});
+      await expect(freshAdapter.connect("session-err2")).rejects.toThrow(
+        "connection refused",
+      );
+    });
+  });
+
+  describe("sendAudio error path (line 384)", () => {
+    it("should throw and emit error when sendMessage throws inside sendAudio", async () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      // sendMessage is private; mock it via type-cast to force sendAudio's catch path
+      jest
+        .spyOn(adapter as any, "sendMessage")
+        .mockImplementationOnce(() => {
+          throw new Error("send failed");
+        });
+
+      await expect(
+        adapter.sendAudio(createAudioForDuration(100)),
+      ).rejects.toThrow("send failed");
+
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe("clearInputBuffer (lines 454-471)", () => {
+    it("should send input_audio_buffer.clear message", () => {
+      mockWs.clearMessages();
+      adapter.clearInputBuffer();
+      expect(mockWs.hasSentMessage("input_audio_buffer.clear")).toBe(true);
+    });
+
+    it("should reset buffer state after clear", async () => {
+      await adapter.sendAudio(createAudioForDuration(200));
+      adapter.clearInputBuffer();
+
+      const bufferState = (adapter as any).bufferState;
+      expect(bufferState.localBytes).toBe(0);
+    });
+
+    it("should do nothing when not connected", async () => {
+      await adapter.disconnect();
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      // Should not throw
+      expect(() => adapter.clearInputBuffer()).not.toThrow();
+    });
+  });
+
+  describe("cancel() error path (lines 490-492)", () => {
+    it("should throw and emit error when sendMessage throws during cancel", async () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      jest
+        .spyOn(adapter as any, "sendMessage")
+        .mockImplementationOnce(() => {
+          throw new Error("cancel send failed");
+        });
+
+      await expect(adapter.cancel()).rejects.toThrow("cancel send failed");
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe("disconnect() paths", () => {
+    it("should return early without error if already disconnected (line 501)", async () => {
+      // Disconnect once properly
+      await adapter.disconnect();
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      // Second disconnect on already-disconnected adapter — should be silent
+      await expect(adapter.disconnect()).resolves.not.toThrow();
+    });
+
+    it("should throw and emit error when ws.send throws during disconnect (lines 536-538)", async () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      // Make send throw to trigger the disconnect error path
+      jest.spyOn(mockWs, "close").mockImplementationOnce(() => {
+        throw new Error("close failed");
+      });
+
+      await expect(adapter.disconnect()).rejects.toThrow("close failed");
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe("sendMessage() queue and error paths", () => {
+    it("should drop oldest message when queue is full (lines 569-576)", () => {
+      const consoleWarnSpy = jest
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+
+      // Force adapter into disconnected state so messages get queued
+      (adapter as any).connected = false;
+      mockWs.readyState = MockWebSocket.CLOSING;
+
+      // Fill queue past MAX_MESSAGE_QUEUE_SIZE (50)
+      for (let i = 0; i < 51; i++) {
+        (adapter as any).sendMessage({ type: "test.message", seq: i });
+      }
+
+      const queue: any[] = (adapter as any).messageQueue;
+      expect(queue.length).toBe(50); // capped at max
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Message queue full"),
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
+    it("should emit error when ws.send throws (lines 583-584)", () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      jest.spyOn(mockWs, "send").mockImplementationOnce(() => {
+        throw new Error("ws send error");
+      });
+
+      // sendMessage is private; trigger it via a public method
+      (adapter as any).sendMessage({ type: "session.update", session: {} });
+
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
+
+  describe("processMessageQueue (lines 593-595)", () => {
+    it("should drain queued messages on reconnect", async () => {
+      // Manually queue some messages
+      (adapter as any).messageQueue.push({ type: "queued.message.1" });
+      (adapter as any).messageQueue.push({ type: "queued.message.2" });
+
+      // Trigger processMessageQueue while connected
+      (adapter as any).processMessageQueue();
+
+      expect(mockWs.hasSentMessage("queued.message.1")).toBe(true);
+      expect(mockWs.hasSentMessage("queued.message.2")).toBe(true);
+      expect((adapter as any).messageQueue.length).toBe(0);
+    });
+  });
+
+  describe("handleMessage — additional message types", () => {
+    it("should handle conversation.created (lines 617-618)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({ type: "conversation.created" });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Conversation created"),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle input_audio_buffer.cleared (lines 660-661)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({ type: "input_audio_buffer.cleared" });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Audio buffer cleared"),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should emit transcript for conversation.item.created with user input_text (lines 673-694)", (done) => {
+      adapter.on("transcript", (segment) => {
+        expect(segment.text).toBe("hello there");
+        expect(segment.isFinal).toBe(true);
+        done();
+      });
+
+      mockWs.receiveMessage({
+        type: "conversation.item.created",
+        item: {
+          role: "user",
+          content: [{ type: "input_text", text: "hello there" }],
+        },
+      });
+    });
+
+    it("should not emit transcript for conversation.item.created without input_text", () => {
+      const transcriptHandler = jest.fn();
+      adapter.on("transcript", transcriptHandler);
+
+      // item with no content matching input_text
+      mockWs.receiveMessage({
+        type: "conversation.item.created",
+        item: {
+          role: "user",
+          content: [{ type: "audio" }],
+        },
+      });
+
+      expect(transcriptHandler).not.toHaveBeenCalled();
+    });
+
+    it("should not emit transcript for conversation.item.created with non-user role", () => {
+      const transcriptHandler = jest.fn();
+      adapter.on("transcript", transcriptHandler);
+
+      mockWs.receiveMessage({
+        type: "conversation.item.created",
+        item: {
+          role: "assistant",
+          content: [{ type: "input_text", text: "assistant text" }],
+        },
+      });
+
+      expect(transcriptHandler).not.toHaveBeenCalled();
+    });
+
+    it("should emit final transcript on response.audio_transcript.done (lines 722-730)", (done) => {
+      adapter.on("transcript", (segment) => {
+        expect(segment.text).toBe("Final spoken text");
+        expect(segment.isFinal).toBe(true);
+        done();
+      });
+
+      mockWs.receiveMessage({
+        type: "response.audio_transcript.done",
+        transcript: "Final spoken text",
+      });
+    });
+
+    it("should not emit transcript on response.audio_transcript.done without transcript field", () => {
+      const transcriptHandler = jest.fn();
+      adapter.on("transcript", transcriptHandler);
+
+      mockWs.receiveMessage({ type: "response.audio_transcript.done" });
+
+      expect(transcriptHandler).not.toHaveBeenCalled();
+    });
+
+    it("should log on response.audio.done (lines 747-748)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({ type: "response.audio.done" });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Audio response complete"),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log error on conversation.item.input_audio_transcription.failed (line 780)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({
+        type: "conversation.item.input_audio_transcription.failed",
+        error: { message: "Transcription error" },
+      });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Transcription failed"),
+        expect.anything(),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log on rate_limits.updated (lines 783-785)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({
+        type: "rate_limits.updated",
+        rate_limits: [{ name: "requests", remaining: 100 }],
+      });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Rate limits updated"),
+        expect.anything(),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log unhandled message type (line 800)", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+      mockWs.receiveMessage({ type: "unknown.custom.event" });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Unhandled message type"),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should accumulate pendingInputTranscript on transcription delta (lines 761-764)", () => {
+      mockWs.receiveMessage({
+        type: "conversation.item.input_audio_transcription.delta",
+        delta: "Hello ",
+      });
+      mockWs.receiveMessage({
+        type: "conversation.item.input_audio_transcription.delta",
+        delta: "world",
+      });
+
+      expect((adapter as any).pendingInputTranscript).toBe("Hello world");
+    });
+
+    it("should use responseInstructionsProvider when set and buffer committed (line 634)", async () => {
+      const provider = jest.fn().mockReturnValue("Use these RAG instructions");
+      adapter.setResponseInstructionsProvider(provider);
+
+      await adapter.sendAudio(createAudioForDuration(200));
+      await adapter.commitAudio();
+
+      mockWs.clearMessages();
+      mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
+
+      expect(provider).toHaveBeenCalled();
+      const responseCreate = mockWs.getMessagesByType("response.create")[0];
+      expect(responseCreate.response.instructions).toBe(
+        "Use these RAG instructions",
+      );
+    });
+
+    it("should handle responseInstructionsProvider throwing an error gracefully (line 634)", async () => {
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const provider = jest.fn().mockImplementation(() => {
+        throw new Error("provider failed");
+      });
+      adapter.setResponseInstructionsProvider(provider);
+
+      await adapter.sendAudio(createAudioForDuration(200));
+      await adapter.commitAudio();
+
+      mockWs.clearMessages();
+      // Should not throw
+      expect(() => {
+        mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
+      }).not.toThrow();
+
+      // response.create should still be sent (without custom instructions)
+      const responseCreate = mockWs.getMessagesByType("response.create")[0];
+      expect(responseCreate).toBeDefined();
+      expect(responseCreate.response.instructions).toBeUndefined();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle API error with no message field (line 795)", (done) => {
+      adapter.on("error", (error) => {
+        expect(error.message).toBe("Unknown error from OpenAI");
+        done();
+      });
+
+      mockWs.receiveMessage({
+        type: "error",
+        error: {},
+      });
+    });
+  });
+
+  describe("attemptReconnect (lines 816-818)", () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    it("should schedule reconnection after non-clean close", async () => {
+      const connectSpy = jest
+        .spyOn(adapter as any, "connect")
+        .mockResolvedValue(undefined);
+
+      // Force adapter to believe it has a valid sessionId
+      (adapter as any).sessionId = "test-session";
+      (adapter as any).reconnectAttempts = 0;
+
+      // Trigger attemptReconnect directly
+      (adapter as any).attemptReconnect();
+
+      // Reconnect delay is 1000ms * 2^0 = 1000ms
+      jest.advanceTimersByTime(1100);
+
+      expect(connectSpy).toHaveBeenCalledWith("test-session");
+      connectSpy.mockRestore();
+    });
+
+    it("should not attempt reconnect when sessionId is null", async () => {
+      const connectSpy = jest
+        .spyOn(adapter as any, "connect")
+        .mockResolvedValue(undefined);
+
+      (adapter as any).sessionId = null;
+      (adapter as any).reconnectAttempts = 0;
+
+      (adapter as any).attemptReconnect();
+      jest.advanceTimersByTime(2000);
+
+      expect(connectSpy).not.toHaveBeenCalled();
+      connectSpy.mockRestore();
+    });
+
+    it("should log reconnection failure when connect rejects", async () => {
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      jest
+        .spyOn(adapter as any, "connect")
+        .mockRejectedValue(new Error("reconnect fail"));
+
+      (adapter as any).sessionId = "test-session";
+      (adapter as any).reconnectAttempts = 0;
+
+      (adapter as any).attemptReconnect();
+      jest.advanceTimersByTime(1100);
+
+      // Wait for the rejected promise to be handled
+      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Reconnection failed"),
+        expect.anything(),
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("startPingInterval health check (lines 831-841)", () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    it("should log OK when ws is open during health check", () => {
+      const consoleSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // startPingInterval is called during connect; trigger manually
+      (adapter as any).startPingInterval();
+
+      jest.advanceTimersByTime(30000);
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Connection health check: OK"),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log warning and clear interval when ws is not open during health check", () => {
+      const consoleWarnSpy = jest
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+
+      // Mark ws as closed so health check sees a bad state
+      mockWs.readyState = MockWebSocket.CLOSED;
+
+      (adapter as any).startPingInterval();
+      jest.advanceTimersByTime(30000);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Not connected"),
+      );
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe("createResponse (lines 847-881)", () => {
+    it("should send response.create with text and audio modalities", async () => {
+      mockWs.clearMessages();
+      await adapter.createResponse("Say hello", true);
+
+      const msg = mockWs.getMessagesByType("response.create")[0];
+      expect(msg).toBeDefined();
+      expect(msg.response.instructions).toBe("Say hello");
+      expect(msg.response.modalities).toEqual(["text", "audio"]);
+    });
+
+    it("should send response.create with text-only modalities when generateAudio=false", async () => {
+      mockWs.clearMessages();
+      await adapter.createResponse("Say hello", false);
+
+      const msg = mockWs.getMessagesByType("response.create")[0];
+      expect(msg.response.modalities).toEqual(["text"]);
+    });
+
+    it("should send response.create without text when no text provided", async () => {
+      mockWs.clearMessages();
+      await adapter.createResponse();
+
+      const msg = mockWs.getMessagesByType("response.create")[0];
+      expect(msg).toBeDefined();
+      expect(msg.response.modalities).toEqual(["text", "audio"]);
+      expect(msg.response.instructions).toBeUndefined();
+    });
+
+    it("should throw when not connected", async () => {
+      await adapter.disconnect();
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      const freshAdapter = new OpenAIRealtimeAdapter(config);
+      await expect(freshAdapter.createResponse("hello")).rejects.toThrow(
+        "Not connected to OpenAI Realtime API",
+      );
+    });
+
+    it("should emit error and throw when sendMessage throws inside createResponse", async () => {
+      const errorHandler = jest.fn();
+      adapter.on("error", errorHandler);
+
+      jest
+        .spyOn(adapter as any, "sendMessage")
+        .mockImplementationOnce(() => {
+          throw new Error("createResponse send failed");
+        });
+
+      await expect(adapter.createResponse("hello")).rejects.toThrow(
+        "createResponse send failed",
+      );
+      expect(errorHandler).toHaveBeenCalled();
+    });
+  });
 });

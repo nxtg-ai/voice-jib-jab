@@ -881,3 +881,77 @@ describe("PolicyGate", () => {
     });
   });
 });
+
+// ── Edge-case coverage for uncovered lines ─────────────────────────────
+
+describe("ClaimsCheck edge cases (uncovered paths)", () => {
+  it("should allow and return no reason codes when claim ID not found in empty registry (line 262)", async () => {
+    // evaluateClaimId() → registry.size === 0 → return { allow, [], 0 }
+    const registry = makeRegistry([], []); // empty registry
+    const check = new ClaimsCheck(registry);
+    const result = await check.evaluate(
+      makeCtx({
+        role: "assistant",
+        text: "ignored",
+        isFinal: true,
+        metadata: { claim_ids: ["CLAIM-999"] },
+      }),
+    );
+    expect(result.decision).toBe("allow");
+    expect(result.reasonCodes).toEqual([]);
+  });
+
+  it("should handle empty string in claim_ids array (parseClaimSource empty string, line 324)", async () => {
+    // parseClaimSource("") → source.trim().length === 0 → returns early
+    const registry = makeRegistry([], []);
+    const check = new ClaimsCheck(registry);
+    const result = await check.evaluate(
+      makeCtx({
+        role: "assistant",
+        text: "ignored",
+        isFinal: true,
+        metadata: { claim_ids: [""] },
+      }),
+    );
+    // Empty string produces no claimIds → no evaluation → allow
+    expect(result.decision).toBe("allow");
+  });
+
+  it("should route plain text strings in metadata claims to text evaluation (line 329)", async () => {
+    // parseClaimSource("not a claim id") → looksLikeClaimId() false → texts.push()
+    const registry = makeRegistry(
+      [{ id: "CLAIM-001", text: "FDA approved for adults over 18" }],
+      [],
+    );
+    const check = new ClaimsCheck(registry);
+    const result = await check.evaluate(
+      makeCtx({
+        role: "assistant",
+        text: "ignored",
+        isFinal: true,
+        metadata: { claims: "not a claim id" },
+      }),
+    );
+    // Treated as text claim (no match in non-empty registry → UNVERIFIED_CLAIM)
+    expect(result.decision).toBe("allow");
+    expect(result.reasonCodes).toContain("UNVERIFIED_CLAIM");
+  });
+});
+
+describe("PIIRedactorCheck edge cases (uncovered paths)", () => {
+  it("should handle circular references in metadata without infinite loop (line 545)", async () => {
+    // redactMetadataValue() → seen.has(value) → return early
+    const check = new PIIRedactorCheck();
+    const circular: Record<string, unknown> = { name: "test" };
+    circular.self = circular; // circular reference
+
+    const result = await check.evaluate(
+      makeCtx({
+        text: "clean text",
+        metadata: circular,
+      }),
+    );
+    // Should not throw or infinite-loop; clean text → allow
+    expect(result.decision).toBe("allow");
+  });
+});

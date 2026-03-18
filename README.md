@@ -1,14 +1,24 @@
 # Voice Jib-Jab: NextGen AI Voice Orchestrator
 
-A browser-based speech-to-speech voice assistant with lane-based orchestration, ensuring responsive, natural conversations with built-in safety controls and retrieval-augmented generation.
+A production voice agent runtime focused on eliminating the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based speech-to-speech assistant with lane-based orchestration, async policy enforcement, and retrieval-augmented generation.
+
+**Status:** 15/15 roadmap initiatives SHIPPED | 2,200+ tests | 91%+ coverage
 
 ## Architecture
 
 ### Three-Lane System
 
-- **Lane A (Reflex):** Instant backchannel audio and short acknowledgements
+- **Lane A (Reflex):** Instant backchannel audio and short acknowledgements (<50ms)
 - **Lane B (Reasoned):** Streaming intelligent responses with RAG grounding
-- **Lane C (Control):** Parallel policy enforcement, moderation, and audit
+- **Lane C (Control):** Parallel async policy enforcement — moderation, PII redaction, claims verification, OPA declarative rules, audit trail
+
+### Lane C — Async Governance Pipeline
+
+Lane C runs in parallel with Lane B, never blocking audio. As of N-15 (2026-03-17), the policy check chain is fully async:
+
+- `PolicyCheck.evaluate()` → `Promise<CheckResult>` — enables dense embedding inference without latency penalty
+- `OpaClaimsCheck` routes through dense embedding similarity (`AllowedClaimsRegistry.getEmbeddingSimilarityScore()`) when the model is initialized, falling back to TF-IDF at runtime
+- `ControlEngine.initialize()` wires both OPA WASM and the dense embedding model at startup
 
 ### Tech Stack
 
@@ -101,6 +111,17 @@ npm run format
 - **TTFB p50:** <400ms (p95: <900ms)
 - **Barge-in stop p95:** <250ms
 - **Turn latency p95:** <1200ms
+
+## Quality
+
+| Metric | Value |
+|--------|-------|
+| Test count | 2,200+ |
+| Statement coverage | 91%+ |
+| Branch coverage | 81%+ |
+| Coverage floor (enforced) | stmt 88 / branch 78 / fn 87 / lines 88 |
+| Roadmap initiatives SHIPPED | 15/15 |
+| Mutation testing | Stryker baseline established (PolicyGate, AllowedClaimsRegistry, LaneArbitrator) |
 
 ## Documentation
 

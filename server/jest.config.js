@@ -26,11 +26,11 @@ export default {
   modulePathIgnorePatterns: ["<rootDir>/dist/"],
   coverageThreshold: {
     global: {
-      // Floors set ~3% below actual (2026-03-12): stmt 91%, branch 81.5%, fn 90%, lines 91.3%
-      statements: 88,
-      branches: 78,
-      functions: 87,
-      lines: 88,
+      // Floors set ~3% below actual (2026-03-18): stmt 94%, branch 86%, fn 90%, lines 94.5%
+      statements: 91,
+      branches: 83,
+      functions: 88,
+      lines: 91,
     },
   },
 };
