@@ -686,6 +686,66 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 256) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Two directives executed in parallel — both shipped in one session:
+
+**DIRECTIVE-NXTG-20260318-48** — Performance Profiling + Optimization
+- `docs/performance-profile.md` (6 sections): executive summary table, stage-by-stage timing breakdown, hot path analysis (OPA WASM, TF-IDF, pattern moderation, fire-and-forget), memory footprint table, optimization findings, N-10 load test reference with SLA headroom.
+- `server/src/__tests__/performance/PipelineLatency.test.ts` (16 benchmark tests): assertions on p50/p95 timing across all key pipeline stages. All assertions met in CI.
+- Commit `13c19f8` | Tests: 2,450 → 2,466
+
+**DIRECTIVE-NXTG-20260318-49** — NEXUS Archive + Project Showcase
+- NEXUS-archive.md Batch 3: 8 DONE directives archived (D-09/10/26/27/36/37/42/43). 15 total archived.
+- CoS Directives section trimmed to active directives only.
+- README refreshed: status badge `17/17 SHIPPED + 1 BUILDING | 2,450+ tests`; Enterprise Features section (Multi-Tenant, Ticketing, Governance, SIP BUILDING); Performance metrics table.
+- Executive Dashboard verified correct — no changes required.
+- Commit `13c19f8` | Tests: 2,466 passed, 0 failed
+
+---
+
+### 2. What surprised you?
+
+**Benchmark tests revealed that the JS wrapper around OPA WASM adds ~0.3–0.7ms** per evaluation — the WASM itself is sub-10μs, but input marshalling, JSON stringify/parse for the evaluate() call, and the output extraction loop each contribute. Still well under the 1ms threshold, but the distinction matters: if the claims payload grows (large claim sets, long input text), the JSON serialization cost could approach 1ms before the Rego logic does. The fix is pre-serialization caching of the input shape — noted in the performance doc as a future micro-optimization.
+
+**Fire-and-forget non-blocking test required a never-resolving Promise to be meaningful.** The naive approach — just asserting `evaluate()` returned quickly — doesn't actually prove non-blocking if the mock resolves immediately. The correct test creates a `createTicket` mock that returns `new Promise(() => {})` (a Promise that never settles), then verifies `evaluate()` completes in <50ms regardless. This is a subtlety in async test design that's easy to miss; the "pass" on the naive version is a false signal.
+
+**The archive operation exposed that NEXUS is now ~8,500 lines.** Even after archiving 8 directives, the file contains 255 check-ins worth of Team Feedback in the ## Team Feedback section. The historical check-ins are valuable for ASIF portfolio intelligence but add load to every context window. At ~250 tokens per check-in, that's ~63,000 tokens of check-in history. Q18 raised below.
+
+---
+
+### 3. Cross-project signals?
+
+**`measureP50P95(fn, iterations)` benchmark helper pattern is portfolio-reusable.** A pure function that runs N iterations, collects `performance.now()` timings, and returns `{ p50, p95, mean }` is applicable to any ASIF project needing performance regression tests in CI. Costs nothing beyond the test file. Guards against silent regressions when a "minor" refactor accidentally makes a hot path 10× slower. Recommend standardizing this helper in a shared `testUtils.ts` per project.
+
+**Never-resolving Promise for fire-and-forget testing.** Any project with fire-and-forget side effects (audit writes, webhook calls, analytics) should test non-blocking with a never-settling mock, not a fast-resolving one. The fast-resolving version only proves the code runs sequentially; the never-settling version proves the hot path truly doesn't wait. Pattern: `jest.fn().mockReturnValue(new Promise(() => {}))`.
+
+**Performance profiling doc template.** `docs/performance-profile.md` structure (executive summary table → stage-by-stage → hot path → memory → findings → load test reference) is directly reusable for any ASIF project approaching production. oneDB, FamilyMind, and any new project would benefit from this template at the same stage of maturity.
+
+---
+
+### 4. What would you prioritize next?
+
+**N-11 Phase 2 — real SIP.js adapter.** Phase 1 contracts are locked; the benchmark suite gives us a regression harness. Phase 2 work: install `sip.js` + `g711` packages, implement `SipJsTelephonyAdapter`, write codec conversion (G.711 PCMU ↔ PCM16 at 8kHz/24kHz), add integration tests against a local SIP echo server. No architecture questions open. Estimated L. Requesting standing auth (Q17 follow-up).
+
+**Dependabot triage (Q15 — 7th reiteration).** Two high-severity vulnerabilities have been open since check-in 61 — now 194 check-ins unresolved. This session added `@modelcontextprotocol/sdk` as a new dependency surface. At this point the audit is genuinely overdue. Still requesting: explicit standing auth for triage pass OR explicit named deferral.
+
+**NEXUS check-in archive (Q18 — new).** The Team Feedback section is ~63K tokens of historical context. Proposal: archive check-ins 1–240 to `NEXUS-checkins-archive.md` (or split by quarter), keeping only the most recent 15 check-ins live in NEXUS.md. This would reduce context load by ~55K tokens without losing portfolio intelligence. Requesting CoS approval before acting (this is a structural governance change).
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q18 (new) — NEXUS check-in archive.** Team Feedback section is now ~8,000 lines / ~63K tokens of historical check-ins. At current cadence (~3 check-ins/session) this will exceed 100K tokens within 20 sessions and will start truncating mid-context. Proposal: archive check-ins 1–240 to a dated file, keep most recent 15–20 live. Requesting approval before acting — this is a structural change to the governance artifact.
+
+**Q17 (follow-up) — N-11 Phase 2: standing auth to proceed?** Phase 1 shipped (27 tests, contracts locked). Research doc complete. No architecture questions. Requesting standing auth to self-execute Phase 2 in next idle cycle.
+
+**Q15 (7th reiteration) — Dependabot: triage now or named defer?** Two high + one moderate. 194 check-ins since first flagged. Requesting explicit CoS call. Will not reiterate again without a response — flagging as a governance risk if left unacknowledged.
+
+---
+
 > Session: 2026-03-18 (check-in 255) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
