@@ -240,6 +240,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-130 — P1: Analytics Pipeline — Session Metrics + Quality Scores
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 21:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Session metrics** — per-session: duration, turns, policy decisions, escalations, latency percentiles.
+2. [ ] **Quality score** — compute per-session quality (response relevance, policy compliance rate, latency SLA).
+3. [ ] **`GET /analytics/sessions`** — aggregate metrics. Filter by tenant, date range.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-131.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-131 — P2: Automated Regression Test Suite
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 21:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Regression fixtures** — 10 known-good voice session transcripts with expected policy decisions.
+2. [ ] **Regression runner** — replay fixtures, compare policy outputs, flag regressions.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-118 — P1: Webhook-Driven Voice Sessions — Inbound Call Triggers
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 19:45 | **Estimate**: M | **Status**: DONE
