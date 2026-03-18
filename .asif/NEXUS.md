@@ -644,6 +644,78 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 253) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Three directives executed across one active session — the most productive single session in the project's history:
+
+**DIRECTIVE-NXTG-20260317-01 (executed from plan)** — N-15 Sprint 2: Async PolicyCheck + Dense Embedding Wiring
+- `PolicyCheck.evaluate()` interface changed from `CheckResult` to `Promise<CheckResult>`
+- All 5 production files updated: `policy_gate.ts`, `opa_claims.ts`, `opa_moderator.ts`, `laneC_control.ts`, 4 check implementations
+- `OpaClaimsCheck` now uses `getEmbeddingSimilarityScore()` when `isEmbeddingInitialized`, TF-IDF fallback otherwise
+- `ControlEngine.initialize()` chains `claimsRegistry.initialize()` alongside OPA WASM load
+- 6 test files migrated to async/await; 4 new tests added
+- Commit `4cfcf68` | Tests: 2,168
+
+**DIRECTIVE-NXTG-20260318-02** — Quality Hardening: Coverage Push + CRUCIBLE Audit
+- CRUCIBLE audit: clean across all 7 gates
+- `OpenAIRealtimeAdapter`: 73.85% → 97.87% (56 new tests, parallel agent)
+- `LaneA`: 85% → 100%; `LaneB`: 83% → 99.07% (new `LaneB.test.ts`, parallel agent)
+- `laneC_control`: 98% → 100%; `policy_gate`: 97% → 99% (edge-case tests direct)
+- Coverage floor raised: stmt 88→91, branch 78→83 in `jest.config.js`
+- README updated with quality table and N-15 architecture note
+- Commit `1024066` | Tests: 2,168 → 2,251
+
+**DIRECTIVE-NXTG-20260318-07** — Documentation Suite
+- `CHANGELOG.md` (179 lines): N-01→N-15 with test counts at each milestone
+- `docs/architecture/ARCHITECTURE.md` (296 lines): 5 Mermaid diagrams
+- `docs/API.md` (788 lines): full WebSocket protocol — 26 message types with TypeScript interfaces
+- `CONTRIBUTING.md` (262 lines): public-facing onboarding, async `PolicyCheck` example, coverage floors
+- Commit `fc69727` | Tests: 2,251 (unchanged)
+
+---
+
+### 2. What surprised you?
+
+**The async interface change had a hidden blast radius.** The plan correctly identified 6 production files and ~100 test `await` additions in `PolicyGate`, `ControlEngine`, and `OpaClaimsCheck`. What the plan didn't catch: `OpaEvaluator.test.ts`, `ModerationPatterns.test.ts`, and `OpaModeratorCheck.test.ts` also call `.evaluate()` on `PolicyCheck` implementations and broke on the same TypeScript error (`Property 'decision' does not exist on type 'Promise<CheckResult>'`). Required 3 additional agent passes. Lesson: when changing an interface, grep for all call sites across the *entire* test suite, not just the files explicitly named in the plan.
+
+**The `handleEvent` async promotion had a non-obvious test coupling.** Making `onTranscript`/`onAssistantTranscript`/`onUserTranscript` async but leaving `handleEvent` sync created a timing gap: tests fire `capturedHandler(event)` and immediately check `eventBus.emit` calls, but the async evaluation hadn't resolved yet. The fix (make `handleEvent` async too, await inner calls) meant the captured lambda `async (event) => { await this.handleEvent(event); }` becomes awaitable from tests. The key insight: fire-and-forget at the *event bus* level doesn't mean fire-and-forget at the *test capture* level — tests need the full await chain even when production callers don't.
+
+**`LaneB.test.ts` had never been committed.** The file existed on disk but had no git history — it was created in a prior session and never staged. The LaneB coverage agent created it fresh, giving 83% → 99.07% coverage on a file that technically had no unit tests in git. Worth noting for the CoS: we may have other test files in the working tree that were created but never committed.
+
+**OpenAIRealtimeAdapter coverage was the largest single gap in the codebase (73.85%)** — far below any other file. The 26-point gap was almost entirely error paths and WebSocket message handlers that required careful mock setup (MockWebSocket `readyState` simulation, queue overflow, reconnect timer). 56 tests to close it; the agent took 2 correction rounds to get timing right on the connect-rejection path. A file this complex with this much uncovered error-handling logic is a latent production risk — these are exactly the paths that fail silently in prod.
+
+---
+
+### 3. Cross-project signals?
+
+**Async interface migration pattern** is now well-exercised here and should be documented for the ASIF portfolio. Pattern: when promoting a sync interface to async, (1) change the interface, (2) grep all call sites including test files with `grep -rn "\.evaluate("`, (3) update event handler chains to be fully awaitable even if fire-and-forget at the bus level, (4) TypeScript will catch most issues but timing bugs in tests require manual identification. The full recipe took 3 correction passes here — a future project hitting the same pattern could skip that with the lesson.
+
+**CRUCIBLE audit finding: `toBeDefined()` is not hollow when used as a precondition.** There was initial concern that 51 `toBeDefined()` calls indicated hollow assertions. Investigation showed all 51 are followed by substantive field assertions on the same object — they're null guards, not the final assertion. This distinction (`toBeDefined()` as precondition vs. `toBeDefined()` as the only assertion) is worth capturing as ASIF CRUCIBLE guidance: Gate 1 should distinguish precondition `toBeDefined()` from terminal `toBeDefined()`.
+
+**WebSocket mock complexity signal.** The `MockWebSocket` class has only 14% statement coverage (intentionally excluded from production coverage requirements). This is the pattern for complex WebSocket test infrastructure — the mock itself isn't the subject under test. Other portfolio projects with WebSocket layers should adopt the same MockWebSocket + captured-handler pattern used here rather than building per-project WebSocket mocks from scratch.
+
+---
+
+### 4. What would you prioritize next?
+
+**Q14 mutation gap closure** (standing item from prior check-ins) — Stryker baseline was established on PolicyGate, AllowedClaimsRegistry, and LaneArbitrator. The next step is reading the mutation report to identify specific survived mutants and writing killer tests. Low scope, high signal.
+
+**Dependabot vulnerability triage** — GitHub has flagged 2 high + 1 moderate since check-in 61 (Q11). With 15/15 SHIPPED and documentation complete, this is the highest-risk open item. A brief triage (identify affected packages, assess exploitability in the voice runtime context) would close the risk or produce a documented acceptance.
+
+**N-11 SIP / N-12 Ticketing / N-13 Multi-Tenant** — all three need Asif's direction per the directive constraints. The codebase is now in the best shape it's ever been (94% coverage, full docs, clean CRUCIBLE) — this is the right moment to begin the next capability layer. Waiting on CoS direction.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q15 — Dependabot: triage now or accept risk?** Q11 was answered as "defer, address in a dedicated security sprint" (implied by silence — never formally answered). With 15/15 SHIPPED and the project showcase-ready, this feels like the right moment for a triage pass. Requesting explicit CoS call: (a) triage + patch now, (b) triage + accept risk with documented rationale, or (c) defer to N-16/security sprint. I can self-execute option (a) or (b) with standing auth if granted.
+
+**Q16 — N-11/N-12/N-13 sequencing?** All three IDEA-stage initiatives are blocked on Asif's direction. If the CoS is ready to inject the first one, recommended sequence based on portfolio value: N-12 (Ticketing MCP) — smallest scope, highest enterprise demo value; then N-13 (Multi-Tenant Isolation) — prerequisite for real enterprise deployment; then N-11 (SIP Telephony) — largest scope, requires external provider research.
+
+---
+
 > Session: 2026-03-17 (check-in 252) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
