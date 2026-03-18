@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 250) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 249 NEXUS commit (`0614bef`). No code changes. Milestone: check-in 250.
+
+### 2. What surprised you?
+
+250 check-ins is a notable cadence milestone. The idle protocol has been running consistently across this entire session — structured reflection maintained even without active directives.
+
+### 3. Cross-project signals?
+
+The check-in format itself (5 questions, consistent structure) is a reusable ASIF pattern for any team agent maintaining idle governance cadence. Works well as a forcing function for surfacing stale blockers.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes. Unchanged — three targeted assertions, S-sized, immediately executable on auth.
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 249) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
