@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-138 — P1: Voice SDK — Browser + Node.js Client Library
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 21:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **`@nxtg/vjj-sdk`** — TypeScript package. `VoiceClient` class: connect(wsUrl), startSession(config), sendAudio(buffer), onResponse(cb), onPolicyEvent(cb), endSession().
+2. [ ] **Browser bundle** — UMD build for `<script>` tag embedding.
+3. [ ] **npm package ready** — `package.json`, types, README with examples.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-139.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-139 — P2: Security Audit — Input Validation + Rate Limiting
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 21:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Audit all API inputs for injection/overflow. 2. [ ] Add rate limiting per tenant. 3. [ ] Document security model.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-130 — P1: Analytics Pipeline — Session Metrics + Quality Scores
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 21:00 | **Estimate**: M | **Status**: DONE
