@@ -242,6 +242,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-166 — P1: Sentiment Analysis Pipeline — Real-Time Mood Detection
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 23:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Sentiment analyzer** — detect caller mood (positive/neutral/negative/frustrated) from audio features + text content.
+2. [ ] **Lane integration** — feed sentiment to PolicyGate as additional context for decision-making.
+3. [ ] **Session metrics** — track sentiment trajectory over conversation (escalating frustration = auto-escalate).
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-167.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-167 — P2: Final NEXUS Archive
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 23:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Final test count. 2. [ ] All features. 3. [ ] NEXUS archive.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-158 — P1: Voice Cloning Integration — Custom TTS Voices
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 23:15 | **Estimate**: M | **Status**: DONE
