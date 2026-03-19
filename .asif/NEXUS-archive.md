@@ -895,3 +895,15 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260319-29 — P2: Final NEXUS Archive + Test Count
 **Status**: DONE | **Archived**: 2026-03-19
 **Deliverables**: D-28/D-29 archived to Batch 10. Final test count: 2845/2845. Cumulative day total: +594 tests (2251→2845). 20 directives shipped across 6 sessions.
+
+### DIRECTIVE-NXTG-20260319-38 — P1: Call Routing — Intelligent Session Assignment
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `RoutingEngine.ts` (priority-sorted rule evaluation: language/topic/callerType/timeRange/concurrencyLimit conditions; JSON-persisted rules; fallback to builtin-customer-support), `CallQueueService.ts` (per-tenant FIFO queue; 1-based position + ETA from AVG_HANDLE_TIME_MS=180s), `api/routing.ts` (9 endpoints: rules CRUD + /routing/evaluate + queue ops), mounted at /routing in index.ts. Tests added. Tests at archive: 2891/2891.
+
+### DIRECTIVE-NXTG-20260319-39 — P2: Voice Agent Marketplace — Share Templates
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `AgentTemplateStore.ts` extended with `published` field (built-ins=true, custom defaults=false), new methods: publishTemplate/unpublishTemplate/listMarketplace/installTemplate (clones to tenant). `api/templates.ts` marketplace routes: GET /marketplace, POST /:id/publish, POST /:id/unpublish, POST /marketplace/:id/install. 22 new tests (47 total in AgentTemplates.test.ts). Tests at archive: 2891/2891.
+
+### DIRECTIVE-NXTG-20260319-43 — P2: Final Session Archive + Test Count
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: D-38/D-39 archived to NEXUS-archive.md (Batch 11). Final test count: 2891/2891. Cumulative session total: 2845→2891 (+46). Session 7 shipped 2 directives (D-38, D-39). N-16 + N-17 added to Executive Dashboard.

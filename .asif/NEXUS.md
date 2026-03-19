@@ -234,7 +234,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 44 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 47 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
@@ -251,12 +251,27 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260319-43 — P2: Final Session Archive + Test Count
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 04:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-19 04:00 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Archive all DONE directives. 2. [ ] Final test count. 3. [ ] Update all initiative statuses in Executive Dashboard.
+1. [x] Archive all DONE directives. 2. [x] Final test count. 3. [x] Update all initiative statuses in Executive Dashboard.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19 — Session 7 Summary**
+>
+> **Final Test Count: 2891 tests, 0 failures** (session started at 2845, +46 net)
+>
+> **Features Shipped This Session**:
+> | Directive | Feature | Tests Added |
+> |-----------|---------|-------------|
+> | D-38 | Call Routing Engine + Queue System | ~24 |
+> | D-39 | Voice Agent Marketplace | 22 |
+>
+> **NEXUS Archive**: Batch 11 appended to NEXUS-archive.md (D-38, D-39, D-43 — 3 directives).
+>
+> **Executive Dashboard**: N-16 (Call Routing) + N-17 (Marketplace) added as SHIPPED.
+>
+> **Cumulative day total**: 2,251 → 2,891 tests (+640). 22 directives shipped across 7 sessions.
 
 ---
 
