@@ -243,6 +243,34 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-10 — P1: Conversation Summarizer — Auto-Generated Session Summaries
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Summary engine** — at session end, generate: key topics discussed, decisions made, action items, sentiment arc.
+2. [ ] **`GET /sessions/:id/summary`** — returns structured summary.
+3. [ ] **Webhook integration** — auto-send summary to ticketing system (via N-12 MCP) when session has escalations.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-11.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-11 — P2: Knowledge Base Builder — Extract FAQ from Sessions
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **FAQ extractor** — analyze session transcripts, identify recurring questions + best answers.
+2. [ ] **Knowledge base store** — per-tenant FAQ database (ChromaDB collection).
+3. [ ] **Auto-suggest** — during live sessions, suggest relevant KB answers to the agent.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-166 — P1: Sentiment Analysis Pipeline — Real-Time Mood Detection
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 23:45 | **Estimate**: M | **Status**: DONE
