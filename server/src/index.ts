@@ -30,6 +30,8 @@ import { initKnowledgeBaseStore } from "./services/KnowledgeBaseStore.js";
 import { createKnowledgeRouter } from "./api/knowledge.js";
 import { initAgentTemplateStore } from "./services/AgentTemplateStore.js";
 import { createTemplatesRouter } from "./api/templates.js";
+import { supervisorRegistry } from "./services/SupervisorRegistry.js";
+import { SupervisorWebSocketServer, createSupervisorRouter } from "./api/supervisor.js";
 
 const app = express();
 const server = createServer(app);
@@ -239,6 +241,10 @@ app.use("/tenants", createKnowledgeRouter(kbStore));
 const templateStore = initAgentTemplateStore(resolve(dirname(config.storage.databasePath), "templates.json"));
 app.use("/templates", createTemplatesRouter(templateStore));
 
+// ── Supervisor System ─────────────────────────────────────────────────
+app.use("/supervisor", createSupervisorRouter(supervisorRegistry, sessionManager));
+const supervisorWsServer = new SupervisorWebSocketServer(supervisorRegistry, sessionManager);
+
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
@@ -252,7 +258,18 @@ async function startServer(): Promise<void> {
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore);
+  const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore);
+
+  // Register whisper handler so supervisors can inject hints into live sessions
+  supervisorRegistry.setWhisperHandler((sessionId, message) => voiceWss.injectWhisper(sessionId, message));
+
+  // Route /supervisor path upgrades to the supervisor WS server
+  server.on("upgrade", (request, socket, head) => {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+    if (url.pathname === "/supervisor") {
+      supervisorWsServer.handleUpgrade(request, socket, head);
+    }
+  });
 
   server.listen(config.port, () => {
     console.log(
@@ -288,7 +305,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger`);
     console.log(`[Server] Voices API: http://localhost:${config.port}/voices`);
     console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb`);
-    console.log(`[Server] Templates API: http://localhost:${config.port}/templates\n`);
+    console.log(`[Server] Templates API: http://localhost:${config.port}/templates`);
+    console.log(`[Server] Supervisor WS: ws://localhost:${config.port}/supervisor\n`);
 
     console.log("Features:");
     console.log(

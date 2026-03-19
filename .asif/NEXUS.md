@@ -232,7 +232,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 40 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 42 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
@@ -242,32 +242,52 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 7: 2 directives (2026-03-18, session 3 — D-166/167)
 > - Batch 8: 2 directives (2026-03-19, session 4 — D-10/11)
 > - Batch 9: 2 directives (2026-03-19, session 5 — D-20/21)
+> - Batch 10: 2 directives (2026-03-19, session 6 — D-28/29)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260319-28 — P1: Real-Time Coaching — Supervisor Whisper Mode
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 02:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 02:45 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Supervisor WebSocket** — parallel connection for supervisors to observe live sessions read-only.
-2. [ ] **Whisper mode** — supervisor sends text guidance visible only to the agent (not the caller).
-3. [ ] **Supervisor dashboard** — list active sessions, join any, see transcript + sentiment in real-time.
-4. [ ] Tests.
+1. [x] **Supervisor WebSocket** — parallel connection for supervisors to observe live sessions read-only.
+2. [x] **Whisper mode** — supervisor sends text guidance visible only to the agent (not the caller).
+3. [x] **Supervisor dashboard** — list active sessions, join any, see transcript + sentiment in real-time.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-29.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Supervisor pub/sub system with whisper injection:
+> - `server/src/services/SupervisorRegistry.ts` — `SupervisorInfo` (supervisorId, watchingSessionId); `watch(ws, sessionId)`, `unwatch(ws)`, `broadcast(sessionId, payload)` (OPEN-state check); `setWhisperHandler()` + `dispatchWhisper()`; module-level singleton `supervisorRegistry`
+> - `server/src/api/supervisor.ts` — `SupervisorWebSocketServer` (noServer: true, path `/supervisor`): handles `supervisor.list_sessions`, `supervisor.join`, `supervisor.leave`, `supervisor.whisper` messages; `createSupervisorRouter()` for `GET /supervisor/sessions`
+> - `server/src/api/websocket.ts` — broadcasts `session.transcript`, `session.user_transcript` (with sentiment), `session.policy_decision` to `supervisorRegistry`; `injectWhisper(sessionId, msg)` public method injects via `laneB.setConversationContext()`
+> - `server/src/index.ts` — mounts supervisor HTTP router; registers whisper handler callback; routes `/supervisor` upgrade events to supervisor WS server
+> - 19 SupervisorRegistry unit tests
+> - Test count: 2845/2845 (up 19 from 2826)
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-29 — P2: Final NEXUS Archive + Test Count
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 02:45 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-19 02:45 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Archive. 2. [ ] Final test count. 3. [ ] NEXUS update.
+1. [x] Archive. 2. [x] Final test count. 3. [x] NEXUS update.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19 — Session 6 Summary**
+>
+> **Final Test Count: 2845 tests, 0 failures** (session started at 2826, +19 net)
+>
+> **Features Shipped This Session**:
+> | Directive | Feature | Tests Added |
+> |-----------|---------|-------------|
+> | D-28 | Supervisor WebSocket + Whisper Mode + Dashboard | 19 |
+>
+> **NEXUS Archive**: Batch 10 appended to NEXUS-archive.md (D-28, D-29 — 2 directives).
+>
+> **Cumulative day total**: 2,251 → 2,845 tests (+594). 20 directives shipped.
 
 ---
 

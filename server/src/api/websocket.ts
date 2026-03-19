@@ -35,6 +35,7 @@ import { SentimentAnalyzer } from "../services/SentimentAnalyzer.js";
 import { SentimentTracker } from "../services/SentimentTracker.js";
 import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
 import type { KnowledgeBaseStore } from "../services/KnowledgeBaseStore.js";
+import { supervisorRegistry } from "../services/SupervisorRegistry.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -416,6 +417,11 @@ export class VoiceWebSocketServer {
           timestamp: segment.timestamp,
         });
 
+        // Forward to supervisor observers
+        if (segment.isFinal) {
+          supervisorRegistry.broadcast(sessionId, { type: "session.transcript", sessionId, text: segment.text, role: "assistant", timestamp: segment.timestamp });
+        }
+
         // Persist assistant transcript to database
         if (config.features.enablePersistentMemory && segment.isFinal) {
           try {
@@ -492,6 +498,8 @@ export class VoiceWebSocketServer {
           if (this.sentimentTracker.shouldEscalate(sessionId)) {
             console.warn(`[WebSocket][Sentiment] Escalation triggered for session ${sessionId} — sustained frustrated trajectory`);
           }
+          // Forward user transcript + sentiment to supervisors
+          supervisorRegistry.broadcast(sessionId, { type: "session.user_transcript", sessionId, text: segment.text, role: "user", timestamp: segment.timestamp, sentiment: sentimentResult.sentiment, sentimentScore: sentimentResult.score });
         }
 
         const event: Event = {
@@ -637,6 +645,9 @@ export class VoiceWebSocketServer {
 
       const payload = event.payload as PolicyDecisionPayload;
       connection.lastPolicyDecision = payload;
+
+      // Forward policy decisions to supervisors
+      supervisorRegistry.broadcast(sessionId, { type: "session.policy_decision", sessionId, decision: payload?.decision, t_ms: event.t_ms });
 
       const disclaimerId = payload?.required_disclaimer_id;
       if (typeof disclaimerId === "string" && disclaimerId.length > 0) {
@@ -1206,5 +1217,24 @@ export class VoiceWebSocketServer {
 
   getConnectionCount(): number {
     return this.connections.size;
+  }
+
+  /**
+   * Inject a supervisor whisper message into a live session's LaneB as a system hint.
+   * Returns true if the session was found and the hint was injected.
+   */
+  injectWhisper(sessionId: string, message: string): boolean {
+    for (const connection of this.connections.values()) {
+      if (connection.sessionId === sessionId) {
+        try {
+          connection.laneB.setConversationContext(`[Supervisor whisper]: ${message}`);
+          console.log(`[WebSocket][Supervisor] Whisper injected into session ${sessionId}`);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    }
+    return false;
   }
 }

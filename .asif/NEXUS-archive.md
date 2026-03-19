@@ -887,3 +887,11 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260319-21 — P2: Compliance Report — Per-Session Audit Export
 **Status**: DONE | **Archived**: 2026-03-19
 **Deliverables**: `GET /sessions/:id/compliance` in sessions.ts — extracts policyDecisions, escalations, claimsChecked from timeline with timestamps; EU AI Act Article 13 metadata; no new deps. Tests at archive: 2826/2826.
+
+### DIRECTIVE-NXTG-20260319-28 — P1: Real-Time Coaching — Supervisor Whisper Mode
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `SupervisorRegistry.ts` (pub/sub, OPEN-state broadcast, whisper dispatch, singleton), `api/supervisor.ts` (SupervisorWebSocketServer noServer path-routed + GET /supervisor/sessions), websocket.ts broadcast hooks on transcript/sentiment/policy + injectWhisper() method, index.ts upgrade routing + whisper handler registration. 19 tests. Tests at archive: 2845/2845.
+
+### DIRECTIVE-NXTG-20260319-29 — P2: Final NEXUS Archive + Test Count
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: D-28/D-29 archived to Batch 10. Final test count: 2845/2845. Cumulative day total: +594 tests (2251→2845). 20 directives shipped across 6 sessions.
