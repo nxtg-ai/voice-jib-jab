@@ -274,14 +274,20 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260319-114 — P1: Enterprise Demo Package
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Demo fixtures** — 3 pre-configured scenarios: customer support (warranty claims), compliance hotline (regulatory questions), sales qualification (product claims).
-2. [ ] **Demo launcher** — `npm run demo:support`, `npm run demo:compliance`, `npm run demo:sales`. Each starts a session with appropriate template + claims registry + policies.
-3. [ ] **Enterprise pitch doc** at `docs/enterprise-pitch.md` — features, pricing ($99+/seat), deployment options.
+1. [x] **Demo fixtures** — 3 pre-configured scenarios: customer support (warranty claims), compliance hotline (regulatory questions), sales qualification (product claims).
+2. [x] **Demo launcher** — `npm run demo:support`, `npm run demo:compliance`, `npm run demo:sales`. Each starts a session with appropriate template + claims registry + policies.
+3. [x] **Enterprise pitch doc** at `docs/enterprise-pitch.md` — features, pricing ($99+/seat), deployment options.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Enterprise demo package with 3 scenarios + pitch doc:
+> - `server/src/demo/fixtures.ts` — `DemoScenario` interface + 3 scenarios: `support` (builtin-customer-support, warranty claims), `compliance` (builtin-tech-support, regulatory questions), `sales` (builtin-sales, product claims); each with `sampleUtterances`, `sampleClaims`, `expectedPolicyTriggers`, `pitchPoints`; `getDemoScenario(id)` + `listDemoScenarios()` exports
+> - `server/package.json` — added `demo:support`, `demo:compliance`, `demo:sales` scripts (`DEMO_SCENARIO=X tsx src/index.ts`)
+> - `server/src/index.ts` — demo mode banner (box-drawing) printed at startup when `DEMO_SCENARIO` is set
+> - `docs/enterprise-pitch.md` — features table, 3 demo scenarios, pricing tiers ($99/$299/custom), deployment options (cloud/on-prem/hybrid), integration points (SIP/CRM/ticketing/SIEM), EU AI Act August 2026 urgency
+> - 43 tests (DemoFixtures.test.ts). Tests: 2965/2965.
 
 ---
 

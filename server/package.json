@@ -9,7 +9,10 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "coverage:check": "jest --coverage --coverageReporters=text-summary",
-    "build:policy": "bash ../scripts/build-policy.sh"
+    "build:policy": "bash ../scripts/build-policy.sh",
+    "demo:support": "DEMO_SCENARIO=support tsx src/index.ts",
+    "demo:compliance": "DEMO_SCENARIO=compliance tsx src/index.ts",
+    "demo:sales": "DEMO_SCENARIO=sales tsx src/index.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

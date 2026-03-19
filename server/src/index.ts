@@ -285,6 +285,22 @@ async function startServer(): Promise<void> {
     }
   });
 
+  // Demo mode banner
+  const demoScenario = process.env.DEMO_SCENARIO;
+  if (demoScenario) {
+    try {
+      const { getDemoScenario } = await import("./demo/fixtures.js");
+      const scenario = getDemoScenario(demoScenario as import("./demo/fixtures.js").DemoScenarioId);
+      console.log("\n╔══════════════════════════════════════════════╗");
+      console.log(`║  DEMO MODE: ${scenario.name.padEnd(33)}║`);
+      console.log(`║  Template: ${scenario.templateId.padEnd(34)}║`);
+      console.log(`║  ${scenario.description.slice(0, 44).padEnd(44)}║`);
+      console.log("╚══════════════════════════════════════════════╝\n");
+    } catch {
+      console.warn("[Demo] Unknown DEMO_SCENARIO:", demoScenario);
+    }
+  }
+
   server.listen(config.port, () => {
     console.log(
       "\n╔══════════════════════════════════════════════════════════╗",
