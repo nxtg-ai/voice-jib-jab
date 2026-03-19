@@ -249,6 +249,47 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-134 — P1: Voice Quality Scoring — Automated Call Grading
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 08:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Quality scorer** — grade each voice session 0-100 based on: response relevance, policy compliance, resolution rate, caller sentiment trajectory, latency adherence.
+2. [ ] **`GET /sessions/:id/quality`** — returns detailed scorecard.
+3. [ ] **Threshold alerts** — webhook when quality drops below configurable threshold.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-135.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-135 — P1: Conversation Playbook — Scripted Response Library
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 08:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Playbook system** — configurable response scripts per scenario (greeting, escalation, closing, FAQ).
+2. [ ] **`POST /playbooks`** CRUD. Per-tenant playbooks.
+3. [ ] **Auto-suggest** — during live session, suggest relevant playbook response based on conversation context.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-136.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-136 — P2: Compliance Report — Per-Tenant Regulatory Export
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 08:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] `GET /tenants/:id/compliance-report` — all policy decisions, claims, escalations in audit-ready format. 2. [ ] PDF or JSON export.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-122 — P1: Voice Analytics Dashboard — Call Center Metrics
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 07:00 | **Estimate**: M | **Status**: DONE
