@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-158 — P1: Voice Cloning Integration — Custom TTS Voices
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 23:15 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Voice profile management** — `POST /voices` (upload sample audio, name, tenant). Store in ChromaDB or disk.
+2. [ ] **TTS with custom voice** — integrate with Kokoro/RVC pipeline. Session config accepts `voiceId`.
+3. [ ] **`GET /voices`** — list available voices per tenant.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-159.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-159 — P2: Final Day Summary + NEXUS Archive
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 23:15 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Final test count. 2. [ ] All features today. 3. [ ] NEXUS archive.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-148 — P1: Conversation Memory — Cross-Session Context
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 22:45 | **Estimate**: M | **Status**: DONE
