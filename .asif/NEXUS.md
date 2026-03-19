@@ -232,37 +232,59 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 30 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 34 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
 > - Batch 4: 15 directives (2026-03-18, team — final session archive)
+> - Batch 5: (included in Batch 4 count)
+> - Batch 6: 4 directives (2026-03-18, session 2 — D-148/149/158/159)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260318-158 — P1: Voice Cloning Integration — Custom TTS Voices
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 23:15 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 23:15 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Voice profile management** — `POST /voices` (upload sample audio, name, tenant). Store in ChromaDB or disk.
-2. [ ] **TTS with custom voice** — integrate with Kokoro/RVC pipeline. Session config accepts `voiceId`.
-3. [ ] **`GET /voices`** — list available voices per tenant.
-4. [ ] Tests.
+1. [x] **Voice profile management** — `POST /voices` (upload sample audio, name, tenant). Store in ChromaDB or disk.
+2. [x] **TTS with custom voice** — integrate with Kokoro/RVC pipeline. Session config accepts `voiceId`.
+3. [x] **`GET /voices`** — list available voices per tenant.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-159.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. JSON-file-backed voice profile store + Kokoro TTS engine:
+> - `server/src/services/VoiceProfileStore.ts` — per-tenant voice profile metadata (profileId, name, audioPath, durationMs, engineData); one JSON file per tenant at `{databaseDir}/voices/{tenantId}.json`; lazy-load + in-memory cache + profileId→tenantId index; `getAudioDir()` for audio file storage
+> - `server/src/services/KokoroVoiceEngine.ts` — `VoiceEngine` interface + `KokoroVoiceEngine` impl; POST /v1/audio/speech to local Kokoro at http://localhost:8880; AbortController timeout (10s); `isAvailable()` health check; `synthesize(text, { voiceId, speed })`
+> - `server/src/api/voices.ts` — 5 endpoints: `GET /voices?tenantId=x`, `POST /voices`, `GET /voices/:profileId`, `DELETE /voices/:profileId`, `POST /voices/:profileId/synthesize`
+> - `server/src/index.ts` — mounts `/voices` router with VoiceProfileStore + KokoroVoiceEngine
+> - `server/src/api/websocket.ts` — accepts `voiceId` in `session.start`; looks up profile name via VoiceProfileStore; stores on connection
+> - 18 VoiceProfileStore tests + 13 KokoroVoiceEngine tests = 31 new tests
+> - Test count: 2713/2713 (up 31 from 2682)
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-159 — P2: Final Day Summary + NEXUS Archive
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 23:15 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 23:15 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Final test count. 2. [ ] All features today. 3. [ ] NEXUS archive.
+1. [x] Final test count. 2. [x] All features today. 3. [x] NEXUS archive.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18 — Session 2 Summary**
+>
+> **Final Test Count: 2713 tests, 0 failures** (session started at 2682, +31 net)
+>
+> **Features Shipped This Session**:
+> | Directive | Feature | Tests Added |
+> |-----------|---------|-------------|
+> | D-158 | VoiceProfileStore + KokoroVoiceEngine + Voices REST API + session voiceId wiring | 31 |
+>
+> **NEXUS Archive**: Batch 6 appended to NEXUS-archive.md (D-148, D-149, D-158, D-159 — 4 directives).
+>
+> **Cumulative day total**: 2,251 → 2,713 tests (+462). 14 directives shipped across 2 sessions.
 
 ---
 

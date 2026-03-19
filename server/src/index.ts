@@ -23,6 +23,9 @@ import { initConversationMemoryStore } from "./services/ConversationMemoryStore.
 import { createMemoryRouter } from "./api/memory.js";
 import { createRateLimiter } from "./middleware/rateLimiter.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
+import { initVoiceProfileStore } from "./services/VoiceProfileStore.js";
+import { KokoroVoiceEngine } from "./services/KokoroVoiceEngine.js";
+import { createVoicesRouter } from "./api/voices.js";
 
 const app = express();
 const server = createServer(app);
@@ -219,6 +222,11 @@ app.use("/admin", adminLimiter, createAdminRouter(tenantRegistry, systemConfigSt
 const memoryStore = initConversationMemoryStore(resolve(dirname(config.storage.databasePath), "memory"));
 app.use("/tenants", createMemoryRouter(memoryStore));
 
+// ── Voice Profile Store + Voices API ─────────────────────────────────
+const voiceProfileStore = initVoiceProfileStore(resolve(dirname(config.storage.databasePath), "voices"));
+const kokoroEngine = new KokoroVoiceEngine();
+app.use("/voices", createVoicesRouter(voiceProfileStore, kokoroEngine));
+
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
@@ -265,7 +273,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Analytics: http://localhost:${config.port}/analytics/sessions`);
     console.log(`[Server] Admin API: http://localhost:${config.port}/admin`);
     console.log(`[Server] Memory API: http://localhost:${config.port}/tenants/{tenantId}/memory`);
-    console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger\n`);
+    console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger`);
+    console.log(`[Server] Voices API: http://localhost:${config.port}/voices\n`);
 
     console.log("Features:");
     console.log(

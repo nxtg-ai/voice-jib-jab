@@ -30,6 +30,7 @@ import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import type { SessionRecorder } from "../services/SessionRecorder.js";
 import type { VoiceTriggerService } from "../services/VoiceTriggerService.js";
 import type { ConversationMemoryStore } from "../services/ConversationMemoryStore.js";
+import type { VoiceProfileStore } from "../services/VoiceProfileStore.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -70,14 +71,16 @@ export class VoiceWebSocketServer {
   private sessionRecorder: SessionRecorder | undefined;
   private voiceTriggerService: VoiceTriggerService | undefined;
   private memoryStore: ConversationMemoryStore | undefined;
+  private voiceProfileStore: VoiceProfileStore | undefined;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
     this.sessionRecorder = sessionRecorder;
     this.voiceTriggerService = voiceTriggerService;
     this.memoryStore = memoryStore;
+    this.voiceProfileStore = voiceProfileStore;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -735,6 +738,13 @@ export class VoiceWebSocketServer {
             connection.voiceMode = message.voiceMode;
             laneB.setVoiceMode(message.voiceMode);
             console.log(`[WebSocket] Voice mode set to: ${message.voiceMode}`);
+          }
+
+          // Store voiceId for this session if provided
+          if (message.voiceId) {
+            (connection as any).voiceId = message.voiceId as string;
+            const profile = this.voiceProfileStore?.getProfile(message.voiceId as string);
+            console.log(`[WebSocket] Voice profile set: ${message.voiceId}${profile ? ` (${profile.name})` : ""}`);
           }
 
           // Only connect Lane B if not already connected

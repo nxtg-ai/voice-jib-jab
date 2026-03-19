@@ -847,3 +847,19 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260318-110 — P1: Admin API — Tenant Management + System Config
 **Status**: DONE | **Archived**: 2026-03-18
 **Deliverables**: `TenantRegistry.ts` (JSON-persisted tenant store, CRUD, claimsThreshold defaults by policyLevel), `SystemConfigStore.ts` (mutable runtime config, no restart needed), `api/admin.ts` (7 endpoints: tenant CRUD + config GET/PUT), `AdminApi.test.ts` (32 tests). Mounted at /admin in index.ts.
+
+### DIRECTIVE-NXTG-20260318-148 — P1: Conversation Memory — Cross-Session Context
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: `ConversationMemoryStore.ts` (per-tenant JSON-file memory, addEntry/getEntries/deleteEntry/clearTenant/getContextString), `api/memory.ts` (GET/POST/DELETE /tenants/:tenantId/memory[/:entryId]), websocket.ts tenant context injection at session.start. 22 tests. Tests at archive: 2682/2682.
+
+### DIRECTIVE-NXTG-20260318-149 — P2: Final Day Summary
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: NEXUS updated with full-day summary. 2682 tests at close of session. 13 directives shipped in day session. N-14/N-15 SHIPPED confirmed.
+
+### DIRECTIVE-NXTG-20260318-158 — P1: Voice Cloning Integration — Custom TTS Voices
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: `VoiceProfileStore.ts` (per-tenant JSON-backed profile store, index, lazy-load), `KokoroVoiceEngine.ts` (Kokoro HTTP TTS, AbortController timeout, isAvailable), `api/voices.ts` (5 endpoints), voiceId wiring in websocket.ts + index.ts. 31 tests. Tests at archive: 2713/2713.
+
+### DIRECTIVE-NXTG-20260318-159 — P2: Final Day Summary + NEXUS Archive
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: D-148/D-149/D-158/D-159 archived to Batch 6. Final test count: 2713/2713. Batch 6 = 4 directives.
