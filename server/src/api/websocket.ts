@@ -33,6 +33,8 @@ import type { ConversationMemoryStore } from "../services/ConversationMemoryStor
 import type { VoiceProfileStore } from "../services/VoiceProfileStore.js";
 import { SentimentAnalyzer } from "../services/SentimentAnalyzer.js";
 import { SentimentTracker } from "../services/SentimentTracker.js";
+import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
+import type { KnowledgeBaseStore } from "../services/KnowledgeBaseStore.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -76,8 +78,10 @@ export class VoiceWebSocketServer {
   private voiceProfileStore: VoiceProfileStore | undefined;
   private sentimentAnalyzer: SentimentAnalyzer;
   private sentimentTracker: SentimentTracker;
+  private conversationSummarizer: ConversationSummarizer;
+  private kbStore: KnowledgeBaseStore | undefined;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
@@ -87,6 +91,8 @@ export class VoiceWebSocketServer {
     this.voiceProfileStore = voiceProfileStore;
     this.sentimentAnalyzer = new SentimentAnalyzer();
     this.sentimentTracker = new SentimentTracker();
+    this.conversationSummarizer = new ConversationSummarizer();
+    this.kbStore = kbStore;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -746,6 +752,16 @@ export class VoiceWebSocketServer {
             }
           }
 
+          // Inject knowledge base context (auto-suggest) if available
+          if (this.kbStore && message.tenantId) {
+            const kbEntries = this.kbStore.listEntries(message.tenantId as string);
+            if (kbEntries.length > 0) {
+              const kbCtx = "Knowledge base FAQs:\n" + kbEntries.slice(0, 10).map(e => `Q: ${e.question}\nA: ${e.answer}`).join("\n\n");
+              (connection as any).kbContext = kbCtx;
+              console.log(`[WebSocket] Injected KB context: ${kbEntries.length} entries (${message.tenantId})`);
+            }
+          }
+
           // Set voice mode if provided
           if (
             message.voiceMode === "push-to-talk" ||
@@ -1123,6 +1139,24 @@ export class VoiceWebSocketServer {
       this.sessionRecorder?.recordSentiment(sessionId, sentimentSummary);
     }
     this.sentimentTracker.clearSession(sessionId);
+
+    // Auto-ticket if sustained frustration was detected during the session
+    if (sentimentSummary.escalationTriggered) {
+      const quickSummary = this.conversationSummarizer.summarize(sessionId, [], {
+        sentimentReadings: sentimentSummary.trajectory.map(r => ({ sentiment: r.sentiment, score: r.score })),
+      });
+      console.warn(`[WebSocket][Summary] Session ${sessionId} ended with escalation flag — escalated=${quickSummary.escalated}, auto-ticketing`);
+      try {
+        const ticketDesc = `Auto-escalation: frustrated caller detected.\nDominant sentiment: ${sentimentSummary.dominantSentiment}\nAverage score: ${sentimentSummary.averageScore.toFixed(2)}\nSession: ${sessionId}`;
+        void (controlEngine as any).createEscalationTicket?.({
+          sessionId,
+          reason: "sentiment_escalation",
+          description: ticketDesc,
+        });
+      } catch (err) {
+        console.error("[WebSocket] Failed to create escalation ticket:", err);
+      }
+    }
 
     // Stop session recording and flush to disk
     this.sessionRecorder?.stopRecording(sessionId).catch((error) => {

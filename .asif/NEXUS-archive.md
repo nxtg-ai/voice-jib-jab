@@ -871,3 +871,11 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260318-167 — P2: Final NEXUS Archive
 **Status**: DONE | **Archived**: 2026-03-18
 **Deliverables**: D-166/D-167 archived to Batch 7. Final test count: 2748/2748. Cumulative day total: +497 tests (2251→2748). 16 directives shipped across 3 sessions.
+
+### DIRECTIVE-NXTG-20260319-10 — P1: Conversation Summarizer — Auto-Generated Session Summaries
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `ConversationSummarizer.ts` (topics/decisions/actionItems/sentimentArc/escalated/keyQuotes), `GET /sessions/:id/summary` in sessions.ts, websocket.ts escalation auto-ticket via controlEngine.createEscalationTicket(). 23 tests. Tests at archive: 2801/2801.
+
+### DIRECTIVE-NXTG-20260319-11 — P2: Knowledge Base Builder — Extract FAQ from Sessions
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `KnowledgeBaseStore.ts` (JSON-backed per-tenant FAQ CRUD + hitCount + text search), `FaqExtractor.ts` (question/answer pair extraction from transcripts), `api/knowledge.ts` (7 endpoints), KB context injection at session.start for auto-suggest. 30 tests. Tests at archive: 2801/2801.

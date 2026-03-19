@@ -26,6 +26,8 @@ import { securityHeaders } from "./middleware/securityHeaders.js";
 import { initVoiceProfileStore } from "./services/VoiceProfileStore.js";
 import { KokoroVoiceEngine } from "./services/KokoroVoiceEngine.js";
 import { createVoicesRouter } from "./api/voices.js";
+import { initKnowledgeBaseStore } from "./services/KnowledgeBaseStore.js";
+import { createKnowledgeRouter } from "./api/knowledge.js";
 
 const app = express();
 const server = createServer(app);
@@ -227,6 +229,10 @@ const voiceProfileStore = initVoiceProfileStore(resolve(dirname(config.storage.d
 const kokoroEngine = new KokoroVoiceEngine();
 app.use("/voices", createVoicesRouter(voiceProfileStore, kokoroEngine));
 
+// ── Knowledge Base Store + KB API ────────────────────────────────────
+const kbStore = initKnowledgeBaseStore(resolve(dirname(config.storage.databasePath), "kb"));
+app.use("/tenants", createKnowledgeRouter(kbStore));
+
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
@@ -240,7 +246,7 @@ async function startServer(): Promise<void> {
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore);
+  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore);
 
   server.listen(config.port, () => {
     console.log(
@@ -274,7 +280,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Admin API: http://localhost:${config.port}/admin`);
     console.log(`[Server] Memory API: http://localhost:${config.port}/tenants/{tenantId}/memory`);
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger`);
-    console.log(`[Server] Voices API: http://localhost:${config.port}/voices\n`);
+    console.log(`[Server] Voices API: http://localhost:${config.port}/voices`);
+    console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb\n`);
 
     console.log("Features:");
     console.log(

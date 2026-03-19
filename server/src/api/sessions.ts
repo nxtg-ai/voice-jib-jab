@@ -10,6 +10,9 @@
 
 import { Router } from "express";
 import type { SessionRecorder } from "../services/SessionRecorder.js";
+import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
+
+const summarizer = new ConversationSummarizer();
 
 export function createSessionsRouter(recorder: SessionRecorder): Router {
   const router = Router();
@@ -36,6 +39,45 @@ export function createSessionsRouter(recorder: SessionRecorder): Router {
       return;
     }
     res.json(recording);
+  });
+
+  /**
+   * GET /sessions/:id/summary — structured conversation summary.
+   */
+  router.get("/:id/summary", (req, res) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
+      res.status(400).json({ error: "Invalid session ID" });
+      return;
+    }
+    const recording = recorder.loadRecording(req.params.id);
+    if (!recording) {
+      res.status(404).json({ error: "Recording not found" });
+      return;
+    }
+
+    // Reconstruct transcript turns from timeline events
+    const turns: Array<{ role: "user" | "assistant"; text: string }> = [];
+    for (const entry of recording.timeline) {
+      const p = entry.payload as Record<string, unknown> | undefined;
+      if (!p?.text || typeof p.text !== "string") continue;
+      if (entry.type === "user_transcript" && p.isFinal) {
+        turns.push({ role: "user", text: p.text });
+      } else if (entry.type === "transcript" && p.isFinal) {
+        turns.push({ role: "assistant", text: p.text });
+      }
+    }
+
+    // Rebuild sentiment readings from recording summary if available
+    const sentimentReadings = recording.summary.sentiment
+      ? [{ sentiment: recording.summary.sentiment.dominantSentiment, score: recording.summary.sentiment.averageScore }]
+      : undefined;
+
+    const summary = summarizer.summarize(req.params.id, turns, {
+      durationMs: recording.durationMs ?? undefined,
+      sentimentReadings,
+    });
+
+    res.json(summary);
   });
 
   /**

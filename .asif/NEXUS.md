@@ -232,7 +232,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 36 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 38 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
@@ -240,34 +240,48 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 5: (included in Batch 4 count)
 > - Batch 6: 4 directives (2026-03-18, session 2 — D-148/149/158/159)
 > - Batch 7: 2 directives (2026-03-18, session 3 — D-166/167)
+> - Batch 8: 2 directives (2026-03-19, session 4 — D-10/11)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260319-10 — P1: Conversation Summarizer — Auto-Generated Session Summaries
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Summary engine** — at session end, generate: key topics discussed, decisions made, action items, sentiment arc.
-2. [ ] **`GET /sessions/:id/summary`** — returns structured summary.
-3. [ ] **Webhook integration** — auto-send summary to ticketing system (via N-12 MCP) when session has escalations.
-4. [ ] Tests.
+1. [x] **Summary engine** — at session end, generate: key topics discussed, decisions made, action items, sentiment arc.
+2. [x] **`GET /sessions/:id/summary`** — returns structured summary.
+3. [x] **Webhook integration** — auto-send summary to ticketing system (via N-12 MCP) when session has escalations.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-11.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Pure-TypeScript rule-based summary engine + session endpoint:
+> - `server/src/services/ConversationSummarizer.ts` — `summarize(sessionId, turns, opts)` → `ConversationSummary { topics, decisions, actionItems, sentimentArc, escalated, keyQuotes, turnCount, durationMs }`; stopword-filtered top-5 topics; decision/action sentence detection; sentiment arc via readings or text-based thirds; key quotes = top-3 longest user sentences
+> - `server/src/api/sessions.ts` — `GET /sessions/:id/summary` reconstructs turns from recording timeline and returns structured ConversationSummary
+> - `server/src/api/websocket.ts` — on disconnect with escalation: runs `conversationSummarizer.summarize()` for log context; fires `controlEngine.createEscalationTicket()` via N-12 MCP
+> - 23 ConversationSummarizer tests
+> - Test count: 2801/2801 (up 23+30 from 2748)
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-11 — P2: Knowledge Base Builder — Extract FAQ from Sessions
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **FAQ extractor** — analyze session transcripts, identify recurring questions + best answers.
-2. [ ] **Knowledge base store** — per-tenant FAQ database (ChromaDB collection).
-3. [ ] **Auto-suggest** — during live sessions, suggest relevant KB answers to the agent.
+1. [x] **FAQ extractor** — analyze session transcripts, identify recurring questions + best answers.
+2. [x] **Knowledge base store** — per-tenant FAQ database (ChromaDB collection).
+3. [x] **Auto-suggest** — during live sessions, suggest relevant KB answers to the agent.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. JSON-file-backed per-tenant KB store with FAQ extraction + auto-suggest injection:
+> - `server/src/services/KnowledgeBaseStore.ts` — `KbEntry { id, tenantId, question, answer, tags, source, hitCount }`; lazy-load + JSON persistence + id→tenantId index; `search(tenantId, query)` stopword-filtered text similarity sorted by hitCount
+> - `server/src/services/FaqExtractor.ts` — `extract(turns)` detects questions (trailing "?" or question words); pairs with next assistant turn; deduplicates by 30-char prefix; max 10 results
+> - `server/src/api/knowledge.ts` — 7 endpoints: `GET/POST /tenants/:tenantId/kb`, `GET /tenants/:tenantId/kb/search?q=`, `GET/PUT/DELETE /tenants/:tenantId/kb/:entryId`, `DELETE /tenants/:tenantId/kb`
+> - `server/src/index.ts` + `server/src/api/websocket.ts` — KB store mounted at `/tenants`; at session.start injects top-10 FAQ entries as system context for auto-suggest
+> - 30 tests (17 KbStore + 7 FaqExtractor + 6 API)
+> - Test count: 2801/2801
 
 ---
 
