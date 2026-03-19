@@ -35,6 +35,7 @@ import { SupervisorWebSocketServer, createSupervisorRouter } from "./api/supervi
 import { initRoutingEngine } from "./services/RoutingEngine.js";
 import { CallQueueService } from "./services/CallQueueService.js";
 import { createRoutingRouter } from "./api/routing.js";
+import { ClaimVerificationService } from "./services/ClaimVerificationService.js";
 
 const app = express();
 const server = createServer(app);
@@ -266,7 +267,12 @@ async function startServer(): Promise<void> {
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore);
+  const fpBaseUrl = process.env.FAULTLINE_API_URL ?? "http://localhost:3001";
+  const fpApiKey = process.env.FAULTLINE_API_KEY ?? "";
+  const verificationService = fpApiKey
+    ? new ClaimVerificationService(fpBaseUrl, fpApiKey)
+    : undefined;
+  const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore, verificationService);
 
   // Register whisper handler so supervisors can inject hints into live sessions
   supervisorRegistry.setWhisperHandler((sessionId, message) => voiceWss.injectWhisper(sessionId, message));

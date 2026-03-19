@@ -35,6 +35,7 @@ import { SentimentAnalyzer } from "../services/SentimentAnalyzer.js";
 import { SentimentTracker } from "../services/SentimentTracker.js";
 import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
 import type { KnowledgeBaseStore } from "../services/KnowledgeBaseStore.js";
+import type { ClaimVerificationService } from "../services/ClaimVerificationService.js";
 import { supervisorRegistry } from "../services/SupervisorRegistry.js";
 
 interface ClientConnection {
@@ -81,8 +82,9 @@ export class VoiceWebSocketServer {
   private sentimentTracker: SentimentTracker;
   private conversationSummarizer: ConversationSummarizer;
   private kbStore: KnowledgeBaseStore | undefined;
+  private verificationService?: ClaimVerificationService;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore, verificationService?: ClaimVerificationService) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
@@ -94,6 +96,7 @@ export class VoiceWebSocketServer {
     this.sentimentTracker = new SentimentTracker();
     this.conversationSummarizer = new ConversationSummarizer();
     this.kbStore = kbStore;
+    this.verificationService = verificationService;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -500,6 +503,11 @@ export class VoiceWebSocketServer {
           }
           // Forward user transcript + sentiment to supervisors
           supervisorRegistry.broadcast(sessionId, { type: "session.user_transcript", sessionId, text: segment.text, role: "user", timestamp: segment.timestamp, sentiment: sentimentResult.sentiment, sentimentScore: sentimentResult.score });
+
+          // Claim verification — fire-and-forget
+          if (this.verificationService) {
+            void this.runClaimVerification(sessionId, segment.text, laneB);
+          }
         }
 
         const event: Event = {
@@ -1212,6 +1220,22 @@ export class VoiceWebSocketServer {
   private sendToClient(ws: WebSocket, message: any): void {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
+    }
+  }
+
+  private async runClaimVerification(
+    sessionId: string,
+    text: string,
+    laneB: LaneB,
+  ): Promise<void> {
+    try {
+      const result = await this.verificationService!.scan(text);
+      if (result) {
+        console.log(`[WebSocket][ClaimVerification] ${sessionId}: ${result.factClaims} claims, ${result.verified} verified, risk=${result.overallRisk}`);
+        laneB.setConversationContext(`[Claim verification]: ${result.spoken}`);
+      }
+    } catch (err) {
+      console.warn(`[WebSocket][ClaimVerification] ${sessionId}: scan failed —`, err);
     }
   }
 

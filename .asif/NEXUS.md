@@ -251,18 +251,24 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260319-113 — P0: OPERATION FIRST DOLLAR — Voice Claim Verification Demo
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P0
-**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: DONE
 
 **Context**: REVENUE SPRINT. Build the "Faultline for phone calls" demo that shows enterprise value.
 
 **Action Items**:
-1. [ ] **Voice verification flow** — caller reads text → VJJ extracts text via speech-to-text → sends to FP API (`POST /scan`) → reads back verification results via TTS.
-2. [ ] **Integration with FP** — HTTP call to FP's scan endpoint. Parse results. Format as spoken response: "I found 5 claims. 3 verified. 2 unverified. The highest risk claim is..."
-3. [ ] **Demo script** at `docs/demo-voice-verification.md` — 60-second walkthrough.
-4. [ ] Tests for the integration flow (mock FP response).
+1. [x] **Voice verification flow** — caller reads text → VJJ extracts text via speech-to-text → sends to FP API (`POST /scan`) → reads back verification results via TTS.
+2. [x] **Integration with FP** — HTTP call to FP's scan endpoint. Parse results. Format as spoken response.
+3. [x] **Demo script** at `docs/demo-voice-verification.md` — 60-second walkthrough.
+4. [x] Tests for the integration flow (mock FP response).
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-114.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Faultline-Pro voice integration — claim verification on every final user transcript:
+> - `server/src/services/ClaimVerificationService.ts` — `POST /scan` client (built-in `fetch`); filters to `fact` claims with `importance >= 3`; `formatSpoken()` → "I found N claims. X supported. Y unverified. Risk: medium." with Warning prefix if contradicted; `highestRiskClaim` appended for contradicted/unverified; returns `null` if no qualifying claims
+> - `server/src/api/websocket.ts` — added `verificationService?: ClaimVerificationService` field; fire-and-forget `runClaimVerification()` called on every `isFinal` user transcript; result injected as `[Claim verification]: ...` context into `laneB.setConversationContext()`; catch block suppresses errors to avoid audio disruption
+> - `server/src/index.ts` — reads `FAULTLINE_API_URL` (default `http://localhost:3001`) + `FAULTLINE_API_KEY`; constructs `ClaimVerificationService` only when API key is set; passed to `VoiceWebSocketServer`
+> - `docs/demo-voice-verification.md` — 60-second walkthrough with two concrete scenarios (contradicted claim / supported claim), enterprise value props, config table
+> - 31 tests (ClaimVerificationService.test.ts). Tests: 2922/2922.
 
 ---
 
