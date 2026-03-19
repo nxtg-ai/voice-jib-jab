@@ -31,6 +31,8 @@ import type { SessionRecorder } from "../services/SessionRecorder.js";
 import type { VoiceTriggerService } from "../services/VoiceTriggerService.js";
 import type { ConversationMemoryStore } from "../services/ConversationMemoryStore.js";
 import type { VoiceProfileStore } from "../services/VoiceProfileStore.js";
+import { SentimentAnalyzer } from "../services/SentimentAnalyzer.js";
+import { SentimentTracker } from "../services/SentimentTracker.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -72,6 +74,8 @@ export class VoiceWebSocketServer {
   private voiceTriggerService: VoiceTriggerService | undefined;
   private memoryStore: ConversationMemoryStore | undefined;
   private voiceProfileStore: VoiceProfileStore | undefined;
+  private sentimentAnalyzer: SentimentAnalyzer;
+  private sentimentTracker: SentimentTracker;
 
   constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore) {
     this.wss = new WebSocketServer({ server });
@@ -81,6 +85,8 @@ export class VoiceWebSocketServer {
     this.voiceTriggerService = voiceTriggerService;
     this.memoryStore = memoryStore;
     this.voiceProfileStore = voiceProfileStore;
+    this.sentimentAnalyzer = new SentimentAnalyzer();
+    this.sentimentTracker = new SentimentTracker();
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -469,6 +475,16 @@ export class VoiceWebSocketServer {
               "[WebSocket] Failed to persist user transcript:",
               error,
             );
+          }
+        }
+
+        // Sentiment analysis on final user transcripts
+        if (segment.isFinal && segment.text) {
+          const sentimentResult = this.sentimentAnalyzer.analyze(segment.text);
+          this.sentimentTracker.addReading(sessionId, sentimentResult);
+          console.log(`[WebSocket][Sentiment] ${sessionId}: ${sentimentResult.sentiment} (score=${sentimentResult.score})`);
+          if (this.sentimentTracker.shouldEscalate(sessionId)) {
+            console.warn(`[WebSocket][Sentiment] Escalation triggered for session ${sessionId} — sustained frustrated trajectory`);
           }
         }
 
@@ -1100,6 +1116,13 @@ export class VoiceWebSocketServer {
         console.error("[WebSocket] Failed to save session summary:", error);
       }
     }
+
+    // Record sentiment summary before flushing session to disk
+    const sentimentSummary = this.sentimentTracker.getSummary(sessionId);
+    if (sentimentSummary.readingCount > 0) {
+      this.sessionRecorder?.recordSentiment(sessionId, sentimentSummary);
+    }
+    this.sentimentTracker.clearSession(sessionId);
 
     // Stop session recording and flush to disk
     this.sessionRecorder?.stopRecording(sessionId).catch((error) => {

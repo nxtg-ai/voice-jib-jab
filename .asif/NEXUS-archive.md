@@ -863,3 +863,11 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260318-159 — P2: Final Day Summary + NEXUS Archive
 **Status**: DONE | **Archived**: 2026-03-18
 **Deliverables**: D-148/D-149/D-158/D-159 archived to Batch 6. Final test count: 2713/2713. Batch 6 = 4 directives.
+
+### DIRECTIVE-NXTG-20260318-166 — P1: Sentiment Analysis Pipeline — Real-Time Mood Detection
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: `SentimentAnalyzer.ts` (keyword-scored 4-class classifier with intensifier multipliers), `SentimentTracker.ts` (per-session trajectory, escalation detection, getSummary), websocket.ts sentiment wiring on final user transcripts with escalation warnings, SessionRecorder.ts `recordSentiment()` + `summary.sentiment` flush. 35 tests. Tests at archive: 2748/2748.
+
+### DIRECTIVE-NXTG-20260318-167 — P2: Final NEXUS Archive
+**Status**: DONE | **Archived**: 2026-03-18
+**Deliverables**: D-166/D-167 archived to Batch 7. Final test count: 2748/2748. Cumulative day total: +497 tests (2251→2748). 16 directives shipped across 3 sessions.

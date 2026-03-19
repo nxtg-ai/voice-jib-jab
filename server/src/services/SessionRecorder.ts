@@ -11,6 +11,7 @@ import { eventBus } from "../orchestrator/EventBus.js";
 import { writeFileSync, readFileSync, mkdirSync, readdirSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 import type { Event, PolicyDecisionPayload, UserTranscriptPayload } from "../schemas/events.js";
+import type { SessionSentimentSummary } from "./SentimentTracker.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -34,6 +35,12 @@ export interface SessionRecording {
     policyDecisions: Record<string, number>;
     audioInputChunks: number;
     audioOutputChunks: number;
+    sentiment?: {
+      dominantSentiment: string;
+      averageScore: number;
+      escalationTriggered: boolean;
+      readingCount: number;
+    };
   };
 }
 
@@ -56,6 +63,7 @@ interface RecordingBuffer {
   policyDecisions: Record<string, number>;
   audioInputChunks: number;
   audioOutputChunks: number;
+  sentiment?: SessionSentimentSummary;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +130,16 @@ export class SessionRecorder {
     eventBus.onSession(sessionId, (event: Event) => {
       this.handleEvent(sessionId, event);
     });
+  }
+
+  /**
+   * Store sentiment summary for the session (called before stopRecording).
+   */
+  recordSentiment(sessionId: string, summary: SessionSentimentSummary): void {
+    const buffer = this.sessions.get(sessionId);
+    if (buffer) {
+      buffer.sentiment = summary;
+    }
   }
 
   /**
@@ -330,6 +348,14 @@ export class SessionRecorder {
         policyDecisions: { ...buffer.policyDecisions },
         audioInputChunks: buffer.audioInputChunks,
         audioOutputChunks: buffer.audioOutputChunks,
+        ...(buffer.sentiment ? {
+          sentiment: {
+            dominantSentiment: buffer.sentiment.dominantSentiment,
+            averageScore: buffer.sentiment.averageScore,
+            escalationTriggered: buffer.sentiment.escalationTriggered,
+            readingCount: buffer.sentiment.readingCount,
+          },
+        } : {}),
       },
     };
 
