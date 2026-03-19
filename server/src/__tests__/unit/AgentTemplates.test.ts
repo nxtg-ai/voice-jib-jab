@@ -138,16 +138,19 @@ describe("AgentTemplateStore", () => {
     expect(tpl).toBeUndefined();
   });
 
-  it("listTemplates() includes all 4 built-ins", () => {
+  it("listTemplates() includes all 7 built-ins", () => {
     const all = store.listTemplates();
     const builtIns = all.filter((t) => t.builtIn);
-    expect(builtIns).toHaveLength(4);
+    expect(builtIns).toHaveLength(7);
 
     const ids = builtIns.map((t) => t.templateId).sort();
     expect(ids).toEqual([
       "builtin-customer-support",
       "builtin-receptionist",
       "builtin-sales",
+      "builtin-support-de",
+      "builtin-support-es",
+      "builtin-support-fr",
       "builtin-tech-support",
     ]);
   });
@@ -320,7 +323,7 @@ describe("AgentTemplateStore", () => {
     const builtIns = results.filter((t) => t.builtIn);
     const customs = results.filter((t) => !t.builtIn);
 
-    expect(builtIns).toHaveLength(4);
+    expect(builtIns).toHaveLength(7);
     expect(customs).toHaveLength(1);
     expect(customs[0].name).toBe("Tenant X Agent");
     expect(customs[0].tenantId).toBe("x");
@@ -552,9 +555,9 @@ describe("Templates API Endpoints", () => {
     expect(res.status).toBe(200);
 
     const data = res.json() as { templates: Array<{ builtIn: boolean }>; count: number };
-    expect(data.count).toBeGreaterThanOrEqual(4);
+    expect(data.count).toBeGreaterThanOrEqual(7);
     const builtIns = data.templates.filter((t) => t.builtIn);
-    expect(builtIns).toHaveLength(4);
+    expect(builtIns).toHaveLength(7);
   });
 
   it("GET /templates/builtin returns only builtins", async () => {
@@ -562,7 +565,7 @@ describe("Templates API Endpoints", () => {
     expect(res.status).toBe(200);
 
     const data = res.json() as { templates: Array<{ builtIn: boolean; templateId: string }>; count: number };
-    expect(data.count).toBe(4);
+    expect(data.count).toBe(7);
     expect(data.templates.every((t) => t.builtIn)).toBe(true);
   });
 

@@ -30,12 +30,15 @@ import { initKnowledgeBaseStore } from "./services/KnowledgeBaseStore.js";
 import { createKnowledgeRouter } from "./api/knowledge.js";
 import { initAgentTemplateStore } from "./services/AgentTemplateStore.js";
 import { createTemplatesRouter } from "./api/templates.js";
+import { createLanguageRouter } from "./api/language.js";
 import { supervisorRegistry } from "./services/SupervisorRegistry.js";
 import { SupervisorWebSocketServer, createSupervisorRouter } from "./api/supervisor.js";
 import { initRoutingEngine } from "./services/RoutingEngine.js";
 import { CallQueueService } from "./services/CallQueueService.js";
 import { createRoutingRouter } from "./api/routing.js";
 import { ClaimVerificationService } from "./services/ClaimVerificationService.js";
+import { initIvrMenuStore } from "./services/IvrMenuStore.js";
+import { createIvrRouter } from "./api/ivr.js";
 
 const app = express();
 const server = createServer(app);
@@ -244,6 +247,13 @@ app.use("/tenants", createKnowledgeRouter(kbStore));
 // ── Agent Template Store + Templates API ─────────────────────────────
 const templateStore = initAgentTemplateStore(resolve(dirname(config.storage.databasePath), "templates.json"));
 app.use("/templates", createTemplatesRouter(templateStore));
+
+// ── Language Detection + Routing API ──────────────────────────────────
+app.use("/language", createLanguageRouter(templateStore));
+
+// ── IVR Menu Store + IVR API ──────────────────────────────────────────
+const ivrStore = initIvrMenuStore(resolve(dirname(config.storage.databasePath), "ivr-menus.json"));
+app.use("/ivr", createIvrRouter(ivrStore));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));

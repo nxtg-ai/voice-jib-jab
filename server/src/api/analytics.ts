@@ -6,6 +6,10 @@
  *   GET /analytics/sessions       — list sessions with aggregate metrics (filterable)
  *   GET /analytics/sessions/:id   — get metrics for a single session
  *   GET /analytics/summary        — aggregate metrics across all sessions
+ *   GET /analytics/dashboard      — full aggregate + sentimentDistribution + callsPerDay + topPolicyViolations
+ *   GET /analytics/tenants        — per-tenant comparison metrics
+ *   GET /analytics/calls-per-day  — calls grouped by day (filterable)
+ *   GET /analytics/export.csv     — call log as downloadable CSV
  */
 
 import { Router } from "express";
@@ -113,6 +117,115 @@ export function createAnalyticsRouter(
   router.get("/summary", (_req, res) => {
     const metrics = deps.analyticsService.getAggregateMetrics();
     res.json(metrics);
+  });
+
+  /**
+   * GET /dashboard — full aggregate including sentimentDistribution, callsPerDay,
+   * and topPolicyViolations (no filter applied).
+   */
+  router.get("/dashboard", (_req, res) => {
+    const metrics = deps.analyticsService.getAggregateMetrics();
+    res.json(metrics);
+  });
+
+  /**
+   * GET /tenants — per-tenant comparison metrics across all sessions.
+   */
+  router.get("/tenants", (_req, res) => {
+    const comparison = deps.analyticsService.getTenantComparison();
+    res.json(comparison);
+  });
+
+  /**
+   * GET /calls-per-day — calls grouped by ISO date, sorted ascending.
+   * Query params: tenantId, from, to
+   */
+  router.get("/calls-per-day", (req, res) => {
+    const filter: AnalyticsFilter = {};
+
+    if (typeof req.query.tenantId === "string" && req.query.tenantId) {
+      filter.tenantId = req.query.tenantId;
+    }
+    if (typeof req.query.from === "string" && req.query.from) {
+      if (isNaN(Date.parse(req.query.from))) {
+        res.status(400).json({ error: "from must be a valid ISO date string" });
+        return;
+      }
+      filter.fromDate = req.query.from;
+    }
+    if (typeof req.query.to === "string" && req.query.to) {
+      if (isNaN(Date.parse(req.query.to))) {
+        res.status(400).json({ error: "to must be a valid ISO date string" });
+        return;
+      }
+      filter.toDate = req.query.to;
+    }
+
+    const result = deps.analyticsService.getCallsPerDay(filter);
+    res.json(result);
+  });
+
+  /**
+   * GET /export.csv — download call log as CSV.
+   * Query params: tenantId, from, to, limit
+   * Columns: sessionId, tenantId, startedAt, durationMs, turnCount,
+   *          qualityScore, complianceRate, escalationCount, policyDecisions
+   */
+  router.get("/export.csv", (req, res) => {
+    const filter: AnalyticsFilter = {};
+
+    if (typeof req.query.tenantId === "string" && req.query.tenantId) {
+      filter.tenantId = req.query.tenantId;
+    }
+    if (typeof req.query.from === "string" && req.query.from) {
+      if (isNaN(Date.parse(req.query.from))) {
+        res.status(400).json({ error: "from must be a valid ISO date string" });
+        return;
+      }
+      filter.fromDate = req.query.from;
+    }
+    if (typeof req.query.to === "string" && req.query.to) {
+      if (isNaN(Date.parse(req.query.to))) {
+        res.status(400).json({ error: "to must be a valid ISO date string" });
+        return;
+      }
+      filter.toDate = req.query.to;
+    }
+
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    if (req.query.limit !== undefined && (!Number.isFinite(rawLimit) || rawLimit < 1)) {
+      res.status(400).json({ error: `limit must be between 1 and ${MAX_LIMIT}` });
+      return;
+    }
+    filter.limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
+      : DEFAULT_LIMIT;
+
+    const metrics = deps.analyticsService.getAggregateMetrics(filter);
+
+    const CSV_HEADERS =
+      "sessionId,tenantId,startedAt,durationMs,turnCount,qualityScore,complianceRate,escalationCount,policyDecisions";
+
+    const rows = metrics.sessions.map((s) => {
+      const policyDecisionsJson = JSON.stringify(s.policyDecisions).replace(/"/g, '""');
+      return [
+        s.sessionId,
+        s.tenantId ?? "",
+        s.startedAt,
+        s.durationMs !== null ? String(s.durationMs) : "",
+        String(s.turnCount),
+        String(s.qualityScore),
+        String(s.complianceRate),
+        String(s.escalationCount),
+        `"${policyDecisionsJson}"`,
+      ].join(",");
+    });
+
+    const csv = [CSV_HEADERS, ...rows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="call-log.csv"');
+    res.send(csv);
   });
 
   return router;

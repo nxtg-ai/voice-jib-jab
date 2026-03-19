@@ -11,7 +11,7 @@
  *   - Engagement score (30 pts): min(turnCount / 5, 1) * 30
  */
 
-import type { SessionRecording } from "./SessionRecorder.js";
+import type { SessionRecording, RecordingEntry } from "./SessionRecorder.js";
 
 // ── Public types ──────────────────────────────────────────────────────
 
@@ -33,6 +33,22 @@ export interface TenantBreakdownEntry {
   avgQualityScore: number;
 }
 
+export interface SentimentDistribution {
+  positive: number;
+  neutral: number;
+  negative: number;
+  frustrated: number;
+}
+
+export interface TenantComparisonEntry {
+  tenantId: string;
+  sessions: number;
+  avgQualityScore: number;
+  avgDurationMs: number | null;
+  escalationRate: number;
+  avgComplianceRate: number;
+}
+
 export interface AggregateMetrics {
   totalSessions: number;
   filteredSessions: number;
@@ -45,6 +61,9 @@ export interface AggregateMetrics {
   escalationRate: number;
   tenantBreakdown: Record<string, TenantBreakdownEntry>;
   sessions: SessionMetrics[];
+  sentimentDistribution: SentimentDistribution;
+  callsPerDay: Array<{ date: string; count: number }>;
+  topPolicyViolations: Array<{ violation: string; count: number }>;
 }
 
 export interface AnalyticsFilter {
@@ -59,8 +78,13 @@ export interface AnalyticsFilter {
 
 type RecordingMetadata = Omit<SessionRecording, "timeline">;
 
+interface FullRecording extends RecordingMetadata {
+  timeline: RecordingEntry[];
+}
+
 interface RecordingSource {
   listRecordings(): RecordingMetadata[];
+  listFullRecordings?(): FullRecording[];
 }
 
 // ── Quality score helpers ────────────────────────────────────────────
@@ -178,7 +202,210 @@ export class AnalyticsService {
     // Compute aggregates from the full filtered set (not paginated)
     const allFilteredMetrics = filtered.map((r) => this.computeSessionMetrics(r));
 
-    return this.buildAggregates(totalSessions, filteredSessions, allFilteredMetrics, sessionMetrics);
+    // Derive new aggregate fields from filtered recordings
+    const sentimentDistribution = this.computeSentimentDistribution(filtered);
+    const callsPerDay = this.computeCallsPerDay(filtered);
+    const topPolicyViolations = this.computeTopPolicyViolations(filtered);
+
+    return this.buildAggregates(
+      totalSessions,
+      filteredSessions,
+      allFilteredMetrics,
+      sessionMetrics,
+      sentimentDistribution,
+      callsPerDay,
+      topPolicyViolations,
+    );
+  }
+
+  /**
+   * Returns calls grouped by ISO date (YYYY-MM-DD), sorted ascending, optionally filtered.
+   */
+  getCallsPerDay(filter?: AnalyticsFilter): Array<{ date: string; count: number }> {
+    const allRecordings = this.recorder.listRecordings();
+    let filtered = allRecordings;
+
+    if (filter?.tenantId) {
+      filtered = filtered.filter((r) => r.tenantId === filter.tenantId);
+    }
+    if (filter?.fromDate) {
+      const from = filter.fromDate;
+      filtered = filtered.filter((r) => r.startedAt >= from);
+    }
+    if (filter?.toDate) {
+      const to = filter.toDate;
+      filtered = filtered.filter((r) => r.startedAt <= to);
+    }
+
+    return this.computeCallsPerDay(filtered);
+  }
+
+  /**
+   * Returns per-tenant comparison metrics across all sessions.
+   */
+  getTenantComparison(): TenantComparisonEntry[] {
+    const allRecordings = this.recorder.listRecordings();
+    const allMetrics = allRecordings.map((r) => this.computeSessionMetrics(r));
+
+    // Group by tenantId
+    const groups = new Map<
+      string,
+      {
+        metrics: SessionMetrics[];
+      }
+    >();
+
+    for (const m of allMetrics) {
+      const key = m.tenantId ?? "unknown";
+      const group = groups.get(key);
+      if (group) {
+        group.metrics.push(m);
+      } else {
+        groups.set(key, { metrics: [m] });
+      }
+    }
+
+    const result: TenantComparisonEntry[] = [];
+    for (const [tenantId, group] of groups) {
+      const { metrics } = group;
+      const sessions = metrics.length;
+
+      const avgQualityScore =
+        Math.round((metrics.reduce((sum, m) => sum + m.qualityScore, 0) / sessions) * 100) / 100;
+
+      const durationsWithValues = metrics
+        .map((m) => m.durationMs)
+        .filter((d): d is number => d !== null);
+      const avgDurationMs =
+        durationsWithValues.length > 0
+          ? durationsWithValues.reduce((a, b) => a + b, 0) / durationsWithValues.length
+          : null;
+
+      const totalDecisions = metrics.reduce((sum, m) => sum + m.totalDecisions, 0);
+      const totalEscalations = metrics.reduce((sum, m) => sum + m.escalationCount, 0);
+      const escalationRate = totalDecisions > 0 ? totalEscalations / totalDecisions : 0;
+
+      const avgComplianceRate =
+        metrics.reduce((sum, m) => sum + m.complianceRate, 0) / sessions;
+
+      result.push({
+        tenantId,
+        sessions,
+        avgQualityScore,
+        avgDurationMs,
+        escalationRate,
+        avgComplianceRate,
+      });
+    }
+
+    return result;
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────
+
+  /**
+   * Aggregate sentiment distribution from recordings that have sentiment data.
+   * Recordings without a dominantSentiment are excluded from counts.
+   */
+  private computeSentimentDistribution(
+    recordings: RecordingMetadata[],
+  ): SentimentDistribution {
+    const dist: SentimentDistribution = { positive: 0, neutral: 0, negative: 0, frustrated: 0 };
+    const distMap = dist as unknown as Record<string, number>;
+    for (const r of recordings) {
+      const dominant = r.summary.sentiment?.dominantSentiment;
+      if (!dominant) {
+        continue;
+      }
+      if (dominant in distMap) {
+        distMap[dominant]++;
+      }
+    }
+    return dist;
+  }
+
+  /**
+   * Group recordings by ISO date (YYYY-MM-DD), sorted ascending.
+   */
+  private computeCallsPerDay(
+    recordings: RecordingMetadata[],
+  ): Array<{ date: string; count: number }> {
+    const dayCounts = new Map<string, number>();
+    for (const r of recordings) {
+      const date = r.startedAt.slice(0, 10);
+      dayCounts.set(date, (dayCounts.get(date) ?? 0) + 1);
+    }
+    return Array.from(dayCounts.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * Collect all policy.decision timeline entries where decision is "refuse" or
+   * "escalate", group by reason (falling back to decision), return top 5 by count.
+   *
+   * Requires full recordings with timeline. Falls back to an empty array when
+   * the recorder does not implement listFullRecordings().
+   */
+  private computeTopPolicyViolations(
+    filteredMeta: RecordingMetadata[],
+  ): Array<{ violation: string; count: number }> {
+    if (!this.recorder.listFullRecordings) {
+      // Recorder does not expose timelines — derive from policyDecisions summary
+      return this.computeTopViolationsFromSummary(filteredMeta);
+    }
+
+    const fullRecordings = this.recorder.listFullRecordings();
+    const filteredIds = new Set(filteredMeta.map((r) => r.sessionId));
+    const relevantRecordings = fullRecordings.filter((r) => filteredIds.has(r.sessionId));
+
+    const violationCounts = new Map<string, number>();
+    for (const recording of relevantRecordings) {
+      for (const entry of recording.timeline) {
+        if (entry.type !== "policy.decision") {
+          continue;
+        }
+        const payload = entry.payload as Record<string, unknown> | undefined;
+        if (!payload) {
+          continue;
+        }
+        const decision = payload.decision as string | undefined;
+        if (decision !== "refuse" && decision !== "escalate") {
+          continue;
+        }
+        const violation =
+          (payload.reason as string | undefined) ?? decision;
+        violationCounts.set(violation, (violationCounts.get(violation) ?? 0) + 1);
+      }
+    }
+
+    return Array.from(violationCounts.entries())
+      .map(([violation, count]) => ({ violation, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }
+
+  /**
+   * Fallback for topPolicyViolations when timeline is not available.
+   * Uses the policyDecisions summary to count refuse and escalate totals.
+   */
+  private computeTopViolationsFromSummary(
+    recordings: RecordingMetadata[],
+  ): Array<{ violation: string; count: number }> {
+    let refuseTotal = 0;
+    let escalateTotal = 0;
+    for (const r of recordings) {
+      refuseTotal += r.summary.policyDecisions.refuse ?? 0;
+      escalateTotal += r.summary.policyDecisions.escalate ?? 0;
+    }
+    const result: Array<{ violation: string; count: number }> = [];
+    if (refuseTotal > 0) {
+      result.push({ violation: "refuse", count: refuseTotal });
+    }
+    if (escalateTotal > 0) {
+      result.push({ violation: "escalate", count: escalateTotal });
+    }
+    return result.sort((a, b) => b.count - a.count).slice(0, 5);
   }
 
   private buildAggregates(
@@ -186,6 +413,9 @@ export class AnalyticsService {
     filteredSessions: number,
     allMetrics: SessionMetrics[],
     paginatedMetrics: SessionMetrics[],
+    sentimentDistribution: SentimentDistribution,
+    callsPerDay: Array<{ date: string; count: number }>,
+    topPolicyViolations: Array<{ violation: string; count: number }>,
   ): AggregateMetrics {
     if (allMetrics.length === 0) {
       return {
@@ -200,6 +430,9 @@ export class AnalyticsService {
         escalationRate: 0,
         tenantBreakdown: {},
         sessions: paginatedMetrics,
+        sentimentDistribution,
+        callsPerDay,
+        topPolicyViolations,
       };
     }
 
@@ -272,6 +505,9 @@ export class AnalyticsService {
       escalationRate,
       tenantBreakdown,
       sessions: paginatedMetrics,
+      sentimentDistribution,
+      callsPerDay,
+      topPolicyViolations,
     };
   }
 }
