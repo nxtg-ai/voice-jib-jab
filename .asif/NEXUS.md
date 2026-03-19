@@ -245,6 +245,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-28 — P1: Real-Time Coaching — Supervisor Whisper Mode
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 02:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Supervisor WebSocket** — parallel connection for supervisors to observe live sessions read-only.
+2. [ ] **Whisper mode** — supervisor sends text guidance visible only to the agent (not the caller).
+3. [ ] **Supervisor dashboard** — list active sessions, join any, see transcript + sentiment in real-time.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-29.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-29 — P2: Final NEXUS Archive + Test Count
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 02:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Archive. 2. [ ] Final test count. 3. [ ] NEXUS update.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-20 — P1: Voice Agent Templates — Pre-Built Personas
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 02:00 | **Estimate**: M | **Status**: DONE
