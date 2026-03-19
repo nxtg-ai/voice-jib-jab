@@ -246,6 +246,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-38 — P1: Call Routing — Intelligent Session Assignment
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 03:30 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Routing engine** — assign inbound calls to agents based on: tenant config, language, topic, load balancing.
+2. [ ] **Routing rules** — `POST /routing/rules` (conditions + target agent template). Priority-based fallback.
+3. [ ] **Queue system** — if all agents busy, queue caller with position + estimated wait.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-39.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-39 — P2: Voice Agent Marketplace — Share Templates
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 03:30 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Publish voice agent templates to a marketplace (similar to SynApps workflow marketplace).
+2. [ ] Browse/install/customize pre-built agents.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-28 — P1: Real-Time Coaching — Supervisor Whisper Mode
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 02:45 | **Estimate**: M | **Status**: DONE
