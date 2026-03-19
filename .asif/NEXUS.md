@@ -8993,3 +8993,30 @@ Same as previous entry — no change in 5 minutes:
 
 Q19/Q20/Q21 from previous entry still open. No new questions.
 
+
+---
+
+> Session: 2026-03-19 (check-in 3 — second consecutive empty-delta) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. Last code commit remains `e8a7aa9`. Three consecutive commits are NEXUS-only housekeeping.
+
+### 2. What surprised me?
+
+The reflection prompt has now fired three times with no intervening work. This is worth naming as a **process signal, not a content signal**: the cadence appears to be running on a timer rather than triggered by a work event. Three empty check-ins in a row produce noise in the NEXUS feedback history and inflate the file size with no portfolio value.
+
+**Recommendation**: Gate the reflection prompt on `git log` activity — only trigger if there are new commits since the last check-in. An empty-delta reflection should be a one-liner skip entry, not a full 5-question form.
+
+### 3. Cross-project signals
+
+None new. See first check-in of this session.
+
+### 4. What I'd prioritize next
+
+Unchanged. Q19 (supervisor auth), Q20 (N-11 SIP decision), Q21 (NEXUS split) remain open.
+
+### 5. Blockers / Questions for CoS
+
+**Q22** — The reflection cadence is firing on a clock rather than on work events. Request CoS review: should the prompt be gated on new commits, or is the idle-signal itself intentional? If intentional, a one-line "no delta" response is sufficient — no need for the full 5-question form on empty intervals.
+
