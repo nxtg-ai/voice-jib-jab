@@ -29,6 +29,8 @@
 | N-17 | Voice Agent Marketplace | EXTENSIBILITY | SHIPPED | P2 | 2026-03-19 |
 | N-18 | Voice Biometrics — Caller ID | GOVERNANCE | SHIPPED | P1 | 2026-03-19 |
 | N-19 | Custom TTS Voices + A/B Testing | INTERACTION | SHIPPED | P1 | 2026-03-19 |
+| N-20 | Agent Personas — Per-Tenant Personality | INTERACTION | SHIPPED | P1 | 2026-03-19 |
+| N-21 | Voice Agent React SDK | EXTENSIBILITY | SHIPPED | P1 | 2026-03-19 |
 
 ---
 
@@ -248,47 +250,58 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 9: 2 directives (2026-03-19, session 5 — D-20/21)
 > - Batch 10: 2 directives (2026-03-19, session 6 — D-28/29)
 > - Batch 11: 2 directives (2026-03-19, session 7 — D-38/39)
+> - Batch 12: 3 directives (2026-03-19, session 8 — D-189/190/191)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260319-189 — P1: Agent Personas — Configurable Personality Profiles
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Persona config** — name, tone (formal/casual/empathetic), vocabulary level, response length preference.
-2. [ ] **Persona library** — 5 pre-built: Professional Support, Friendly Helper, Technical Expert, Warm Receptionist, Compliance Officer.
-3. [ ] **Per-tenant persona assignment** — different tenants get different agent personalities.
-4. [ ] Tests.
+1. [x] **Persona config** — `PersonaConfig`: name, tone (formal/casual/empathetic), vocabularyLevel (simple/standard/technical), responseLengthPreference (brief/standard/detailed), description, systemPromptSnippet (injected into LLM system prompt).
+2. [x] **Persona library** — 5 pre-built hardcoded personas: `persona_professional_support`, `persona_friendly_helper`, `persona_technical_expert`, `persona_warm_receptionist`, `persona_compliance_officer`. All `isBuiltIn: true`, cannot be updated/deleted.
+3. [x] **Per-tenant persona assignment** — `assignPersonaToTenant()` / `getTenantPersona()` / `unassignPersonaFromTenant()`. Endpoints: `GET/POST/DELETE /tenants/:tenantId/persona`.
+4. [x] Tests — 65 tests in `Personas.test.ts`.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-190.
-**Response** (filled by team): >
+**Response** (filled by team): > **DONE 2026-03-19.** `PersonaStore` (JSON-persisted, singleton proxy) + `personas.ts` (two routers: `createPersonasRouter` at `/personas`, `createTenantPersonaRouter` at `/tenants`). Full CRUD with built-in guard validation. 65 tests. Wired in `index.ts`. Total: 3506 tests, all green. Coverage 83.43% branches.
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-190 — P1: Voice Agent SDK — React Component Library
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **`<VoiceAgent />`** React component — embed voice agent in any React app. Props: wsUrl, tenantId, persona, onTranscript, onPolicyEvent.
-2. [ ] **`useVoiceAgent()` hook** — programmatic control.
-3. [ ] **npm package** — `@nxtg/voice-agent-react`. Types included.
-4. [ ] Tests.
+1. [x] **`<VoiceAgent />`** React component — `wsUrl`, `tenantId`, `persona`, `autoConnect`, `onTranscript`, `onPolicyEvent`, `onStateChange`, `onError`, `className`, `children`. Default UI with Connect/Disconnect buttons + `data-testid` attributes.
+2. [x] **`useVoiceAgent()` hook** — returns `{ state, sessionId, connect, disconnect, sendAudio, stopAudio, transcript, lastPolicyEvent, isConnected }`. Creates `VoiceClient` once on mount via `useEffect([], [])`, callbacks stable via `optionsRef`.
+3. [x] **npm package** — `@nxtg/voice-agent-react` at `packages/voice-agent-react/`. Types fully exported. Vitest + jsdom test environment configured.
+4. [x] Tests — 25 hook tests + 14 component tests = 39 tests in `packages/voice-agent-react/src/__tests__/`.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-191.
-**Response** (filled by team): >
+**Response** (filled by team): > **DONE 2026-03-19.** Package at `packages/voice-agent-react/` with `useVoiceAgent` hook + `VoiceAgent` component + TypeScript types. Wraps `@nxtg/vjj-sdk`'s `VoiceClient`. 39 tests (unit only — not included in server Jest count, require separate `npm install` for jsdom/testing-library). N-20 added to NEXUS dashboard.
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-191 — P2: Final MAXOUT Session Summary
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 10:45 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-19 10:45 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Final test count. 2. [ ] All features shipped. 3. [ ] README + NEXUS archive.
+1. [x] Final test count: **3,506 server tests** (108 suites), 0 failed. Coverage: stmts 92.23%, branch 83.43%, fn 92.11%, lines 92.64%.
+2. [x] Features shipped this MAXOUT session (2026-03-19):
+   - D-134: Voice Quality Scoring (VoiceQualityScorer, 5-dim scorecard, webhook threshold)
+   - D-135: Conversation Playbook (PlaybookStore, keyword suggest)
+   - D-136: Tenant Compliance Report (GET /tenants/:id/compliance-report)
+   - D-162: Voice Biometrics — Caller Identification (VoiceprintStore, cosine similarity, auto-context)
+   - D-163: Custom TTS Voices + A/B Testing (VoiceAbTestService, /voices/available, /voices/abtests)
+   - D-164: Docker Compose Update (env vars + volume mounts for all JSON stores)
+   - D-189: Agent Personas (PersonaStore, 5 built-ins, per-tenant assignment)
+   - D-190: Voice Agent SDK — React Component Library (@nxtg/voice-agent-react)
+3. [x] README updated (status badge, features list). NEXUS: D-189/190/191 DONE, N-20/21 added to dashboard.
 
-**Response** (filled by team): >
+**Response** (filled by team): > **DONE 2026-03-19.** MAXOUT session complete. 8 directives shipped. Test suite grew from 3,203 (start of session) to 3,506 (+303 tests). All 21 roadmap initiatives shipped or building. README badge updated. NEXUS archive batch 12 logged.
 
 ---
 

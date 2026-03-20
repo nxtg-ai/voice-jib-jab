@@ -47,6 +47,8 @@ import { createTenantComplianceRouter } from "./api/tenantCompliance.js";
 import { initVoiceprintStore } from "./services/VoiceprintStore.js";
 import { createVoiceprintsRouter } from "./api/voiceprints.js";
 import { initVoiceAbTestService } from "./services/VoiceAbTestService.js";
+import { initPersonaStore } from "./services/PersonaStore.js";
+import { createPersonasRouter, createTenantPersonaRouter } from "./api/personas.js";
 
 const app = express();
 const server = createServer(app);
@@ -278,6 +280,11 @@ app.use("/tenants", createTenantComplianceRouter(sessionRecorder, analyticsServi
 // ── Voice Biometrics (D-162) ──────────────────────────────────────────
 const voiceprintStore = initVoiceprintStore(resolve(dirname(config.storage.databasePath), "voiceprints.json"));
 app.use("/voiceprints", createVoiceprintsRouter(voiceprintStore, memoryStore));
+
+// ── Agent Personas (D-189) ────────────────────────────────────────────
+const personaStore = initPersonaStore(resolve(dirname(config.storage.databasePath), "personas.json"));
+app.use("/personas", createPersonasRouter(personaStore));
+app.use("/tenants", createTenantPersonaRouter(personaStore));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
