@@ -55,6 +55,7 @@ import { createFlowsRouter } from "./api/flows.js";
 import { translationService } from "./services/TranslationService.js";
 import { createTranslationRouter } from "./api/translation.js";
 import { monitoringDashboardHtml } from "./api/monitoringDashboard.js";
+import { transcriptViewerHtml } from "./api/transcriptViewer.js";
 import { IntentClassifier } from "./services/IntentClassifier.js";
 import { initIntentStore } from "./services/IntentStore.js";
 import { createIntentsRouter } from "./api/intents.js";
@@ -141,6 +142,15 @@ app.get("/metrics", (_req, res) => {
 // Monitoring dashboard — full voice agent ops view
 app.get("/dashboard", (_req, res) => {
   res.type("html").send(monitoringDashboardHtml());
+});
+
+// Transcript viewer — session conversation with timestamps, sentiment, policy decisions
+app.get("/transcripts/:sessionId", (req, res) => {
+  if (!/^[a-zA-Z0-9_-]+$/.test(req.params.sessionId)) {
+    res.status(400).send("Invalid session ID");
+    return;
+  }
+  res.type("html").send(transcriptViewerHtml());
 });
 
 // ── OPA singleton initialization ─────────────────────────────────────────
