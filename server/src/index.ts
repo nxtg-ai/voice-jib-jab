@@ -49,6 +49,11 @@ import { createVoiceprintsRouter } from "./api/voiceprints.js";
 import { initVoiceAbTestService } from "./services/VoiceAbTestService.js";
 import { initPersonaStore } from "./services/PersonaStore.js";
 import { createPersonasRouter, createTenantPersonaRouter } from "./api/personas.js";
+import { initFlowStore } from "./services/FlowStore.js";
+import { FlowEngine } from "./services/FlowEngine.js";
+import { createFlowsRouter } from "./api/flows.js";
+import { translationService } from "./services/TranslationService.js";
+import { createTranslationRouter } from "./api/translation.js";
 
 const app = express();
 const server = createServer(app);
@@ -285,6 +290,14 @@ app.use("/voiceprints", createVoiceprintsRouter(voiceprintStore, memoryStore));
 const personaStore = initPersonaStore(resolve(dirname(config.storage.databasePath), "personas.json"));
 app.use("/personas", createPersonasRouter(personaStore));
 app.use("/tenants", createTenantPersonaRouter(personaStore));
+
+// ── Conversation Flow Builder (D-201) ─────────────────────────────────
+const flowStore = initFlowStore(resolve(dirname(config.storage.databasePath), "flows.json"));
+const flowEngine = new FlowEngine(flowStore);
+app.use("/flows", createFlowsRouter(flowStore, flowEngine));
+
+// ── Real-Time Translation (D-202) ────────────────────────────────────
+app.use("/translation", createTranslationRouter(translationService));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
