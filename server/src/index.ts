@@ -39,6 +39,11 @@ import { createRoutingRouter } from "./api/routing.js";
 import { ClaimVerificationService } from "./services/ClaimVerificationService.js";
 import { initIvrMenuStore } from "./services/IvrMenuStore.js";
 import { createIvrRouter } from "./api/ivr.js";
+import { VoiceQualityScorer } from "./services/VoiceQualityScorer.js";
+import { createQualityRouter } from "./api/quality.js";
+import { initPlaybookStore } from "./services/PlaybookStore.js";
+import { createPlaybooksRouter } from "./api/playbooks.js";
+import { createTenantComplianceRouter } from "./api/tenantCompliance.js";
 
 const app = express();
 const server = createServer(app);
@@ -254,6 +259,17 @@ app.use("/language", createLanguageRouter(templateStore));
 // ── IVR Menu Store + IVR API ──────────────────────────────────────────
 const ivrStore = initIvrMenuStore(resolve(dirname(config.storage.databasePath), "ivr-menus.json"));
 app.use("/ivr", createIvrRouter(ivrStore));
+
+// ── Voice Quality Scoring ─────────────────────────────────────────────
+const voiceQualityScorer = new VoiceQualityScorer({ qualityThreshold: 70 });
+app.use("/quality", createQualityRouter(sessionRecorder, voiceQualityScorer));
+
+// ── Conversation Playbook ─────────────────────────────────────────────
+const playbookStore = initPlaybookStore(resolve(dirname(config.storage.databasePath), "playbooks.json"));
+app.use("/playbooks", createPlaybooksRouter(playbookStore));
+
+// ── Tenant Compliance Report ──────────────────────────────────────────
+app.use("/tenants", createTenantComplianceRouter(sessionRecorder, analyticsService));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
