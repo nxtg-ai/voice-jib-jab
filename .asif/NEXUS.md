@@ -254,6 +254,47 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-201 — P1: Conversation Flow Builder — Visual Dialog Designer
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 11:15 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Flow config** — JSON-based conversation flow: greeting → intent detection → routing → response → follow-up.
+2. [ ] **`POST /flows`** CRUD. Per-tenant flows.
+3. [ ] **Flow execution engine** — follow the flow during live sessions, branch based on caller input.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-202.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-202 — P1: Real-Time Translation — Cross-Language Voice Calls
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 11:15 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Translation pipeline** — detect caller language → translate to agent language → process → translate response back → TTS in caller language.
+2. [ ] **Supported pairs** — EN↔ES, EN↔FR, EN↔DE initial.
+3. [ ] **Latency budget** — translation must add <500ms to voice pipeline.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-203.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-203 — P2: Final Session Archive
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 11:15 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Final test count. 2. [ ] All features. 3. [ ] Archive.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-189 — P1: Agent Personas — Configurable Personality Profiles
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: DONE
