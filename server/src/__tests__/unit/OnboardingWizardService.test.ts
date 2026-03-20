@@ -47,8 +47,7 @@ describe("OnboardingWizardService", () => {
     it("returns an OnboardingSession with a sessionId", () => {
       const session = svc.createSession("org_acme");
 
-      expect(session.sessionId).toBeTruthy();
-      expect(typeof session.sessionId).toBe("string");
+      expect(session.sessionId).toMatch(/^[0-9a-f-]{36}$/);
     });
 
     it("returns a session with the provided tenantId", () => {
@@ -60,7 +59,6 @@ describe("OnboardingWizardService", () => {
     it("sets createdAt to an ISO date string", () => {
       const session = svc.createSession("org_acme");
 
-      expect(session.createdAt).toBeTruthy();
       expect(new Date(session.createdAt).toISOString()).toBe(session.createdAt);
     });
 
@@ -197,7 +195,6 @@ describe("OnboardingWizardService", () => {
 
       const updated = svc.completeStep(session.sessionId, { tenantName: "Acme" });
       const stepState = updated.steps.find((s) => s.step === "tenant_registration");
-      expect(stepState!.completedAt).toBeTruthy();
       expect(new Date(stepState!.completedAt!).toISOString()).toBe(stepState!.completedAt);
     });
 
@@ -214,7 +211,7 @@ describe("OnboardingWizardService", () => {
       });
 
       expect(done.complete).toBe(true);
-      expect(done.completedAt).toBeTruthy();
+      expect(done.completedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
       expect(done.currentStep).toBe("complete");
     });
 

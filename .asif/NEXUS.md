@@ -10290,3 +10290,63 @@ Unchanged from check-in 49:
 Q19–Q34 remain open. No new questions this cycle.
 
 **Standing observation**: 14 open questions across Q19-Q34. These have accumulated over ~6 sessions. If the CoS review cadence is 3x daily, some of these are 2+ days old. If any are blocking architectural decisions, please flag — I'm treating all as non-blocking until I hear otherwise.
+
+---
+
+> Session: 2026-03-20 (check-in 51 — CRUCIBLE self-audit, Idle Time Protocol) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**CRUCIBLE Protocol self-audit (Gates 1-7).** No new features shipped — this is idle-time quality work.
+
+**Findings and fixes:**
+- Gate 1 (trivially-true): `expect(true)` → **0 instances** ✅
+- Gate 2 (tautologies): `expect(1).toBe(1)` → **0 instances** ✅
+- Gate 3 (coverage config): `src/index.ts` excluded — **correct** (wiring only, no business logic) ✅
+- Gate 4 (dead tests): **0 `it.skip`/`describe.skip`/`xit`** — all 6 grep hits were in comments or variable names ✅
+- Gate 5 (mock proliferation): 87 `jest.mock()` across 159 suites = 0.55/suite — **acceptable** for service-heavy codebase ✅
+- Gate 6 (coverage omits in business logic): Only `src/index.ts` excluded — **no business logic omitted** ✅
+- Gate 7 (mutation spot-check): `jest.getTimerCount().toBeGreaterThan(0)` in LaneArbitrator — **valid** (tests that interval is active, not just zero). No fabricated timing assertions found.
+
+**Weak assertions strengthened (11 → 5):**
+- `ConversationAnalyticsService.test.ts` lines 110-111: `toBeTruthy()` → `toMatch(/^\d{4}-\d{2}-\d{2}T/)` (ISO date check)
+- `OnboardingWizardService.test.ts` line 50: `toBeTruthy() + typeof === 'string'` → `toMatch(/^[0-9a-f-]{36}$/)` (UUID check)
+- `OnboardingWizardService.test.ts` line 63: removed redundant `toBeTruthy()` (next line had ISO check)
+- `OnboardingWizardService.test.ts` line 198: removed redundant `toBeTruthy()` (next line had ISO check)
+- `OnboardingWizardService.test.ts` line 217: `toBeTruthy()` → `toMatch(/^\d{4}-\d{2}-\d{2}T/)` (ISO date check)
+
+Remaining 5 `toBeTruthy()` are in `DemoFixtures.test.ts` checking non-empty fixture strings (id, name, description, templateId, greeting) — these are appropriate: they verify fixture data is populated, not a specific format.
+
+Test count: **4,831 passed, 0 failed** (unchanged — strengthened assertions pass).
+
+---
+
+### 2. What surprised me?
+
+The CRUCIBLE audit came out cleaner than expected for a 4,831-test suite. No fabricated green-light patterns, no coverage gaming, no disabled tests. The main quality signal was weak `toBeTruthy()` assertions — now reduced from 11 to 5. The remaining 5 are all in fixture validation where truthiness is the right check (we just want non-empty strings).
+
+The `jest.getTimerCount().toBeGreaterThan(0)` pattern I flagged from the summary is **legitimate** — LaneArbitrator uses `setInterval` internally and the tests correctly verify the timer is (a) created when needed and (b) cleared on stop. This is a valid behavioral check.
+
+The force-exit warning in `WebhookService.test.ts` is the one genuine outstanding test hygiene issue: active timers not cleaned up after test runs. This is pre-existing from the SLA monitor / webhook polling service. Non-critical but worth a dedicated fix.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Integration test teardown fix** — `WebhookService.test.ts` force-exit warning; add timer cleanup in `afterAll`
+2. **NEXUS split** — file is now ~10,300 lines (Q21)
+3. **Store async initialize refactor** — Q33 startup serialization risk
+4. **Stryker refresh** — mutation baseline stale
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q34 remain open. No new questions this cycle.
+

@@ -107,8 +107,8 @@ describe("ConversationAnalyticsService", () => {
 
       const result = await svc.generateInsights();
 
-      expect(result.dateRange.from).toBeTruthy();
-      expect(result.dateRange.to).toBeTruthy();
+      expect(result.dateRange.from).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(result.dateRange.to).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it("empty session set returns empty clusters, FAQs, paths", async () => {
