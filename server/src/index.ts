@@ -82,6 +82,11 @@ import { LiveKbSearchService } from "./services/LiveKbSearchService.js";
 import { createKbSearchRouter } from "./api/kbSearch.js";
 import { initTrainingDataService } from "./services/TrainingDataService.js";
 import { createTrainingRouter } from "./api/training.js";
+import { AgentComparisonService } from "./services/AgentComparisonService.js";
+import { createCompareAgentsRouter } from "./api/compareAgents.js";
+import { compareAgentsDashboardHtml } from "./api/compareAgentsDashboard.js";
+import { AuditReportService } from "./services/AuditReportService.js";
+import { createAuditReportRouter } from "./api/auditReport.js";
 import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 
@@ -346,6 +351,17 @@ app.use("/kb-search", createKbSearchRouter(liveKbSearch));
 const trainingDataService = initTrainingDataService(resolve(dirname(config.storage.databasePath), "training-data.json"));
 app.use("/training", createTrainingRouter(trainingDataService));
 
+// ── Agent Performance Comparison ─────────────────────────────────────
+const agentComparisonService = new AgentComparisonService(sessionRecorder, voiceQualityScorer);
+app.use("/compare-agents", createCompareAgentsRouter(agentComparisonService));
+app.get("/compare-agents/dashboard", (_req, res) => {
+  res.type("html").send(compareAgentsDashboardHtml());
+});
+
+// ── Audit Report Generator ────────────────────────────────────────────
+const auditReportService = new AuditReportService(sessionRecorder, voiceQualityScorer);
+app.use("/audit", createAuditReportRouter(auditReportService));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -453,7 +469,9 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Session Export:   http://localhost:${config.port}/export/sessions`);
     console.log(`[Server] SLA Monitor:     http://localhost:${config.port}/sla/dashboard`);
     console.log(`[Server] Live KB Search:  http://localhost:${config.port}/kb-search`);
-    console.log(`[Server] Training Mode:   http://localhost:${config.port}/training/annotations\n`);
+    console.log(`[Server] Training Mode:   http://localhost:${config.port}/training/annotations`);
+    console.log(`[Server] Agent Compare:   http://localhost:${config.port}/compare-agents/dashboard`);
+    console.log(`[Server] Audit Reports:   http://localhost:${config.port}/audit/report\n`);
 
     console.log("Features:");
     console.log(
