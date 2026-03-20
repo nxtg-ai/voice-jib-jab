@@ -249,6 +249,48 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-162 — P1: Voice Biometrics — Caller Identification
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 09:30 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Voiceprint enrollment** — `POST /voiceprints` (tenant_id, caller_id, audio_sample). Extract embedding.
+2. [ ] **Caller identification** — at session start, compare audio against enrolled voiceprints. Return confidence score.
+3. [ ] **Auto-context** — if caller identified, load their history/preferences/last issue from memory.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-163.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-163 — P1: Custom TTS Voices — Per-Brand Voice Profiles
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 09:30 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Voice profile config** — per-tenant TTS voice selection (Kokoro voice name, speed, pitch adjustments).
+2. [ ] **`GET /voices/available`** — list all available TTS voices with preview samples.
+3. [ ] **Voice A/B testing** — split sessions between voice profiles, track quality scores by voice.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-164.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-164 — P2: Docker Compose Update — All New Services
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 09:30 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Update docker-compose.yml with all new services from marathon (analytics, quality scorer, playbooks, routing, marketplace).
+2. [ ] Verify `docker-compose up` starts everything cleanly.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-134 — P1: Voice Quality Scoring — Automated Call Grading
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 08:00 | **Estimate**: M | **Status**: DONE
