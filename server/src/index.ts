@@ -66,6 +66,15 @@ import { createRecordingsRouter } from "./api/recordings.js";
 import { initAgentAbTestService } from "./services/AgentAbTestService.js";
 import { createAbTestsRouter } from "./api/abtests.js";
 import { abTestDashboardHtml } from "./api/abTestDashboard.js";
+import { HealthMonitorService, createVoiceAgentHealthChecks } from "./services/HealthMonitorService.js";
+import { ConfigValidator } from "./services/ConfigValidator.js";
+import { createValidateRouter } from "./api/validate.js";
+import { TenantConfigMigrator } from "./services/TenantConfigMigrator.js";
+import { createTenantMigrationRouter } from "./api/tenantMigration.js";
+import { ConversationSearchService } from "./services/ConversationSearchService.js";
+import { createSearchRouter } from "./api/search.js";
+import { createHealthRouter } from "./api/health.js";
+import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 
 const app = express();
 const server = createServer(app);
@@ -281,6 +290,34 @@ app.get("/abtests/dashboard", (_req, res) => {
   res.type("html").send(abTestDashboardHtml());
 });
 
+// ── Health Monitor ────────────────────────────────────────────────────
+const healthChecks = createVoiceAgentHealthChecks({
+  opaEnabled: config.opa.enabled,
+  sqlitePath: config.storage.databasePath,
+  postgresUrl: process.env.DATABASE_URL,
+});
+export const healthMonitor = new HealthMonitorService(healthChecks, {
+  intervalMs: 10_000,
+  webhookUrl: process.env.HEALTH_WEBHOOK_URL,
+  failureThreshold: 2,
+});
+app.use("/health", createHealthRouter(healthMonitor));
+app.get("/health/monitor", (_req, res) => {
+  res.type("html").send(healthMonitorDashboardHtml());
+});
+
+// ── Session Config Validator ──────────────────────────────────────────
+const configValidator = new ConfigValidator(config);
+app.use("/validate", createValidateRouter(configValidator));
+
+// ── Tenant Config Migration (export/import) ───────────────────────────
+const tenantMigrator = new TenantConfigMigrator(tenantRegistry, personaStore, kbStore, playbookStore, ivrStore);
+app.use("/tenants", createTenantMigrationRouter(tenantMigrator));
+
+// ── Conversation Search ───────────────────────────────────────────────
+const conversationSearch = new ConversationSearchService(sessionRecorder);
+app.use("/search", createSearchRouter(conversationSearch));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -300,6 +337,9 @@ app.use("/voice", voiceLimiter, createVoiceRouter(voiceTriggerService, `http://l
 async function startServer(): Promise<void> {
   // Initialize OPA singleton before accepting any sessions
   const opaEvaluator = await initializeOpa();
+
+  // Start health monitor
+  healthMonitor.start();
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
@@ -377,7 +417,11 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Voiceprints API: http://localhost:${config.port}/voiceprints`);
     console.log(`[Server] Voice A/B Tests: http://localhost:${config.port}/voices/abtests`);
     console.log(`[Server] Agent A/B Tests: http://localhost:${config.port}/abtests`);
-    console.log(`[Server] A/B Dashboard:   http://localhost:${config.port}/abtests/dashboard\n`);
+    console.log(`[Server] A/B Dashboard:   http://localhost:${config.port}/abtests/dashboard`);
+    console.log(`[Server] Health Monitor:  http://localhost:${config.port}/health/monitor`);
+    console.log(`[Server] Health API:      http://localhost:${config.port}/health/subsystems`);
+    console.log(`[Server] Config Validate: http://localhost:${config.port}/validate`);
+    console.log(`[Server] Conversation Search: http://localhost:${config.port}/search/conversations\n`);
 
     console.log("Features:");
     console.log(
