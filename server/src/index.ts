@@ -73,6 +73,8 @@ import { TenantConfigMigrator } from "./services/TenantConfigMigrator.js";
 import { createTenantMigrationRouter } from "./api/tenantMigration.js";
 import { ConversationSearchService } from "./services/ConversationSearchService.js";
 import { createSearchRouter } from "./api/search.js";
+import { SessionExportService } from "./services/SessionExportService.js";
+import { createExportRouter } from "./api/export.js";
 import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 
@@ -318,6 +320,10 @@ app.use("/tenants", createTenantMigrationRouter(tenantMigrator));
 const conversationSearch = new ConversationSearchService(sessionRecorder);
 app.use("/search", createSearchRouter(conversationSearch));
 
+// ── Session Export ────────────────────────────────────────────────────
+const sessionExportService = new SessionExportService(sessionRecorder, recordingStore, voiceQualityScorer);
+app.use("/export", createExportRouter(sessionExportService));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -421,7 +427,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Health Monitor:  http://localhost:${config.port}/health/monitor`);
     console.log(`[Server] Health API:      http://localhost:${config.port}/health/subsystems`);
     console.log(`[Server] Config Validate: http://localhost:${config.port}/validate`);
-    console.log(`[Server] Conversation Search: http://localhost:${config.port}/search/conversations\n`);
+    console.log(`[Server] Conversation Search: http://localhost:${config.port}/search/conversations`);
+    console.log(`[Server] Session Export: http://localhost:${config.port}/export/sessions\n`);
 
     console.log("Features:");
     console.log(
