@@ -64,6 +64,7 @@
 | N-52 | API Coverage — supervisor + webhookRetry + voices (0%→100%) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-53 | Branch Coverage — knowledge + onboarding + training + webhooks APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-54 | Branch Coverage — agentVersions + search + HealthMonitor + TenantMigrator | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-55 | Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12751,7 +12752,64 @@ Four-file parallel branch coverage pass targeting the remaining low-coverage ser
 - **HealthMonitorService.test.ts** (+9 tests): `HealthMonitorService.ts` 60.86% → **86.95% branch**. Added coverage for TTS 403/500 branches, OPA `opaEnabled=true` file-not-found path, ChromaDB `!res.ok` throw and success, database `postgresUrl` valid/invalid-hostname, `sqlitePath` nonexistent, neither-option no-op.
 - **TenantConfigMigrator.test.ts** (+5 tests): `TenantConfigMigrator.ts` 68.18% → **81.81% branch**. Added catch-block tests for `createTenant` throws (tenant registration failure), `createPersona` throws, `createEntry` (playbook) throws, `createMenu` (IVR) throws, plus non-Error throw → `String(err)` branch.
 
-4,546 → **4,584 tests** (+38). All passing. Dashboard: 54/54 SHIPPED.
+4,546 → **4,584 tests** (+38). All passing. Dashboard: 55/55 SHIPPED.
+
+---
+
+### Check-in 87 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-54** (committed `df88074`): Branch coverage for 4 files — agentVersions.ts (73.52%→94.11%), search.ts (73.68%→100%), HealthMonitorService.ts (60.86%→86.95%), TenantConfigMigrator.ts (68.18%→81.81%). +38 tests (4,546→4,584).
+
+**N-55** (committed `ebc9be0`): Branch coverage for 5 files — VectorStore (new, 74.19%), KnowledgeBase (72.41%), training-api (improved), routing-api (improved), RetrievalService (44.26%→83.6%). +34 tests (4,584→4,618). New `jest.mock("fs")` factory pattern for `existsSync` control.
+
+Total this session: +72 tests, 2 SHIPPED initiatives, dashboard advances to **55/55**.
+
+#### 2. What surprised me?
+
+**`jest.spyOn` cannot redefine non-configurable properties.** `existsSync` is non-configurable on the Node.js `fs` module under Jest's ESM interop. `spyOn` fails silently or throws "Cannot redefine property". The fix is `jest.mock("fs", () => ({ ...real, existsSync: jest.fn().mockImplementation(real.existsSync) }))` — a module-level factory hoisted before imports. This pattern took one failed attempt to discover; now documented for reuse.
+
+**Dead code is permanent in coverage.** Three branches in `RetrievalService.ts` (lines 134, 276, 284) are structurally unreachable via any real inputs — they only trigger if the caller passes contradictory options that the constructor already prevents. Istanbul counts them as missed. There is no test that can reach them without breaking the API contract. Accepted at 83.6% instead of chasing 100%.
+
+**`KnowledgePack` uses `readFileSync` while `resolveKnowledgeFile` uses `existsSync`.** This split lets you mock `existsSync=false` (to simulate "file not found" for path resolution) while the file still reads successfully — because `readFileSync` is unmocked. A useful orthogonality for testing, but subtle to exploit correctly.
+
+#### 3. Cross-project signals
+
+**The `jest.mock("fs")` factory pattern for named imports** is reusable across the portfolio. Any module that imports `{ existsSync }` (named import) cannot be patched with `spyOn`. The module-level factory mock is the canonical solution. Worth adding to the ASIF test patterns guide.
+
+**"Dead code at 83%" is a valid terminal state.** Not every coverage gap is fixable. When a branch is architecturally unreachable (constructor invariants prevent the inputs that would trigger it), trying to reach it requires breaking the API contract. The right call is to note it and move on. Portfolio-wide: consider annotating these with `/* istanbul ignore next */` to stop them showing as gaps.
+
+#### 4. What would I prioritize next?
+
+1. **N-12 plan (`keen-enchanting-yao.md`) still on disk** — `TicketingMcpClient.ts` + `ControlEngine` ticketing tests. This was the last pending plan from a prior session. N-12 shows SHIPPED in the dashboard but the plan references it as "N-12 adds enterprise support ticketing." If N-12 is already fully SHIPPED (ticketing MCP), the plan file may be stale and can be archived.
+2. **Coverage floor check** — with 4,618 tests and branch coverage improvements across 10+ files since N-49, a full `npm test --coverage` run would confirm the overall branch % against the 78% floor in `jest.config.js`.
+3. **Any new CoS directives** — ready for the next batch if Q42 gets a response.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (new)** — The plan file `~/.claude/plans/keen-enchanting-yao.md` references N-12 "ticketing integration via MCP" as a future build. But N-12 is already SHIPPED in the dashboard. Is the plan stale? Or is this a separate untracked enhancement? Should I archive or delete the plan file?
+
+Dashboard: 55/55 SHIPPED.
+
+---
+
+### N-55: Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing (2026-03-21)
+
+Five-file parallel branch coverage pass. Work done via 4 parallel agents:
+
+- **VectorStore.test.ts** (NEW, +6 tests): `retrieval/VectorStore.ts` → **74.19% branch**. Empty query, whitespace query, no-overlap corpus (zero dot product), negative topK, stopwords-only document (docNorm=0 guard), unknown tokens (IDF miss).
+- **KnowledgeBase.test.ts** (+5 tests): `services/KnowledgeBaseStore.ts` → **72.41% branch**. Non-ENOENT readFileSync re-throw, `incrementHit` nonexistent id (no throw), `search("")` → `[]`, `search(stopwords)` → `[]`, `clearTenant` when no file on disk.
+- **training-api.test.ts** (+7 tests): `api/training.ts` improved branch. Whitespace-only `sessionId` → 400, whitespace-only `text` → 400; malformed filter types (`labels`/`sessionIds` not array → ignored, `from`/`to`/`tenantId` not string → ignored).
+- **Routing.test.ts** (+4 tests): `api/routing.ts` improved branch. `conditions: "string"` → 400 (not array), `tenantId: null` in PUT, `conditions: null` in PUT → not forwarded, `conditions: "string"` in PUT → not forwarded.
+- **RetrievalService.test.ts** (+12 tests): `retrieval/RetrievalService.ts` **44.26% → 83.6% branch**. Added `jest.mock("fs")` factory for `existsSync` control. Tests: `getDefaults()`, `!ready` early return, empty/whitespace query topic fallback ("NextGen AI"), `lookupDisclaimer` null for unknown ID, `knowledgeDir` in `resolveKnowledgeFile`, `existsSync=false` optional→warn+undefined, `existsSync=false` non-optional→throw→catch ready=false, tiny caps drop disclaimers, for-loop break on cap exceed, `latency` keyword → performance_claims disclaimers.
+
+Dead code noted: `trimToCaps` while-loops (lines 276, 284) and `if (!factsPath)` guard (line 134) are structurally unreachable via normal code flow. Accepted at 83.6% branch.
+
+4,584 → **4,618 tests** (+34). All passing. Dashboard: 55/55 SHIPPED.
 
 ---
 
