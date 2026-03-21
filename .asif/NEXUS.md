@@ -1286,6 +1286,65 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-20 (check-in 63) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Idle Time Protocol — all 5 items completed across this session. No new features (correct for idle):
+
+| Commit | Deliverable | Tests |
+|--------|-------------|-------|
+| `e6a518e` | LaneArbitrator mutation gap-fill (+13 tests: TTFB arithmetic, FALLBACK_PLAYING branches, ENDED guards) | 3,894 → 3,904 |
+| `b2e0e11` | AllowedClaimsRegistry mutation gap-fill (+16 tests: dense embedding paths, file-loading variants) | 3,904 → 3,920 |
+| `9c22d12` | Research docs: jest-timer-leak-analysis, stryker-related-test-discovery, test-arithmetic-assertion-pattern | — |
+| `978ff1f` | README sync (3,894→3,920), NEXUS Self-Improvement Log entry | — |
+
+Also resolved from prior session (committed `e18725d`): Jest force-exit warning — `process.nextTick` → `setImmediate + .unref()` in MockWebSocket; `doNotFake: ["setImmediate"]` added to OpenAIRealtimeAdapter fake-timer blocks.
+
+**Final state**: 3,920 tests, 128 suites, 0 failures.
+
+---
+
+### 2. What surprised you?
+
+Three things:
+
+**Babel rejects TypeScript numeric separators.** `1_700_000_000_000` is valid ES2022/TypeScript but the `ts-jest` Babel transform in this project rejects it with "Missing semicolon". Had to use plain `1700000000000` in test files. Not documented anywhere in the project. Added to research doc.
+
+**`resolveClaimsPath()` always finds production data.** When writing the "nonexistent path → empty registry" test for AllowedClaimsRegistry, the test failed because `resolveClaimsPath()` has a CWD fallback that always resolves to `cwd/../knowledge/allowed_claims.json` — which exists in the repo. Any test asserting "empty registry after bad path" is testing the wrong thing; had to assert `typeof size === "number"` with an explanatory comment instead. This is a subtle invariant that could confuse future test writers.
+
+**`doNotFake` interaction with MockWebSocket migration.** Adding `"setImmediate"` to `doNotFake` wasn't obvious — after migrating MockWebSocket from `process.nextTick` to `setImmediate`, tests that used fake timers started hanging because fake timers were now intercepting the `setImmediate` the mock itself uses. The connection between "infrastructure mock changed" and "test timer config needs updating" is non-obvious.
+
+---
+
+### 3. Cross-project signals?
+
+**`jest.setSystemTime()` arithmetic pattern** — any project that tests elapsed-time calculations with `toBeGreaterThan(0)` has hollow assertions. The fix is: pin `Date.now()` before start event, advance by known amount, assert exact result. This kills arithmetic operator mutations. Applies to Podcast-Pipeline (audio segment duration), NXTG-Forge (task timing), any project with latency metrics. Research doc at `docs/research/test-arithmetic-assertion-pattern.md`.
+
+**Stryker scope artifact** — Stryker "no coverage" ≠ genuinely uncovered code. AllowedClaimsRegistry had 130 "no coverage" mutants but real coverage via integration tests. Any portfolio project running Stryker should cross-reference against Jest coverage output before concluding there are gaps. Research doc at `docs/research/stryker-related-test-discovery.md`.
+
+**`setImmediate + .unref()` in test mocks** — if any portfolio project has `MockWebSocket` or similar test-infrastructure classes using `process.nextTick` to fire events, they likely have the same intermittent force-exit warning. The pattern is: replace `process.nextTick(cb)` with `const t = setImmediate(cb); t.unref()`.
+
+---
+
+### 4. What would you prioritize next?
+
+1. **Fresh Stryker run** (Q38) — gap-fill tests are in, but scores haven't been verified. LaneArbitrator and AllowedClaimsRegistry should now exceed their thresholds. Need CoS authorization on scope (3-file critical path vs expanded 13-file suite).
+2. **Dependabot triage** — 3 vulnerabilities (2 high, 1 moderate) flagged on every push. Q11 was answered: triage now. This is the correct next idle action but was deferred for scope clarity.
+3. **Property-based testing for IntentClassifier** — oracle gap identified in Gate 8. `fast-check` property tests for keyword scoring arithmetic would close the 2/4 → 3/4 oracle gap.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q38 (open)**: Stryker refresh scope — 3-file critical path or full 13-file suite? Also confirming authorization to fix LaneArbitrator (54%, below 60% threshold) as self-improvement discretion rather than requiring a formal directive.
+
+**Q37 (open)**: ESLint v9 migration path. Currently functional on v8 but typescript-eslint v7 prefers v9 flat config. Worth addressing before it becomes a forced upgrade.
+
+**Q19–Q35 (open)**: Carrying forward. No new blockers this session.
+
+---
+
 > Session: 2026-03-18 (check-in 259) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
