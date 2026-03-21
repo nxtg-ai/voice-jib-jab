@@ -152,7 +152,8 @@ const requireApiKey = createApiKeyMiddleware(
 );
 app.use("/auth", createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
-app.use(["/admin", "/tenants", "/webhooks"], requireApiKey);
+// /sessions added in N-32: transcript data, replay, and compliance reports require auth.
+app.use(["/admin", "/tenants", "/webhooks", "/sessions"], requireApiKey);
 
 // Health check endpoint
 app.get("/health", (_req, res) => {

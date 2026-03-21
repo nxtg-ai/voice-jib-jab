@@ -41,6 +41,7 @@
 | N-29 | API Key Authentication | GOVERNANCE | SHIPPED | P0 | 2026-03-21 |
 | N-30 | Real-Time Audit Event Stream | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
 | N-31 | API Key TTL / Expiry + Rotation | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-32 | Session Endpoint Protection | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -11868,3 +11869,47 @@ Nothing — reflection trigger fired immediately after the N-31 push. Check-in 6
 ### 5. Blockers / Questions for CoS
 
 Q38, Q39, Q40 remain open. No new blockers. **Q42 raised**: N-32 (session endpoint protection) — S-sized, one-liner change in `index.ts` + tests. Ready to execute on authorization, or proceeding autonomously on next "Continue roadmap" trigger per established session pattern.
+
+> **RESOLVED** — Shipped as N-32 (2026-03-21).
+
+---
+
+> Session: 2026-03-21 (check-in 68) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**N-32 — Session Endpoint Protection** (P1, GOVERNANCE):
+- Added `/sessions` to the existing `app.use([...], requireApiKey)` guard array in `index.ts` — single-line change covers both sessions router mounts (line 282 + profiler at line 355) automatically
+- `SessionsAuth.test.ts` — 9 tests: 401 without key on 5 different session endpoints, 200 with valid key, 401 with expired key (verifies "expired" message), error body shape, auth-disabled bypass
+
+**Test delta**: 4,133 → 4,142 (+9). 133 suites. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**A single-line array extension guards both sessions mounts simultaneously.** `app.use(["/sessions"], requireApiKey)` registered before any handlers fires for every request matching `/sessions/*`, regardless of how many separate `app.use("/sessions", ...)` calls exist later. The profiler router (mounted separately at line 355) gets protected for free. This is why the pre-mount guard pattern is superior to per-route middleware: new route handlers added later are automatically protected without code changes.
+
+**The `app.use()` array guard is now protecting 4 route families**: `/admin`, `/tenants`, `/webhooks`, `/sessions`. The only unguarded management-adjacent routes remaining are `/analytics` (aggregate metrics — lower sensitivity) and `/audit` (the audit log itself — currently readable without auth, which is a deliberate choice: audit logs should be readable by ops teams even if auth is misconfigured, to support incident response).
+
+---
+
+### 3. Cross-project signals
+
+**Auth guard coverage map is a first-class deliverable.** After N-29/N-32, the codebase now has explicit documentation of which routes are guarded vs. unguarded. Other ASIF projects adding auth should maintain a similar map — a single `app.use([paths], requireApiKey)` line is the authoritative source of truth for what's protected. Anything not in that array is intentionally public.
+
+**Integration tests for auth guards should test the guard layer in isolation.** `SessionsAuth.test.ts` builds a minimal app (store + middleware + router) rather than importing the full `index.ts`. This isolates the test to the guard pattern itself, runs in <100ms, and doesn't require initializing 30+ services. This is the correct pattern for N-29/N-30/N-31/N-32 guard tests.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **N-33: `/analytics` and `/audit` access control** — analytics contains aggregate call-center metrics (call volumes, sentiment distributions, tenant comparisons) that could leak competitive intelligence. `GET /audit/events` exposes all API access logs. Both warrant protection. Medium: 2-line index.ts change + ~10 tests.
+2. **Q40 — IntentClassifier word-boundary fix** — authorization pending.
+3. **Q39 — Dependabot alert dismissal** — authorization pending.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38, Q39, Q40 remain open. Q42 resolved. Dashboard: 32/32 SHIPPED.
