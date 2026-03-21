@@ -118,6 +118,7 @@ import { requestIdMiddleware } from "./middleware/requestId.js";
 import { GracefulShutdown } from "./services/GracefulShutdown.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { RATE_LIMITS } from "./config/rateLimits.js";
+import { jsonErrorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 const server = createServer(app);
@@ -508,6 +509,10 @@ export const voiceTriggerService = new VoiceTriggerService(
   systemConfigStore,
 );
 app.use("/voice", voiceLimiter, createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
+
+// N-45: Global JSON error handler — must be mounted after all routes.
+// Converts unhandled Express errors to structured JSON; prevents HTML 500 leaking stack traces.
+app.use(jsonErrorHandler);
 
 async function startServer(): Promise<VoiceWebSocketServer> {
   // Initialize OPA singleton before accepting any sessions

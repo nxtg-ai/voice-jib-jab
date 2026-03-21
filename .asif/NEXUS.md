@@ -54,6 +54,7 @@
 | N-42 | Trust Proxy Configuration | GOVERNANCE | SHIPPED | P0 | 2026-03-21 |
 | N-43 | Helmet.js Security Headers | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-44 | Request Body Size Limit (256 KB) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-45 | Global JSON Error Handler | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -12222,6 +12223,44 @@ Dashboard: 41/41 SHIPPED.
 **Q45 resolved** — N-42 self-started and shipped per K8s deployment evidence.
 
 Dashboard: 42/42 SHIPPED.
+
+---
+
+### Check-in 77 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-44: Request Body Size Limit** — added `{ limit: "256kb" }` to `express.json()` in `index.ts`. Oversized request bodies now return HTTP 413 instead of being silently processed. 7 tests in `BodySizeLimit.test.ts`. +7 → 4,287 total. Commit: `10b2816`.
+
+**N-45: Global JSON Error Handler** — new `middleware/errorHandler.ts` (`jsonErrorHandler`) mounted after all routes. Converts any `next(err)` into a structured JSON response: `{ "error": "..." }`. Prevents Express from returning HTML 500 pages with stack traces. In production: generic "Internal server error" for 5xx. In development: raw error message. Preserves `err.status` / `err.statusCode` for explicit client errors (4xx). Logs 5xx to stderr with X-Request-ID for trace correlation. 11 tests in `ErrorHandler.test.ts`. +11 → 4,298 total. Commit: pending.
+
+Also fixed stale NEXUS detail statuses: N-11 detail BUILDING → confirmed dashboard already shows SHIPPED.
+
+Dashboard: 45/45 SHIPPED.
+
+#### 2. What surprised me?
+
+**`process.env.NODE_ENV` mutation in `makeApp()` is a test anti-pattern.** The first draft of the test mutated `NODE_ENV` inside the app factory and tried to restore it — this can bleed state across tests if the test runner runs suites concurrently (Jest workers share process env within a worker). The cleaner approach is for the middleware itself to read `NODE_ENV` at request time (not at construction time), so `process.env.NODE_ENV = "production"` in `beforeAll` directly controls behaviour without any factory tricks. That's what the final implementation does.
+
+**Express error middleware arity is a footprint requirement.** Express detects error middleware by checking `fn.length === 4`. If you write `(err, req, res) => void` (3 args), Express treats it as a normal route, not an error handler, and errors pass straight through. The unused `_next` parameter is not optional — it must be declared.
+
+#### 3. Cross-project signals
+
+**Every Express project without a `jsonErrorHandler` leaks HTML 500 pages to clients.** The default Express handler returns `Error: <message>` in HTML format, including partial stack traces in development mode. Any ASIF project serving a production API should mount this handler (or an equivalent) as the last middleware. The implementation here is directly portable — 40 lines, zero dependencies.
+
+**The `err.status` vs `err.statusCode` duality is a real API surface.** `http-errors` (used by many Express middlewares) sets `.status`; some frameworks set `.statusCode`. The handler checks both. Any ASIF error handler should do the same or it will silently 500 on structured errors that already have the right status code.
+
+#### 4. What would I prioritize next?
+
+1. **N-46: 404 handler** — currently unknown routes return Express's default HTML 404. Adding an explicit `app.use((_req, res) => res.status(404).json({ error: "Not found" }))` before the error handler closes the last HTML-response gap. S-sized, ~5 tests.
+2. **CRUCIBLE Gate 2 sweep** — 4,298 tests; the N-3x through N-4x sprint added ~550 tests. A non-empty assertion scan on the newer test files would close any hollow tests from shipping pressure.
+3. **N-11 detail status fix** — the detail section still reads `BUILDING`; dashboard is correct. Housekeeping only.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change without CoS call.
+
+Dashboard: 45/45 SHIPPED.
 
 ---
 
