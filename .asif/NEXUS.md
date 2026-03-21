@@ -10869,3 +10869,46 @@ Q38: **Stryker refresh — scope and authorization?** Last Stryker run was scope
 ### 5. Blockers / Questions for CoS
 
 Q38 still open (Stryker refresh scope + LaneArbitrator below-threshold authorization). No new blockers.
+
+---
+
+> Session: 2026-03-20 (check-in 62) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**AllowedClaimsRegistry mutation gap-fill — CRUCIBLE Gate 6** (`b2e0e11`):
+- 19 new tests covering the 130 Stryker no-coverage mutants
+- Dense embedding paths: `initialize()` empty-registry skip branch, `isEmbeddingInitialized` getter, `getEmbeddingSimilarityScore` multi-claim max selection, `[0,1]` clamping, TF-IDF fallback
+- File loading (`enableFileLoad: true`) — first direct tests ever: `allowed_claims` key, `claims` fallback, `disallowed_patterns` from file, invalid entries skipped, `claim` field alias, malformed JSON error path, CWD fallback, injected-claims precedence, pattern merging
+
+**Test delta**: 3,904 → 3,920 (+16). AllowedClaimsRegistry: 40 → 59 tests. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**The "no-coverage" mutants were a discovery failure, not a coverage failure.** The AllowedClaimsRegistry `initialize()` and file-loading paths DO have indirect coverage via ControlEngine and OpaClaimsCheck integration tests. Stryker just didn't identify those as "related tests" for AllowedClaimsRegistry — its related-test discovery is file-scoped, not transitive. So the 130 no-coverage mutants were entirely a Stryker instrumentation artifact. The new direct tests are valuable regardless, but the root cause wasn't hollow assertions — it was Stryker's scope detection.
+
+**CWD fallback for `allowed_claims.json` is always active.** Even when `sourcePath` points to a nonexistent file, `resolveClaimsPath` falls through to `resolve(cwd, "..", "knowledge", "allowed_claims.json")` and finds the real production file. The "nonexistent path → empty registry" test I wrote was wrong because the CWD fallback fired. This is actually a design concern: in production, a misconfigured `sourcePath` silently loads the default file instead of failing. But it's intentional defensive behavior — documented in the existing `console.warn`.
+
+---
+
+### 3. Cross-project signals
+
+**Stryker's "no-coverage" classification is about related-test discovery, not actual coverage.** When a file is tested indirectly (via integration tests or higher-layer unit tests), Stryker may classify those mutations as "no coverage" because the mutated file has no *directly* related test file. The fix is always direct unit tests — but the signal is "Stryker can't find related tests" not "this code has no tests." Other ASIF projects using Stryker should verify their related-test scoping before reading no-coverage counts as absolute truth.
+
+**File loading with CWD fallbacks**: Any service that uses `resolve(cwd, ...)` fallback paths for config/data files will load real data during test runs if the file exists. Tests that assume empty state from a misconfigured path need to either mock `existsSync` or use an explicit `enableFileLoad: false` guard. This pattern exists in AllowedClaimsRegistry, RetrievalService, and likely other knowledge-loading services.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Fresh Stryker run** — both LaneArbitrator and AllowedClaimsRegistry now have significantly more direct tests. Expect LaneArbitrator to approach 60%+ threshold (was 54%), AllowedClaimsRegistry to exceed 40% threshold (was 36%). Running the baseline would confirm whether the gaps are closed or reveal remaining survivors.
+2. **Idle Time Protocol item 2** — document recent research in `docs/research/`. The timer leak investigation (process.nextTick → setImmediate), Stryker no-coverage classification, and CWD fallback loading pattern are all worth documenting.
+3. **ESLint v9 migration** (Q37) — still deferred.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38 still open (Stryker refresh scope authorization). No new blockers.
