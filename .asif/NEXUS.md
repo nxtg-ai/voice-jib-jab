@@ -10595,3 +10595,52 @@ Q19–Q35 remain open.
 **Result**: 3,894 tests (128 suites), 0 failures, clean exit — no force-exit warning.
 
 Note: Test count decreased from 4,976 → 3,894 because 1,082 tests were from the stryker sandbox (35 files × ~31 tests avg). The canonical count is 3,894.
+
+---
+
+> Session: 2026-03-20 (check-in 57) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**Force-exit warning fix** (`490cbec`). Two-part fix that has persisted as tech debt across several sessions:
+- `jest.config.js`: excluded `.stryker-tmp/` from `modulePathIgnorePatterns` + `testPathIgnorePatterns`
+- `OpenAIRealtimeAdapter.ts`: added `.unref()` to `pingInterval` in `startPingInterval()`
+
+**Standing state**: 3,894 tests, 128 suites, 0 failures, clean exit. Note: canonical count is now 3,894 — the previous 4,976 figure included 1,082 phantom tests from the stale Stryker sandbox.
+
+---
+
+### 2. What surprised me?
+
+The timer leak had two independent causes that both needed fixing. I expected one culprit but found two:
+
+1. **The obvious one I missed**: `.stryker-tmp/` was the immediate open handle. Jest was running a stale Stryker mutation sandbox as real tests. The phantom test count inflation (4,976 vs 3,894) had been masked by the fact that "all tests pass" — nobody noticed 1,082 extra tests were running from the wrong directory.
+
+2. **The deeper one**: Even after excluding stryker, `pingInterval.unref()` was still needed. The 30-second health-check interval in `OpenAIRealtimeAdapter` never fires during the 13-second test run, but the unawaited timer prevents worker exit. The fix pattern (`.unref()`) was already in `HealthMonitorService` — it just wasn't applied consistently.
+
+The `--detectOpenHandles` flag was the right tool and identified the exact source file + line number immediately. I should have reached for it sooner rather than manually running isolated test subsets.
+
+---
+
+### 3. Cross-project signals
+
+**Stryker sandbox pollution pattern**: Any project that runs Stryker mutation testing without cleaning up `.stryker-tmp/` will silently inflate its test count and potentially inherit open handle warnings from stryker-mutated test copies. Add `.stryker-tmp/` to `jest.config.js` `testPathIgnorePatterns` as a standard practice. This is portfolio-wide hygiene.
+
+**`.unref()` discipline for background timers**: Any `setInterval`/`setTimeout` that exists for infrastructure health-checking (not application logic) should call `.unref()`. If the process is going down, health pings shouldn't stop it. Template: `this.timer = setInterval(fn, ms); this.timer.unref();`
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 — MCP Ticketing Integration**: Plan already written in `keen-enchanting-yao.md`. GitHub Issues via MCP client when Lane C escalates. ~50 new tests. Implementation-ready.
+2. **NEXUS split (Q21)**: File is ~10,600 lines. Old Team Feedback archive needed.
+3. **Dependabot triage (Q11)**: 2 high + 1 moderate vulnerabilities on main branch per GitHub push warnings.
+4. **Stryker mutation refresh**: Baseline is stale since mid-March. After test count correction (3,894), a fresh mutation score would be informative.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q35 remain open from prior sessions.
+
+**Q36**: The Stryker sandbox inflation means the mutation testing run that produced the cached `.stryker-tmp/` sandbox was never cleaned up after completion. Should Stryker runs be followed by `rm -rf .stryker-tmp/` in a post-run hook, or should Stryker be configured to clean up automatically (`cleanTempDir: true`)? Recommend adding to ASIF testing standards.
