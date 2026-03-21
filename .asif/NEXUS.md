@@ -62,6 +62,7 @@
 | N-50 | Branch Coverage — GracefulShutdown + validate + complianceDashboard | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-51 | Branch Coverage — laneC_control + tenantMigration error paths | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-52 | API Coverage — supervisor + webhookRetry + voices (0%→100%) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-53 | Branch Coverage — knowledge + onboarding + training + webhooks APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12686,3 +12687,54 @@ Key technique: For the `!body` branch on line 65, `express.json()` with `strict:
 **Q43 (open)** — Pre-push lock-file sync check (`npm ci --dry-run`).
 
 Dashboard: 51/51 SHIPPED.
+
+---
+
+### N-53: Branch Coverage — knowledge + onboarding + training + webhooks APIs (2026-03-21)
+
+Four API routers with low branch coverage. Work done in parallel via 4 agent teams:
+
+- **knowledge-api.test.ts** (NEW, 42 tests): `knowledge.ts` 0% → **94.5% branch**. Full coverage of all 7 endpoints + tenant ID validation middleware. Key branches: `isValidId()` valid/invalid, `isStringArray()` array-of-non-strings, source filter normalization (`"manual"/"extracted"/other→undefined`), entry.tenantId mismatch → 404, `updateEntry` returns null → 404, `incrementHit` called once per search result.
+- **onboarding-api.test.ts** (+4 tests): `onboarding.ts` 62.5% → **79.2% branch**. Added catch-block tests for `completeStep`, `skipStep`, `goBack`, `resetSession` — each throwing a plain Error without `validationErrors` to hit the fallback `e.message ?? "Unknown error"` path.
+- **training-api.test.ts** (+10 tests): `training.ts` 60% → **73.3% branch**. Covered validation branches in POST /annotations: missing sessionId, non-number turnIndex, missing speaker, invalid speaker value ("bot"), missing text. PATCH /annotations: invalid label, null return (404). POST /datasets: missing/wrong-type name.
+- **webhooks-api.test.ts** (+8 tests): `webhooks.ts` 64.6% → **83.3% branch**. Covered: POST /test missing webhookId → 400; `deliverDirectly()` function (entire path): with/without secret (HMAC header), fetch 200 → success true, fetch 400 → success false, fetch throws Error → error field, fetch throws non-Error → String(err).
+
+Remaining gaps (all `req.body ?? {}` V8 operator branches — structurally unreachable via HTTP with express.json(), same class as N-51).
+
+4,483 → **4,546 tests** (+63). All passing. Dashboard: 53/53 SHIPPED.
+
+---
+
+### Check-in 85 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-52**: 3 new API test files (supervisor, webhookRetry, voices) — 0%→100% branch on supervisor and webhookRetry, 37.8%→93.3% on voices. +112 tests (4,371→4,483). Commit `ef0c728`.
+
+**N-53**: 4-file parallel branch coverage pass — knowledge (0%→94.5%), onboarding (62.5%→79.2%), training (60%→73.3%), webhooks (64.6%→83.3%). Created `knowledge-api.test.ts` (42 tests), extended 3 existing test files (+63 tests total). Commit TBD.
+
+#### 2. What surprised me?
+
+**`deliverDirectly()` in webhooks.ts was entirely uncovered — a function that makes live fetch() calls to external webhook endpoints.** This is the most consequential coverage gap found this session. The function handles HMAC signing, status code mapping, and error serialization. It had 0 branch coverage because the only way to reach it is when `service.deliver()` returns an empty array (inactive/unsubscribed webhook path). The test that covers this required mocking `global.fetch` with `jest.spyOn` and constructing a complete webhook config with a secret. The function's `err instanceof Error ? err.message : String(err)` non-Error path was also uncovered — following the same portfolio-wide pattern.
+
+**Training API validation paths are deeply nested.** `POST /annotations` has 6 sequential validation guards (sessionId, turnIndex, speaker type, speaker value, text, label) — but the existing tests only covered the happy path and label validation. The early guards (sessionId, turnIndex, speaker) were all uncovered. Each requires a specific malformed body to trigger. This is a test debt smell: feature tests were written "outside-in" (happy path only), leaving the input validation entirely untested.
+
+#### 3. Cross-project signals
+
+**`deliverDirectly()` pattern: internal helper functions that bypass the service layer are coverage blind spots.** When a function is only reachable through a non-obvious code path (e.g. "only when service.deliver returns []"), it accumulates debt silently. The pattern is: service method → fallback path → internal helper. Integration tests never trigger the fallback; unit tests don't know about it. Recommendation: tag such helpers with a comment `// reachable only when: <condition>` so future auditors know how to reach it.
+
+**Sequential validation chains with early returns leave all-but-last guards uncovered.** This appeared in both `training.ts` (6 guards in POST /annotations) and `knowledge.ts` (multiple guards in POST/PUT). The happy-path test only executes the final valid state; every guard before it is a dead branch. Standard fix: one test per guard, each sending a body that passes all previous guards but fails the current one. This is worth a portfolio-wide test convention.
+
+#### 4. What would I prioritize next?
+
+1. **Remaining low-branch files**: `services/HealthMonitorService.ts` (60.9%), `services/TenantConfigMigrator.ts` (68.2%), `services/KnowledgeBaseStore.ts` (72.4%)
+2. **`api/agentVersions.ts` (73.5%)** and **`api/search.ts` (73.7%)** — small API files, fast wins
+3. **Webhook `deliverDirectly` non-Error catch path** — one additional test would push webhooks.ts to ~90%
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+
+Dashboard: 53/53 SHIPPED.

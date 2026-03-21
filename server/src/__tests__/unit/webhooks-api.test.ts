@@ -367,3 +367,184 @@ describe("Webhooks API", () => {
     });
   });
 });
+
+// ── POST /webhooks/test — missing webhookId (lines 72-73) ──────────────
+
+describe("POST /webhooks/test — validation", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    const app = express();
+    app.use(express.json());
+    app.use("/webhooks", createWebhooksRouter(mockSvc as never));
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns 400 when webhookId is absent from body", async () => {
+    const res = await httpRequest(server, "POST", "/webhooks/test", {});
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("webhookId is required");
+    expect(mockSvc.getWebhook).not.toHaveBeenCalled();
+  });
+});
+
+// ── POST /webhooks/test — deliverDirectly path (lines 100-274) ─────────
+
+describe("POST /webhooks/test — deliverDirectly", () => {
+  let server: Server;
+
+  const WEBHOOK_WITH_SECRET: Record<string, unknown> = {
+    webhookId: "wh-sec",
+    tenantId: "org_acme",
+    url: "https://acme.example.com/hook",
+    events: ["call_start"],
+    active: false,
+    secret: "s3cr3t",
+    createdAt: "2026-03-01T10:00:00.000Z",
+    updatedAt: "2026-03-01T10:00:00.000Z",
+  };
+
+  const WEBHOOK_NO_SECRET: Record<string, unknown> = {
+    webhookId: "wh-nosec",
+    tenantId: "org_acme",
+    url: "https://acme.example.com/hook",
+    events: ["call_start"],
+    active: false,
+    createdAt: "2026-03-01T10:00:00.000Z",
+    updatedAt: "2026-03-01T10:00:00.000Z",
+  };
+
+  beforeAll((done) => {
+    const app = express();
+    app.use(express.json());
+    app.use("/webhooks", createWebhooksRouter(mockSvc as never));
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("calls deliverDirectly when deliver() returns empty array and returns a delivery", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_NO_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    jest.spyOn(global, "fetch").mockResolvedValue({ status: 200, ok: true } as Response);
+
+    const res = await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-nosec",
+      event: "call_start",
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    expect(data.webhookId).toBe("wh-nosec");
+    expect(data.success).toBe(true);
+    expect(data.statusCode).toBe(200);
+    expect(typeof data.deliveryId).toBe("string");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("deliverDirectly — webhook without secret sends no X-Webhook-Signature header", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_NO_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue({ status: 200, ok: true } as Response);
+
+    await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-nosec",
+      event: "call_start",
+    });
+
+    const [, fetchInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = fetchInit.headers as Record<string, string>;
+    expect(headers["X-Webhook-Signature"]).toBeUndefined();
+  });
+
+  it("deliverDirectly — webhook with secret adds X-Webhook-Signature header", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_WITH_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    const fetchSpy = jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue({ status: 200, ok: true } as Response);
+
+    await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-sec",
+      event: "call_start",
+    });
+
+    const [, fetchInit] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    const headers = fetchInit.headers as Record<string, string>;
+    expect(headers["X-Webhook-Signature"]).toMatch(/^sha256=[0-9a-f]{64}$/);
+  });
+
+  it("deliverDirectly — 400 response sets success = false", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_NO_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    jest.spyOn(global, "fetch").mockResolvedValue({ status: 400, ok: false } as Response);
+
+    const res = await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-nosec",
+      event: "call_start",
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    expect(data.success).toBe(false);
+    expect(data.statusCode).toBe(400);
+    expect(data.error).toBeUndefined();
+  });
+
+  it("deliverDirectly — fetch throws Error → error field contains message", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_NO_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+
+    const res = await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-nosec",
+      event: "call_start",
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    expect(data.success).toBe(false);
+    expect(data.statusCode).toBeUndefined();
+    expect(data.error).toBe("ECONNREFUSED");
+  });
+
+  it("deliverDirectly — fetch throws non-Error value → error field is stringified", async () => {
+    mockSvc.getWebhook.mockReturnValue(WEBHOOK_NO_SECRET);
+    mockSvc.deliver.mockResolvedValue([]);
+    jest.spyOn(global, "fetch").mockRejectedValue("timeout");
+
+    const res = await httpRequest(server, "POST", "/webhooks/test", {
+      webhookId: "wh-nosec",
+      event: "call_start",
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    expect(data.success).toBe(false);
+    expect(data.error).toBe("timeout");
+  });
+});

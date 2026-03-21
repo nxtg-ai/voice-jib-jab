@@ -374,3 +374,81 @@ describe("Onboarding API", () => {
     });
   });
 });
+
+// ── Error paths — catch blocks ────────────────────────────────────────
+
+describe("Error paths — catch blocks", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    const app = buildApp();
+    server = createServer(app);
+    server.listen(0, "127.0.0.1", done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("complete-step: plain Error without validationErrors returns 400 with error message (line 123)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    mockSvc.completeStep.mockImplementation(() => {
+      throw new Error("Step failed");
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/complete-step",
+      { tenantName: "Acme Corp" },
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Step failed");
+    expect((body as { validationErrors?: unknown }).validationErrors).toBeUndefined();
+  });
+
+  it("skip: service.skipStep throws returns 400 with error message (lines 147-148)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    mockSvc.skipStep.mockImplementation(() => {
+      throw new Error("Cannot skip this step");
+    });
+
+    const res = await httpRequest(server, "POST", "/onboarding/sessions/sess-001/skip");
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Cannot skip this step");
+  });
+
+  it("back: service.goBack throws returns 400 with error message (lines 172-173)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    mockSvc.goBack.mockImplementation(() => {
+      throw new Error("Already at first step");
+    });
+
+    const res = await httpRequest(server, "POST", "/onboarding/sessions/sess-001/back");
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Already at first step");
+  });
+
+  it("reset: service.resetSession throws returns 400 with error message (lines 197-198)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    mockSvc.resetSession.mockImplementation(() => {
+      throw new Error("Reset not permitted");
+    });
+
+    const res = await httpRequest(server, "POST", "/onboarding/sessions/sess-001/reset");
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Reset not permitted");
+  });
+});

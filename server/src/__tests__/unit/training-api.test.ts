@@ -377,3 +377,156 @@ describe("Training API", () => {
     });
   });
 });
+
+// ── Additional coverage for uncovered validation branches ──────────────────
+
+describe("Training API — validation branch coverage", () => {
+  let server: Server;
+
+  beforeEach((done) => {
+    jest.clearAllMocks();
+    server = createServer(buildApp());
+    server.listen(0, "127.0.0.1", done);
+  });
+
+  afterEach((done) => {
+    server.close(done);
+  });
+
+  const req = (method: string, path: string, body?: unknown) =>
+    httpRequest(server, method, `/training${path}`, body);
+
+  // ── POST /annotations — turnIndex validation (lines 81-82) ─────────
+
+  it("POST /annotations returns 400 when turnIndex is missing", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      speaker: "assistant",
+      text: "Hello",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("turnIndex");
+  });
+
+  it("POST /annotations returns 400 when turnIndex is a string", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: "1",
+      speaker: "assistant",
+      text: "Hello",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("turnIndex");
+  });
+
+  // ── POST /annotations — speaker missing/wrong-type (lines 87-88) ───
+
+  it("POST /annotations returns 400 when speaker is missing", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      text: "Hello",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("speaker");
+  });
+
+  it("POST /annotations returns 400 when speaker is a number", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      speaker: 42,
+      text: "Hello",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("speaker");
+  });
+
+  // ── POST /annotations — invalid speaker value (lines 92-93) ────────
+
+  it("POST /annotations returns 400 when speaker is an invalid string value", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      speaker: "bot",
+      text: "Hello",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("speaker");
+  });
+
+  // ── POST /annotations — text missing/wrong-type (lines 98-99) ──────
+
+  it("POST /annotations returns 400 when text is missing", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      speaker: "user",
+      label: "good_response",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("text");
+  });
+
+  // ── PATCH /annotations/:id — invalid label (lines 156-159) ─────────
+
+  it("PATCH /annotations/:id returns 400 for invalid label", async () => {
+    const res = await req("PATCH", "/annotations/ann-001", {
+      label: "totally_wrong",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("label");
+  });
+
+  it("PATCH /annotations/:id returns 404 when service returns null for valid label", async () => {
+    mockSvc.updateAnnotationLabel.mockReturnValue(null);
+
+    const res = await req("PATCH", "/annotations/ghost-id", {
+      label: "neutral",
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  // ── POST /datasets — missing name (lines 219-220) ──────────────────
+
+  it("POST /datasets returns 400 when name is missing", async () => {
+    const res = await req("POST", "/datasets", {
+      filters: {},
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("name");
+  });
+
+  it("POST /datasets returns 400 when name is not a string", async () => {
+    const res = await req("POST", "/datasets", {
+      name: 99,
+      filters: {},
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("name");
+  });
+});
