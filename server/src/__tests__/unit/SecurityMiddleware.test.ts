@@ -154,41 +154,74 @@ describe("Rate Limiter", () => {
   });
 });
 
-// ── Security Headers Tests ───────────────────────────────────────────
+// ── Security Headers Tests (N-43: Helmet) ────────────────────────────
 
 describe("Security Headers", () => {
   let server: Server;
+  let res: HttpResponse;
+
+  beforeAll(async () => {
+    const app = express();
+    app.use(securityHeaders);
+    app.get("/health", (_req, res) => res.json({ status: "ok" }));
+    server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    res = await httpRequest(server, "GET", "/health");
+  });
 
   afterAll((done) => {
     server.close(done);
   });
 
-  beforeAll((done) => {
-    const app = express();
-    app.use(securityHeaders);
-    app.get("/health", (_req, res) => res.json({ status: "ok" }));
-    server = createServer(app);
-    server.listen(0, done);
-  });
-
-  it("sets X-Content-Type-Options to nosniff", async () => {
-    const res = await httpRequest(server, "GET", "/health");
+  // ── Headers carried over from manual implementation ──────────────
+  it("sets X-Content-Type-Options to nosniff", () => {
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
   });
 
-  it("sets X-Frame-Options to DENY", async () => {
-    const res = await httpRequest(server, "GET", "/health");
+  it("sets X-Frame-Options to DENY (strict — API server, no embeddable UI)", () => {
     expect(res.headers["x-frame-options"]).toBe("DENY");
   });
 
-  it("sets X-XSS-Protection header", async () => {
-    const res = await httpRequest(server, "GET", "/health");
-    expect(res.headers["x-xss-protection"]).toBe("1; mode=block");
+  it("sets Referrer-Policy to strict-origin-when-cross-origin", () => {
+    expect(res.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
   });
 
-  it("sets Referrer-Policy header", async () => {
-    const res = await httpRequest(server, "GET", "/health");
-    expect(res.headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  // ── New headers added by Helmet (N-43) ───────────────────────────
+  it("sets Strict-Transport-Security (HSTS) with 180-day maxAge", () => {
+    const hsts = res.headers["strict-transport-security"] as string;
+    expect(hsts).toBeDefined();
+    expect(hsts).toContain("max-age=15552000");
+    expect(hsts).toContain("includeSubDomains");
+  });
+
+  it("sets Content-Security-Policy header", () => {
+    expect(res.headers["content-security-policy"]).toBeDefined();
+  });
+
+  it("sets X-DNS-Prefetch-Control to off", () => {
+    expect(res.headers["x-dns-prefetch-control"]).toBe("off");
+  });
+
+  it("sets X-Download-Options to noopen", () => {
+    expect(res.headers["x-download-options"]).toBe("noopen");
+  });
+
+  it("sets X-Permitted-Cross-Domain-Policies to none", () => {
+    expect(res.headers["x-permitted-cross-domain-policies"]).toBe("none");
+  });
+
+  it("sets Cross-Origin-Opener-Policy header", () => {
+    expect(res.headers["cross-origin-opener-policy"]).toBeDefined();
+  });
+
+  it("sets Cross-Origin-Resource-Policy header", () => {
+    expect(res.headers["cross-origin-resource-policy"]).toBeDefined();
+  });
+
+  // X-XSS-Protection: 0 — Helmet explicitly disables the deprecated header.
+  // Setting it to "0" is safer than "1; mode=block" on browsers that mishandle the filter.
+  it("sets X-XSS-Protection to 0 (explicitly disabled — modern recommendation)", () => {
+    expect(res.headers["x-xss-protection"]).toBe("0");
   });
 });
 
