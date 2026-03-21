@@ -65,6 +65,7 @@
 | N-53 | Branch Coverage — knowledge + onboarding + training + webhooks APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-54 | Branch Coverage — agentVersions + search + HealthMonitor + TenantMigrator | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-55 | Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-56 | Branch Coverage — abtests + auditEvents + accessLogger + SessionHistory + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12756,6 +12757,20 @@ Four-file parallel branch coverage pass targeting the remaining low-coverage ser
 
 ---
 
+### N-56: Branch Coverage — abtests + auditEvents + accessLogger + SessionHistory + Database (2026-03-21)
+
+Five-file parallel branch coverage pass. Work done via 3 parallel agents:
+
+- **abtests-api.test.ts** (+13 tests): `api/abtests.ts` 84.61% → **improved branch**. `validateSplitRatio` `raw===null` and out-of-range; `variantA:null`/`variantB:null` → 400; missing `variantB.name`; ternary false-branches for `tenantId`/`hypothesis`/`minSamplesPerVariant`; `splitRatio` Number() path; `pauseTest`/`resumeTest` → 404.
+- **AuditEventLogger.test.ts** (+5 tests): `api/auditEvents.ts` 80% → **improved branch**. `typeof tenantId/type === "string"` false paths via repeated query params (`tenantId[]=...`); `limit=abc` (NaN), `limit=-5`, `limit=0` → parseInt filter skipped.
+- **AccessLogger.test.ts** (+2 tests): `middleware/accessLogger.ts` 80% → **improved**. Custom `skip` fn provided (covers `?? DEFAULT_SKIP` left side); no `write` option (covers `?? process.stderr.write` default path via spy).
+- **SessionHistory.test.ts** (+5 tests): `storage/SessionHistory.ts` improved branch. `metadata=NULL` row → `|| "{}"` fallback in `getOrCreateUser()`, `getSession()`, `getUserSessions()`; `recordSession()` default `null` userId; `getSessionHistory()` singleton first + repeated call.
+- **Database.test.ts** (+2 tests): `storage/Database.ts` improved branch. `getDatabase()` with `process.env.DATABASE_PATH` (env var branch); `getDatabase({ path })` no `walMode` → `?? true` default.
+
+4,618 → **4,646 tests** (+28). All passing. Dashboard: 56/56 SHIPPED.
+
+---
+
 ### Check-in 87 — 2026-03-21
 
 #### 1. What shipped since last check-in?
@@ -12794,6 +12809,45 @@ Total this session: +72 tests, 2 SHIPPED initiatives, dashboard advances to **55
 **Q44 (new)** — The plan file `~/.claude/plans/keen-enchanting-yao.md` references N-12 "ticketing integration via MCP" as a future build. But N-12 is already SHIPPED in the dashboard. Is the plan stale? Or is this a separate untracked enhancement? Should I archive or delete the plan file?
 
 Dashboard: 55/55 SHIPPED.
+
+---
+
+### Check-in 88 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-56** (committed `a1e46bf`): Branch coverage for 5 files — abtests-api (+13), AuditEventLogger (+5), AccessLogger (+2), SessionHistory (+5), Database (+2). +27 tests (4,618→4,646). Dashboard: 56/56 SHIPPED.
+
+Total this session: +27 tests, 1 SHIPPED initiative.
+
+#### 2. What surprised me?
+
+**Express repeats query params as arrays.** The `GET /events` endpoint had `if (type && typeof type === "string")` uncovered — because the tests all passed proper string values. To cover the `typeof !== "string"` branch, you must send `type[]=foo&type[]=bar` which makes Express parse `req.query.type` as `string[]`. This isn't obvious until you look at how Express handles repeated keys.
+
+**`process.stderr.write` is spyable.** I expected to need a custom injection to test the default write path in `accessLogger.ts`. But `jest.spyOn(process.stderr, "write")` works fine — you get mock access to the default stderr path without needing to refactor the source. Restoring with `mockRestore()` in a finally block is critical.
+
+**`SessionHistory` uses raw SQL inserts to set up null metadata.** To test the `metadata || "{}"` fallback, I had to insert rows directly via `db.prepare(...).run(...)` with `metadata: null`. The `getOrCreateUser()` path requires matching the fingerprint of an existing row — so you insert with a real fingerprint, then null-update, then re-call. This is valid but fragile if the schema changes.
+
+#### 3. Cross-project signals
+
+**"Repeated query param → array" is a common Express gotcha.** Any project that uses `if (param && typeof param === "string")` guards in query handlers will have this coverage gap. Portfolio-wide: if a project does `typeof req.query.X === "string"`, make sure at least one test sends `X[]=...` to cover the false branch.
+
+**Default parameter coverage requires calling the function without the arg.** The `userId = null` default in `recordSession()` was only tested by passing explicit values. You need `recordSession(id)` with no second arg. Obvious in retrospect — but easy to miss when tests always pass all arguments.
+
+#### 4. What would I prioritize next?
+
+1. **`api/websocket.ts` (81.39% branch, 22 missed)** — the largest remaining gap below 85%. Lines 490, 495, 515, 522, 691, 726, 782, 784, 791, 793, 811, 814 — likely error handling, edge cases in message dispatch, and voice session lifecycle paths.
+2. **Overall branch %** — at 86.96% after N-55. N-56 improvements should push it slightly higher. A `--coverage` run after push would confirm.
+3. **`api/abtests.ts` remaining gaps** — may still have a few uncovered lines after the 10 missed branches were addressed.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 56/56 SHIPPED.
 
 ---
 
