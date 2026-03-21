@@ -10644,3 +10644,54 @@ The `--detectOpenHandles` flag was the right tool and identified the exact sourc
 Q19–Q35 remain open from prior sessions.
 
 **Q36**: The Stryker sandbox inflation means the mutation testing run that produced the cached `.stryker-tmp/` sandbox was never cleaned up after completion. Should Stryker runs be followed by `rm -rf .stryker-tmp/` in a post-run hook, or should Stryker be configured to clean up automatically (`cleanTempDir: true`)? Recommend adding to ASIF testing standards.
+
+---
+
+> Session: 2026-03-20 (check-in 58) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**Security: npm audit 11 vulnerabilities → 0** (`a2b4083`):
+- Root: `@typescript-eslint` ^6 → ^7 (minimatch ReDoS, high)
+- Client: `vite` ^5 → ^6.4, `vitest` ^1 → ^3.2, `@vitest/coverage-v8` ^1 → ^3.2, `@vitejs/plugin-react` ^4.2 → ^4.5
+- Fixed: all 6 high + 5 moderate vulns. 0 remaining.
+
+**Timer leak (partial fix, continued from check-in 57)**:
+- `OpenAIRealtimeAdapter.attemptReconnect()`: added `.unref()` to reconnect timer
+- `LaneA.ts`: skip `initializeAudioCache()` when `enabled=false` (prevents real TTS HTTP calls in tests)
+- `websocket.ts`: `laneAEnabled` now reads from `config.features.enableLaneA` (was hardcoded `true`)
+
+**Current state**: 3,894 tests, 128 suites, 0 failures. Client: 79 tests, 5 suites. Pre-push hook: PASSED.
+
+---
+
+### 2. What surprised me?
+
+The dependency upgrade chain was longer than expected:
+- `vitest` v2 still bundled vite v5 internally, keeping the esbuild vulnerability even after upgrading the declared dep. Had to go all the way to vitest v3 to eliminate vitest's internal vite copy.
+- `@vitejs/plugin-react` v4.2 only supported vite ^4||^5 — needed to upgrade to v4.5 for vite v6 compatibility.
+
+The force-exit warning has three independent causes (stryker sandbox, pingInterval, reconnect timer). Each fix reduced the frequency but the warning remains intermittent. Root cause: `MockWebSocket.ts` uses `process.nextTick` to emit "open" — this fires after test cleanup in fast runs (9-10s) but not slow runs (13-14s). `--detectOpenHandles` returns nothing because it changes jest's timing and the race disappears.
+
+---
+
+### 3. Cross-project signals
+
+**vitest + vite vulnerability chain**: Any ASIF project using vitest <v3 has an indirect vite/esbuild vulnerability even if vite is patched at the top level. Check `node_modules/vitest/node_modules/vite` for hidden copies. The fix is vitest ≥3.0.
+
+**`process.nextTick` in test mocks**: Using `process.nextTick` to simulate async behavior in mocks (like MockWebSocket's connection opening) creates a timing window where the event fires after cleanup. Better pattern: expose a `triggerOpen()` method on the mock that tests call explicitly, rather than auto-firing via nextTick.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **MockWebSocket process.nextTick fix** — change `process.nextTick` in `MockWebSocket.ts` to a manually-triggered method. Eliminates the remaining intermittent force-exit. ~5 test file changes.
+2. **NEXUS split (Q21)** — file is now ~10,700 lines
+3. **Stryker mutation refresh** — baseline stale since mid-March (now with correct 3,894 test count)
+4. **Dependabot** — 0 remaining after this session's upgrades
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q37: Upgrade path for `eslint ^8.56` → `^9.x`? The root package.json has eslint v8 but typescript-eslint v7 prefers eslint v9 (flat config). Currently functional but will need migration if typescript-eslint v8 is ever needed. Recommend adding ESLint config file so lint rules are actually enforced.
