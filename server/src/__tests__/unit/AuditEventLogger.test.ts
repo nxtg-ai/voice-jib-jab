@@ -320,6 +320,54 @@ describe("createAuditEventsRouter()", () => {
     });
   });
 
+  describe("GET /events — non-string filter params (branch coverage)", () => {
+    beforeEach(() => {
+      logger.log({ type: "session_started", tenantId: "org_a", detail: {} });
+      logger.log({ type: "session_ended", tenantId: "org_b", detail: {} });
+    });
+
+    it("tenantId repeated as array — no filter applied, returns all events", async () => {
+      // Express sets req.query.tenantId to string[] when param is repeated,
+      // so typeof tenantId === "string" is false → branch skipped
+      const res = await httpRequest(server, "GET", "/audit/events?tenantId[]=org_a&tenantId[]=org_b");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+
+    it("type repeated as array — no filter applied, returns all events", async () => {
+      // Same pattern for type param
+      const res = await httpRequest(server, "GET", "/audit/events?type[]=audit.session.start&type[]=other");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+
+    it("limit=abc (NaN) — no limit applied, returns all events", async () => {
+      // parseInt("abc") === NaN → isNaN check fails → limit branch skipped
+      const res = await httpRequest(server, "GET", "/audit/events?limit=abc");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+
+    it("limit=-5 (negative) — no limit applied, returns all events", async () => {
+      // n > 0 check fails for negative values → limit branch skipped
+      const res = await httpRequest(server, "GET", "/audit/events?limit=-5");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+
+    it("limit=0 (zero) — no limit applied, returns all events", async () => {
+      // n > 0 check fails for zero → limit branch skipped
+      const res = await httpRequest(server, "GET", "/audit/events?limit=0");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+  });
+
   describe("GET /audit/events/stream", () => {
     it("returns 200 with text/event-stream content-type", async () => {
       // Use raw http to GET the SSE endpoint and immediately destroy

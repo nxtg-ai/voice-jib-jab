@@ -498,3 +498,212 @@ describe("A/B Tests API", () => {
     });
   });
 });
+
+// ── Branch coverage additions ──────────────────────────────────────────────
+
+describe("A/B Tests API — branch coverage additions", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ── validateSplitRatio helpers ─────────────────────────────────────
+
+  describe("validateSplitRatio helpers", () => {
+    it("returns null (no error) when splitRatio is null — covers raw === null branch", async () => {
+      mockSvc.createTest.mockReturnValue(TEST_A);
+
+      const res = await httpRequest(server, "POST", "/abtests", {
+        name: "Null ratio test",
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+        splitRatio: null,
+      });
+
+      // null splitRatio passes validation; createTest is called successfully
+      expect(res.status).toBe(201);
+      expect(mockSvc.createTest).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns 400 when splitRatio is negative — out-of-range branch", async () => {
+      const res = await httpRequest(server, "POST", "/abtests", {
+        name: "Negative ratio test",
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+        splitRatio: -0.1,
+      });
+
+      expect(res.status).toBe(400);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("splitRatio");
+      expect(mockSvc.createTest).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── POST /abtests — body validation branches ───────────────────────
+
+  describe("POST /abtests — body validation branches", () => {
+    it("returns 400 when variantA is null — !variantA branch (L97)", async () => {
+      const res = await httpRequest(server, "POST", "/abtests", {
+        name: "Null A test",
+        variantA: null,
+        variantB: { name: "B" },
+      });
+
+      expect(res.status).toBe(400);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("variantA");
+      expect(mockSvc.createTest).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when variantB is null — !variantB branch (L101)", async () => {
+      const res = await httpRequest(server, "POST", "/abtests", {
+        name: "Null B test",
+        variantA: { name: "A" },
+        variantB: null,
+      });
+
+      expect(res.status).toBe(400);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("variantB");
+      expect(mockSvc.createTest).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 when variantB.name is missing (L113)", async () => {
+      const res = await httpRequest(server, "POST", "/abtests", {
+        name: "Missing B name",
+        variantA: { name: "Control" },
+        variantB: { voiceId: "v2" },
+      });
+
+      expect(res.status).toBe(400);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("variantB.name");
+      expect(mockSvc.createTest).not.toHaveBeenCalled();
+    });
+
+    it("passes null to createTest when tenantId is non-string (L127 false branch)", async () => {
+      mockSvc.createTest.mockReturnValue(TEST_A);
+
+      await httpRequest(server, "POST", "/abtests", {
+        name: "Numeric tenant",
+        tenantId: 42,
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+      });
+
+      expect(mockSvc.createTest).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: null }),
+      );
+    });
+
+    it("passes undefined to createTest when hypothesis is non-string (L129 false branch)", async () => {
+      mockSvc.createTest.mockReturnValue(TEST_A);
+
+      await httpRequest(server, "POST", "/abtests", {
+        name: "Numeric hypothesis",
+        hypothesis: 99,
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+      });
+
+      expect(mockSvc.createTest).toHaveBeenCalledWith(
+        expect.objectContaining({ hypothesis: undefined }),
+      );
+    });
+
+    it("passes Number(splitRatio) to createTest when splitRatio is provided (L133 true branch)", async () => {
+      mockSvc.createTest.mockReturnValue(TEST_A);
+
+      await httpRequest(server, "POST", "/abtests", {
+        name: "Explicit ratio",
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+        splitRatio: 0.5,
+      });
+
+      expect(mockSvc.createTest).toHaveBeenCalledWith(
+        expect.objectContaining({ splitRatio: 0.5 }),
+      );
+    });
+
+    it("passes undefined to createTest when minSamplesPerVariant is non-number (L135 false branch)", async () => {
+      mockSvc.createTest.mockReturnValue(TEST_A);
+
+      await httpRequest(server, "POST", "/abtests", {
+        name: "String samples",
+        variantA: { name: "A" },
+        variantB: { name: "B" },
+        minSamplesPerVariant: "five",
+      });
+
+      expect(mockSvc.createTest).toHaveBeenCalledWith(
+        expect.objectContaining({ minSamplesPerVariant: undefined }),
+      );
+    });
+  });
+
+  // ── POST /abtests/:testId/pause ────────────────────────────────────
+
+  describe("POST /abtests/:testId/pause", () => {
+    it("returns 200 with the updated test when pauseTest succeeds", async () => {
+      const paused = { ...TEST_A, status: "paused" };
+      mockSvc.pauseTest.mockReturnValue(paused);
+
+      const res = await httpRequest(server, "POST", "/abtests/test-001/pause");
+
+      expect(res.status).toBe(200);
+      const data = res.json() as typeof paused;
+      expect(data.status).toBe("paused");
+      expect(mockSvc.pauseTest).toHaveBeenCalledWith("test-001");
+    });
+
+    it("returns 404 when pauseTest returns null — test not found (L283)", async () => {
+      mockSvc.pauseTest.mockReturnValue(null);
+
+      const res = await httpRequest(server, "POST", "/abtests/ghost-test/pause");
+
+      expect(res.status).toBe(404);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("ghost-test");
+      expect(mockSvc.pauseTest).toHaveBeenCalledWith("ghost-test");
+    });
+  });
+
+  // ── POST /abtests/:testId/resume ───────────────────────────────────
+
+  describe("POST /abtests/:testId/resume", () => {
+    it("returns 200 with the updated test when resumeTest succeeds", async () => {
+      const resumed = { ...TEST_B, status: "active" };
+      mockSvc.resumeTest.mockReturnValue(resumed);
+
+      const res = await httpRequest(server, "POST", "/abtests/test-002/resume");
+
+      expect(res.status).toBe(200);
+      const data = res.json() as typeof resumed;
+      expect(data.status).toBe("active");
+      expect(mockSvc.resumeTest).toHaveBeenCalledWith("test-002");
+    });
+
+    it("returns 404 when resumeTest returns null — test not found (L302)", async () => {
+      mockSvc.resumeTest.mockReturnValue(null);
+
+      const res = await httpRequest(server, "POST", "/abtests/ghost-test/resume");
+
+      expect(res.status).toBe(404);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("ghost-test");
+      expect(mockSvc.resumeTest).toHaveBeenCalledWith("ghost-test");
+    });
+  });
+});

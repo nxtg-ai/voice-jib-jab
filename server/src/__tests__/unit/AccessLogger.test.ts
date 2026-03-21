@@ -170,3 +170,45 @@ describe("Access logger middleware (N-47)", () => {
     expect(rawLines[0]).toMatch(/\n$/);
   });
 });
+
+describe("createAccessLogger — default-arg and write branches", () => {
+  it("custom skip=()=>false logs /health (skip branch provided explicitly)", async () => {
+    // Covers L38: options.skip ?? DEFAULT_SKIP — the left-side (skip IS provided)
+    const customLines: string[] = [];
+    const app = express();
+    app.use(
+      createAccessLogger({
+        skip: () => false, // never skip anything
+        write: (l) => customLines.push(l.trim()),
+      }),
+    );
+    app.get("/health", (_req, res) => res.json({ status: "ok" }));
+    const s = await startServer(app);
+    await get(s, "/health");
+    await stopServer(s);
+    // /health should be logged because custom skip always returns false
+    expect(customLines).toHaveLength(1);
+    const entry = JSON.parse(customLines[0]!) as { path: string };
+    expect(entry.path).toBe("/health");
+  });
+
+  it("no write option provided — falls back to process.stderr.write (default write branch)", async () => {
+    // Covers L40: options.write ?? ((line) => process.stderr.write(line)) — right-side default
+    const writeSpy = jest.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const app = express();
+      // No write option → default path: process.stderr.write
+      app.use(createAccessLogger({ skip: () => false }));
+      app.get("/probe", (_req, res) => res.json({ ok: true }));
+      const s = await startServer(app);
+      await get(s, "/probe");
+      await stopServer(s);
+      expect(writeSpy).toHaveBeenCalled();
+      const callArg = writeSpy.mock.calls[0]?.[0];
+      expect(typeof callArg).toBe("string");
+      expect(callArg as string).toContain("/probe");
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+});

@@ -546,3 +546,27 @@ describe("Schema integrity", () => {
     expect(session.user_id).toBeNull();
   });
 });
+
+describe("getDatabase() singleton — branch coverage", () => {
+  afterEach(() => {
+    closeDatabase();
+    delete process.env.DATABASE_PATH;
+  });
+
+  it("uses process.env.DATABASE_PATH when no config.path is given (L273 middle branch)", () => {
+    // Set env var to an in-memory path — better-sqlite3 treats ":memory:" as in-memory
+    process.env.DATABASE_PATH = ":memory:";
+
+    const db = getDatabase(); // no config at all → falls through to process.env.DATABASE_PATH
+    expect(db).toBeInstanceOf(DatabaseAdapter);
+    expect(db.isInitialized()).toBe(true);
+  });
+
+  it("defaults walMode to true when config.walMode is not provided (L274 ?? true branch)", () => {
+    // Pass a config with only path — walMode is absent so ?? true fires
+    // :memory: doesn't actually use WAL but the branch is taken; verify no error
+    const db = getDatabase({ path: ":memory:" });
+    expect(db).toBeInstanceOf(DatabaseAdapter);
+    expect(db.isInitialized()).toBe(true);
+  });
+});

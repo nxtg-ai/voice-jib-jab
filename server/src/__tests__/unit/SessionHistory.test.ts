@@ -12,7 +12,10 @@
 
 import { getDatabase, closeDatabase } from "../../storage/Database.js";
 import { getTranscriptStore } from "../../storage/TranscriptStore.js";
-import { SessionHistory } from "../../storage/SessionHistory.js";
+import {
+  SessionHistory,
+  getSessionHistory,
+} from "../../storage/SessionHistory.js";
 
 // Mock the TranscriptStore module to isolate SessionHistory tests
 jest.mock("../../storage/TranscriptStore.js", () => {
@@ -690,6 +693,58 @@ describe("SessionHistory", () => {
     });
   });
 
+  describe("SessionHistory — branch coverage additions", () => {
+    it("getOrCreateUser(): null metadata in DB hits the || '{}' fallback (L159)", () => {
+      // Create user via normal path first, then overwrite metadata with NULL directly
+      const user = history.getOrCreateUser("fp-null-meta");
+      const db = getDatabase();
+      db.prepare("UPDATE users SET metadata = NULL WHERE id = ?").run(user.id);
+
+      // Second call hits the existing-user UPDATE path with metadata=NULL
+      const user2 = history.getOrCreateUser("fp-null-meta");
+
+      // metadata || "{}" fires, JSON.parse("{}") → empty object
+      expect(user2.metadata).toEqual({});
+    });
+
+    it("recordSession(): omitting userId argument uses the default null (L187)", () => {
+      // Call with only sessionId — userId defaults to null
+      history.recordSession("sess-default-userid");
+
+      const session = history.getSession("sess-default-userid");
+
+      expect(session).not.toBeNull();
+      expect(session!.userId).toBeNull();
+    });
+
+    it("getSession(): null metadata in DB hits the || '{}' fallback (L230)", () => {
+      // Insert a session row with metadata=NULL directly
+      const db = getDatabase();
+      db.prepare("INSERT INTO sessions (id, metadata) VALUES (?, NULL)").run(
+        "sess-null-meta",
+      );
+
+      const session = history.getSession("sess-null-meta");
+
+      expect(session).not.toBeNull();
+      expect(session!.metadata).toEqual({});
+    });
+
+    it("getUserSessions(): null metadata in DB hits the || '{}' fallback (L241)", () => {
+      // Create a user, then insert a session with metadata=NULL for that user
+      const user = history.getOrCreateUser("fp-sessions-null-meta");
+      const db = getDatabase();
+      db.prepare(
+        "INSERT INTO sessions (id, user_id, metadata) VALUES (?, ?, NULL)",
+      ).run("sess-user-null-meta", user.id);
+
+      const sessions = history.getUserSessions(user.id);
+
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].metadata).toEqual({});
+    });
+  });
+
   describe("getUserTranscriptCount()", () => {
     it("should return 0 for a user with no transcripts", () => {
       const user = history.getOrCreateUser("fp-count-empty");
@@ -759,5 +814,27 @@ describe("SessionHistory", () => {
       expect(history.getUserTranscriptCount(user1.id)).toBe(1);
       expect(history.getUserTranscriptCount(user2.id)).toBe(1);
     });
+  });
+});
+
+describe("getSessionHistory() singleton — branch coverage", () => {
+  beforeEach(() => {
+    closeDatabase();
+    getDatabase({ path: ":memory:", walMode: false });
+  });
+
+  afterEach(() => {
+    closeDatabase();
+  });
+
+  it("returns a SessionHistory instance on first call (L374: !instance is true)", () => {
+    const inst = getSessionHistory();
+    expect(inst).toBeInstanceOf(SessionHistory);
+  });
+
+  it("returns the same instance on subsequent calls (L374: !instance is false)", () => {
+    const inst1 = getSessionHistory();
+    const inst2 = getSessionHistory();
+    expect(inst1).toBe(inst2);
   });
 });
