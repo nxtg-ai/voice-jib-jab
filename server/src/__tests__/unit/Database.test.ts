@@ -9,6 +9,9 @@
  * to avoid filesystem side effects.
  */
 
+import { mkdtempSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import {
   DatabaseAdapter,
   getDatabase,
@@ -315,6 +318,82 @@ describe("DatabaseAdapter", () => {
     });
   });
 });
+
+  describe("branch coverage — uncovered paths", () => {
+    let branchAdapter: DatabaseAdapter;
+
+    afterEach(() => {
+      try { branchAdapter?.close(); } catch { /* ignore */ }
+    });
+
+    it("enables WAL mode when walMode is true — line 59 branch (requires real file)", () => {
+      // WAL mode requires a real file — :memory: always uses "memory" journal mode.
+      // All other tests use walMode:false; this covers the `if (this.config.walMode)` branch.
+      const base = mkdtempSync(join(tmpdir(), "vjj-wal-"));
+      const dbPath = join(base, "wal.db");
+      try {
+        branchAdapter = new DatabaseAdapter({ path: dbPath, walMode: true });
+        branchAdapter.initialize();
+        const walMode = branchAdapter.getDb().pragma("journal_mode") as Array<{
+          journal_mode: string;
+        }>;
+        expect(walMode[0].journal_mode).toBe("wal");
+      } finally {
+        try { branchAdapter?.close(); } catch { /* ignore */ }
+        rmSync(base, { recursive: true, force: true });
+      }
+    });
+
+    it("verbose:true passes console.log to better-sqlite3 (covers ternary line 54)", () => {
+      // Covers `this.config.verbose ? console.log : undefined` true branch
+      branchAdapter = new DatabaseAdapter({ path: ":memory:", walMode: false, verbose: true });
+      expect(() => branchAdapter.initialize()).not.toThrow();
+      expect(branchAdapter.isInitialized()).toBe(true);
+    });
+
+    it("creates parent directory when it does not exist (line 49 mkdirSync branch)", () => {
+      // Use a real tmpdir with a new sub-directory so existsSync returns false
+      const base = mkdtempSync(join(tmpdir(), "vjj-db-test-"));
+      const newSubDir = join(base, "nested", "subdir");
+      const dbPath = join(newSubDir, "test.db");
+
+      try {
+        branchAdapter = new DatabaseAdapter({ path: dbPath, walMode: false });
+        branchAdapter.initialize();
+        expect(branchAdapter.isInitialized()).toBe(true);
+      } finally {
+        try { branchAdapter?.close(); } catch { /* ignore */ }
+        rmSync(base, { recursive: true, force: true });
+      }
+    });
+
+    it("re-opening an existing DB file invokes .map() callback on migration rows — line 95", () => {
+      // Line 95 `.map((row: any) => row.name)` is only invoked when the SELECT
+      // returns at least one row. On first open, migrations table is empty.
+      // Fix: open a real file, initialize (applies 5 migrations), close, re-open
+      // with a NEW adapter. Second adapter's runMigrations() sees all 5 rows,
+      // invokes the .map() callback, and skips all already-applied migrations.
+      const base = mkdtempSync(join(tmpdir(), "vjj-reopen-"));
+      const dbPath = join(base, "reopen.db");
+      let first: DatabaseAdapter | undefined;
+      try {
+        first = new DatabaseAdapter({ path: dbPath, walMode: false });
+        first.initialize();
+        first.close();
+
+        branchAdapter = new DatabaseAdapter({ path: dbPath, walMode: false });
+        branchAdapter.initialize(); // runMigrations → SELECT returns 5 rows → .map() invoked
+        expect(branchAdapter.isInitialized()).toBe(true);
+
+        const db = branchAdapter.getDb();
+        const count = (db.prepare("SELECT COUNT(*) as c FROM migrations").get() as { c: number }).c;
+        expect(count).toBe(5); // no duplicate migrations
+      } finally {
+        try { first?.close(); } catch { /* ignore */ }
+        rmSync(base, { recursive: true, force: true });
+      }
+    });
+  });
 
 describe("Singleton lifecycle", () => {
   afterEach(() => {

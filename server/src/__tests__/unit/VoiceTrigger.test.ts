@@ -364,6 +364,74 @@ describe("VoiceTriggerService", () => {
     }
   });
 
+  // ── Branch coverage: guard paths (lines 105-128, 157-158) ─────────────
+
+  it("activateTrigger with unknown sessionId is a no-op (guard: !triggerId)", () => {
+    // No trigger was created — pendingBySession has no entry for this ID
+    expect(() => service.activateTrigger("unknown-session-id")).not.toThrow();
+    expect(service.listTriggers()).toHaveLength(0);
+  });
+
+  it("completeTrigger with unknown sessionId is a no-op (guard: !triggerId)", () => {
+    expect(() =>
+      service.completeTrigger("unknown-session-id", {
+        status: "completed",
+        durationMs: null,
+        transcript: [],
+        policyDecisions: [],
+      }),
+    ).not.toThrow();
+    expect(service.listTriggers()).toHaveLength(0);
+  });
+
+  it("getTriggerBySession with unknown sessionId returns null (guard: !triggerId)", () => {
+    expect(service.getTriggerBySession("unknown-session-id")).toBeNull();
+  });
+
+  it("getTriggerBySession returns null when trigger deleted from map (guard: ?? null)", () => {
+    // Exercise the `this.triggers.get(triggerId) ?? null` fallback on line 158.
+    // We expose this by directly manipulating the internal map via a cast — the
+    // only way to hit this branch without internal mutation API.
+    const record = service.createTrigger({
+      tenantId: "t1",
+      callbackUrl: "https://example.com/cb",
+    });
+    // Remove from triggers map but leave pendingBySession intact
+    (service as unknown as { triggers: Map<string, TriggerRecord> }).triggers.delete(
+      record.triggerId,
+    );
+    expect(service.getTriggerBySession(record.sessionId)).toBeNull();
+  });
+
+  it("activateTrigger with stale sessionId (trigger deleted) is a no-op (guard: !record)", () => {
+    const record = service.createTrigger({
+      tenantId: "t1",
+      callbackUrl: "https://example.com/cb",
+    });
+    (service as unknown as { triggers: Map<string, TriggerRecord> }).triggers.delete(
+      record.triggerId,
+    );
+    expect(() => service.activateTrigger(record.sessionId)).not.toThrow();
+  });
+
+  it("completeTrigger with stale sessionId (trigger deleted) is a no-op (guard: !record)", () => {
+    const record = service.createTrigger({
+      tenantId: "t1",
+      callbackUrl: "https://example.com/cb",
+    });
+    (service as unknown as { triggers: Map<string, TriggerRecord> }).triggers.delete(
+      record.triggerId,
+    );
+    expect(() =>
+      service.completeTrigger(record.sessionId, {
+        status: "completed",
+        durationMs: null,
+        transcript: [],
+        policyDecisions: [],
+      }),
+    ).not.toThrow();
+  });
+
   it("sendCallback POSTs with Content-Type: application/json", async () => {
     const fetchCalls: Array<{ headers: Record<string, string> }> = [];
     const originalFetch = global.fetch;

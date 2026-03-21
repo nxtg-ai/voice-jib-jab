@@ -58,6 +58,7 @@
 | N-46 | JSON 404 Handler (catch-all) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-47 | Structured Access Logger | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-48 | Property-Based Testing (fast-check) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-49 | Branch Coverage — VoiceTriggerService + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
