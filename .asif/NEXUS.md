@@ -12528,3 +12528,45 @@ The fix is mechanical (commit the lock file), but the gap is worth addressing sy
 **Q43 (new)** — Pre-push hook gap: should I update the ASIF CI Gate hook template to include `npm ci --dry-run` as a lock-file sync check? This would prevent the N-48 CI break class system-wide. Ready to execute immediately on authorization, or happy to treat as a low-priority idle task.
 
 Dashboard: 48/48 SHIPPED.
+
+---
+
+### Check-in 82 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-49: Branch Coverage — VoiceTriggerService + Database** — two CRUCIBLE fixes from the idle audit. 4,339 → 4,349 tests (+10). Commit: `e7b2842`.
+
+- `VoiceTrigger.test.ts` +6 tests: 62.5% → 100% branch on `VoiceTriggerService`. All missing branches were guard-return paths (`activateTrigger`, `completeTrigger`, `getTriggerBySession`) called with unknown or stale session IDs. Four tests used internal state manipulation via `as unknown as` cast to exercise the `triggers` Map deletion path — the only way to reach the `!record` guard without a new public API.
+
+- `Database.test.ts` +4 tests: 68.18% → 81.81% branch on `Database.ts`. Covered: WAL pragma (line 59), verbose ternary (line 54), `mkdirSync` for missing parent dir (line 49), `.map()` callback on migration rows (line 95). Remaining uncovered: line 78 (`if (!this.db) throw` in private `runMigrations`) — unreachable via public API.
+
+#### 2. What surprised me?
+
+**WAL mode silently no-ops on `:memory:` SQLite.** My first WAL test used `{ path: ":memory:", walMode: true }` and asserted `journal_mode === "wal"`. Received `"memory"` instead. SQLite in-memory databases always use "memory" journal mode regardless of WAL pragma — the pragma is silently ignored. All existing Database tests used `:memory:`, which means the WAL pragma branch (line 59) was always skipped because the tests could never actually verify WAL was enabled. The fix was a tmpdir real file. Worth knowing for any ASIF project testing SQLite configurations.
+
+**The `.map()` callback coverage problem.** Line 95 was "uncovered" even though the containing `runMigrations()` code path was executed on every test. The callback `(row: any) => row.name` was never invoked because on first open the migrations table is always empty — `.all()` returns `[]`, `.map()` is called on it but the callback is never called. Istanbul counts the callback body as a distinct statement. Covered by re-opening an existing database file where 5 migrations were already recorded.
+
+**Guard-return branches via internal state manipulation.** The `!record` guard in `activateTrigger` (line 108) is reachable only when `pendingBySession` has a valid `triggerId` that was subsequently deleted from the `triggers` Map. This can't happen via any public method — `createTrigger` always inserts to both Maps atomically, and there's no `deleteTrigger`. Tested via `(service as unknown as { triggers: Map<...> }).triggers.delete(id)`. This is a legitimate test pattern for defensive guards with no public trigger path.
+
+#### 3. Cross-project signals
+
+**Never use `:memory:` SQLite to test WAL or journal mode configuration.** Any ASIF project using better-sqlite3 should use a real tmpdir file when testing database-level configuration. The `:memory:` path silently ignores pragmas that affect file-based behaviour. This is a subtle foot-gun that passes tests but doesn't validate production configuration.
+
+**The "re-open existing file" test pattern is a standard SQLite coverage technique.** When testing migration idempotency or skip-already-applied logic, a single `initialize()` call will never exercise the "rows exist" branch of a migrations query. Create DB → close → re-open → `initialize()` is the canonical pattern. Worth adding to the ASIF test playbook.
+
+**Internal state tests via `as unknown as` cast have limited blast radius.** For private methods or defensive guards that are genuinely unreachable via public API, a typed cast to access internal Maps/fields is the least-bad option. It's brittle (any rename breaks it) but it documents the intended invariant and raises branch coverage for the guard. Used sparingly, it's better than leaving safety-net branches permanently uncovered.
+
+#### 4. What would I prioritize next?
+
+1. **Pre-push hook hardening (Q43)** — add lock-file sync check to prevent a recurrence of the N-48 CI break class. Low effort, high systemic value.
+2. **Remaining Database.ts line 78** — the `!this.db` throw in `runMigrations`. Currently unreachable. Option: add a `resetForTesting()` method (test-only) or accept as permanently uncovered and add a `/* istanbul ignore next */` annotation with a comment explaining why.
+3. **Full suite CRUCIBLE re-run** — N-48 and N-49 improved oracle diversity and branch coverage. A re-run of Gates 1-5 would confirm the suite is now clean after the improvements.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check authorization.
+
+Dashboard: 49/49 SHIPPED.
