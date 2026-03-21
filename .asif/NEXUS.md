@@ -12265,6 +12265,42 @@ Dashboard: 45/45 SHIPPED.
 
 ---
 
+### Check-in 78 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-45: Global JSON Error Handler** — `middleware/errorHandler.ts` mounted after all routes. Converts any `next(err)` to structured `{ "error": "..." }` JSON. Production: generic "Internal server error" for 5xx (no info disclosure). Development: raw error message. Preserves `err.status`/`err.statusCode` for explicit 4xx. Logs 5xx with X-Request-ID. 11 tests in `ErrorHandler.test.ts`. +11 → 4,298 total. Commit: `baa7a14`.
+
+**N-46: JSON 404 Catch-All** — 5-line catch-all middleware between last route and error handler. Unknown routes now return HTTP 404 `{ "error": "Not found" }` instead of Express's HTML "Cannot GET /". 7 tests in `NotFoundHandler.test.ts`. +7 → 4,305 total. Commit: `21744f9`.
+
+Also fixed final stale detail status: N-11 BUILDING → SHIPPED. Dashboard: 46/46 SHIPPED.
+
+#### 2. What surprised me?
+
+**Express error middleware arity is a footprint contract, not a convention.** `fn.length === 4` is how Express detects error handlers at registration time. Forgetting `_next` as the fourth parameter silently degrades the middleware to a normal route — errors pass straight through with zero indication. This is a footprint-based API contract that is easy to break and impossible to detect from TypeScript types alone. Worth a lint rule or at minimum a comment on every error handler.
+
+**The 404 handler placement is load-bearing.** Mounting it *after* the error handler (wrong order) would mean 404s bypass the error handler for structured output — they would instead silently succeed with an empty body. Mounting it *before* all routes (also wrong) would make every valid route return 404. The correct position — between last route and error handler — is a positional API that Express enforces through middleware chain execution order, not through types. Easy to get wrong in a large `index.ts` file.
+
+#### 3. Cross-project signals
+
+**The N-45 + N-46 pair is a complete "last mile" response hygiene kit.** Every Express project should have both: the 404 catch-all (JSON, not HTML) and the error handler (JSON, not HTML). Together they eliminate all HTML bleed from API responses. The combination is 45 lines of code with 18 tests and is directly portable to any ASIF Express project.
+
+**Ordering: 404 before error handler, error handler last.** This is the canonical Express pattern but easy to forget in codebases with large `index.ts` files where routes are registered far from the tail middleware. Worth documenting in CLAUDE.md for any project that adds this pattern: "404 catch-all must be after last route, before error handler; error handler must be last."
+
+#### 4. What would I prioritize next?
+
+1. **CRUCIBLE Gate 2 non-empty assertion sweep** — 4,305 tests; the N-36 through N-46 sprint added ~290 tests under shipping pressure. A targeted scan for hollow create-then-query patterns is overdue. Idle-time protocol task.
+2. **N-47: HTTP compression** — `compression` middleware reduces response sizes for large JSON payloads (analytics, audit logs, session exports). S-sized, directly improves client-perceived performance for data-heavy endpoints.
+3. **N-47: Request logging middleware** — structured access logs (method, path, status, duration, requestId) to stderr. Complements the X-Request-ID and error handler added this sprint. Would give ops a complete correlated trace story.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change without CoS call.
+
+Dashboard: 46/46 SHIPPED.
+
+---
+
 ### Check-in 76 — 2026-03-21
 
 #### 1. What shipped since last check-in?
