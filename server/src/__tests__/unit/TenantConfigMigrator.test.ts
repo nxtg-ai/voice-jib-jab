@@ -604,4 +604,107 @@ describe("TenantConfigMigrator.importTenant", () => {
     expect(result.counts.playbooks).toBe(1);
     expect(result.counts.ivrMenus).toBe(1);
   });
+
+  it("records warning when createTenant throws during tenant registration", async () => {
+    const { migrator, registry, personaStore, kbStore, playbookStore, ivrStore } =
+      buildMigrator();
+    // Target tenant does not exist — force the createTenant path
+    registry.getTenant.mockReturnValue(null);
+    registry.createTenant.mockImplementation(() => {
+      throw new Error("DB locked");
+    });
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(buildExport({ tenant: TENANT_CONFIG }), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("tenant registration failed"))).toBe(true);
+  });
+
+  it("records warning when createPersona throws during persona import", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } =
+      buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    personaStore.createPersona.mockImplementation(() => {
+      throw new Error("Store error");
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.counts.personas).toBe(0);
+    expect(result.warnings.some((w) => w.includes("import failed"))).toBe(true);
+    // Other stores should still succeed
+    expect(result.counts.knowledgeItems).toBe(1);
+    expect(result.counts.playbooks).toBe(1);
+    expect(result.counts.ivrMenus).toBe(1);
+  });
+
+  it("records warning when createEntry throws during playbook import", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } =
+      buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    playbookStore.createEntry.mockImplementation(() => {
+      throw new Error("Store error");
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.counts.playbooks).toBe(0);
+    expect(result.warnings.some((w) => w.includes("import failed"))).toBe(true);
+    // Other stores should still succeed
+    expect(result.counts.personas).toBe(1);
+    expect(result.counts.knowledgeItems).toBe(1);
+    expect(result.counts.ivrMenus).toBe(1);
+  });
+
+  it("records warning when createMenu throws during IVR menu import", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } =
+      buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    ivrStore.createMenu.mockImplementation(() => {
+      throw new Error("Store error");
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.counts.ivrMenus).toBe(0);
+    expect(result.warnings.some((w) => w.includes("import failed"))).toBe(true);
+    // Other stores should still succeed
+    expect(result.counts.personas).toBe(1);
+    expect(result.counts.knowledgeItems).toBe(1);
+    expect(result.counts.playbooks).toBe(1);
+  });
+
+  it("uses String(err) in warning message when a non-Error value is thrown", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } =
+      buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    // Throw a plain string (not an Error instance) from kbStore.addEntry
+    kbStore.addEntry.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "plain string error";
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("plain string error"))).toBe(true);
+  });
 });

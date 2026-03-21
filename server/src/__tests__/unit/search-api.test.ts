@@ -280,3 +280,78 @@ describe("Search API", () => {
     });
   });
 });
+
+// ── Validation and error-path branch coverage ─────────────────────────────────
+
+describe("Search API — validation and error-path branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns 400 when limit is NaN (non-numeric string)", async () => {
+    const res = await httpRequest(server, "GET", "/search/conversations?limit=abc");
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("limit");
+    expect(mockSvc.search).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when limit is negative", async () => {
+    const res = await httpRequest(server, "GET", "/search/conversations?limit=-1");
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("limit");
+    expect(mockSvc.search).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when offset is NaN (non-numeric string)", async () => {
+    const res = await httpRequest(server, "GET", "/search/conversations?offset=abc");
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("offset");
+    expect(mockSvc.search).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when offset is negative", async () => {
+    const res = await httpRequest(server, "GET", "/search/conversations?offset=-1");
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("offset");
+    expect(mockSvc.search).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when searchService.search() throws", async () => {
+    mockSvc.search.mockRejectedValue(new Error("DB error"));
+
+    const res = await httpRequest(server, "GET", "/search/conversations");
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data).toEqual({ error: "Internal server error" });
+  });
+
+  it("returns 500 when searchService.getSessionSummary() throws", async () => {
+    mockSvc.getSessionSummary.mockRejectedValue(new Error("timeout"));
+
+    const res = await httpRequest(server, "GET", "/search/conversations/sess-001/summary");
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data).toEqual({ error: "Internal server error" });
+  });
+});

@@ -63,6 +63,7 @@
 | N-51 | Branch Coverage — laneC_control + tenantMigration error paths | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-52 | API Coverage — supervisor + webhookRetry + voices (0%→100%) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-53 | Branch Coverage — knowledge + onboarding + training + webhooks APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-54 | Branch Coverage — agentVersions + search + HealthMonitor + TenantMigrator | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12738,3 +12739,53 @@ Remaining gaps (all `req.body ?? {}` V8 operator branches — structurally unrea
 **Q43 (open)** — Pre-push lock-file sync check.
 
 Dashboard: 53/53 SHIPPED.
+
+---
+
+### N-54: Branch Coverage — agentVersions + search + HealthMonitor + TenantMigrator (2026-03-21)
+
+Four-file parallel branch coverage pass targeting the remaining low-coverage service and API files. Work done via 4 parallel agents:
+
+- **agentVersions-api.test.ts** (+18 tests): `agentVersions.ts` 73.52% → **94.11% branch**. Added describe block covering all `.trim() === ""` branches (whitespace-only inputs) across 6 endpoints, `createVersion` catch block, `No deployment found` → 404 path in canary endpoint, and `typeof canaryPercent !== "number"` → 400 guard.
+- **search-api.test.ts** (+6 tests): `search.ts` 73.68% → **100% branch**. Added NaN and negative branches for `limit` and `offset` validation, plus `search()` throws → 500 and `getSessionSummary()` throws → 500.
+- **HealthMonitorService.test.ts** (+9 tests): `HealthMonitorService.ts` 60.86% → **86.95% branch**. Added coverage for TTS 403/500 branches, OPA `opaEnabled=true` file-not-found path, ChromaDB `!res.ok` throw and success, database `postgresUrl` valid/invalid-hostname, `sqlitePath` nonexistent, neither-option no-op.
+- **TenantConfigMigrator.test.ts** (+5 tests): `TenantConfigMigrator.ts` 68.18% → **81.81% branch**. Added catch-block tests for `createTenant` throws (tenant registration failure), `createPersona` throws, `createEntry` (playbook) throws, `createMenu` (IVR) throws, plus non-Error throw → `String(err)` branch.
+
+4,546 → **4,584 tests** (+38). All passing. Dashboard: 54/54 SHIPPED.
+
+---
+
+### Check-in 86 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-54**: Branch coverage for 4 files — agentVersions.ts (73.52%→94.11%), search.ts (73.68%→100%), HealthMonitorService.ts (60.86%→86.95%), TenantConfigMigrator.ts (68.18%→81.81%). 4 parallel agents. +38 tests (4,546→4,584). Commit pending.
+
+#### 2. What surprised me?
+
+**`createVoiceAgentHealthChecks()` TTS and STT check are structurally identical (same fetch call) but named separately.** This means TTS coverage was 0% because no test named the `"tts"` check — the existing STT tests exercised the STT check only. A subtle nominal coverage gap.
+
+**The PostgreSQL URL path in the database health check (`new URL(postgresUrl)`) throws synchronously on invalid input, which is different from the SQLite path that uses `await access()` (async).** This branch mixing makes the function harder to reason about. But it's clean from a coverage standpoint — just needs correct test setup.
+
+**TenantConfigMigrator catch blocks for tenant registration vs. per-item imports are structurally identical** but the tenant registration failure was entirely untested. The existing "store errors" test only covered `kbStore.addEntry` — the other four (tenant, persona, playbook, ivr) were all dark.
+
+#### 3. Cross-project signals
+
+**`createVoiceAgentHealthChecks()` pattern: factory functions that return named check objects are invisible to coverage unless each named check is invoked by name.** If a test calls `checks[0].check()` instead of `checks.find(c => c.name === "tts").check()`, it can accidentally skip entire check implementations. Portfolio recommendation: test check factory functions by name, not by index.
+
+**Coverage asymmetry between sibling implementations.** When two items are structurally identical (like STT and TTS checks), only one tends to get tested. Sibling parity is worth adding as a CRUCIBLE Gate 2 note: "for sibling implementations, assert both are covered."
+
+#### 4. What would I prioritize next?
+
+1. **`retrieval/RetrievalService.ts` (44.26% branch)** — largest remaining gap. Uncovered blocks at lines 65, 73, 102, 125, 134, 165–198, 275–289. Will require more complex test setup (mock retrieval backends).
+2. **`api/agentVersions.ts` remaining gaps** — lines 140-141 now covered; check if any more remain.
+3. **`services/KnowledgeBaseStore.ts`** — not yet measured this session.
+4. **RetrievalService** — the largest uncovered block is likely the ChromaDB fallback path.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+
+Dashboard: 54/54 SHIPPED.

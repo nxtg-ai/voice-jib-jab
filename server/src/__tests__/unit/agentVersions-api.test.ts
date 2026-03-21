@@ -540,3 +540,231 @@ describe("Agent Versions API", () => {
     });
   });
 });
+
+// ── Empty-string and error-path branch coverage ───────────────────────
+
+describe("Agent Versions API — empty-string and error-path branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ── POST /agent-versions — trim() === "" branches ────────────────────
+
+  it("POST /agent-versions returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions", {
+      agentId: "  ",
+      label: "v1",
+      config: {},
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toMatch(/agentId/);
+  });
+
+  it("POST /agent-versions returns 400 when label is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions", {
+      agentId: "agent-1",
+      label: "   ",
+      config: {},
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toMatch(/label/);
+  });
+
+  it("POST /agent-versions returns 400 with error message when createVersion throws", async () => {
+    mockStore.createVersion.mockImplementation(() => {
+      throw new Error("duplicate version label");
+    });
+
+    const res = await httpRequest(server, "POST", "/agent-versions", {
+      agentId: "agent-1",
+      label: "v1",
+      config: {},
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toMatch(/duplicate version label/);
+  });
+
+  // ── POST /agent-versions/deployments/canary — trim() === "" branches ─
+
+  it("POST /agent-versions/deployments/canary returns 400 when tenantId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/canary", {
+      tenantId: "   ",
+      agentId: "agent-1",
+      canaryVersionId: "ver-002",
+      canaryPercent: 10,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments/canary returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/canary", {
+      tenantId: "tenant-1",
+      agentId: "   ",
+      canaryVersionId: "ver-002",
+      canaryPercent: 10,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments/canary returns 400 when canaryVersionId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/canary", {
+      tenantId: "tenant-1",
+      agentId: "agent-1",
+      canaryVersionId: "   ",
+      canaryPercent: 10,
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments/canary returns 404 when store throws 'No deployment found'", async () => {
+    mockStore.setCanary.mockImplementation(() => {
+      throw new Error("No deployment found: tenant-1/agent-1");
+    });
+
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/canary", {
+      tenantId: "tenant-1",
+      agentId: "agent-1",
+      canaryVersionId: "ver-002",
+      canaryPercent: 10,
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  // ── DELETE /agent-versions/deployments/canary — trim() === "" branches
+
+  it("DELETE /agent-versions/deployments/canary returns 400 when tenantId is whitespace-only", async () => {
+    const res = await httpRequest(server, "DELETE", "/agent-versions/deployments/canary", {
+      tenantId: "   ",
+      agentId: "agent-1",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("DELETE /agent-versions/deployments/canary returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "DELETE", "/agent-versions/deployments/canary", {
+      tenantId: "tenant-1",
+      agentId: "   ",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  // ── POST /agent-versions/deployments/rollback — trim() === "" branches
+
+  it("POST /agent-versions/deployments/rollback returns 400 when tenantId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/rollback", {
+      tenantId: "   ",
+      agentId: "agent-1",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments/rollback returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/rollback", {
+      tenantId: "tenant-1",
+      agentId: "   ",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  // ── POST /agent-versions/deployments — trim() === "" branches ────────
+
+  it("POST /agent-versions/deployments returns 400 when tenantId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments", {
+      tenantId: "   ",
+      agentId: "agent-1",
+      versionId: "ver-001",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments", {
+      tenantId: "tenant-1",
+      agentId: "   ",
+      versionId: "ver-001",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments returns 400 when versionId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments", {
+      tenantId: "tenant-1",
+      agentId: "agent-1",
+      versionId: "   ",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  // ── POST /agent-versions/resolve — trim() === "" branches ────────────
+
+  it("POST /agent-versions/resolve returns 400 when tenantId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/resolve", {
+      tenantId: "   ",
+      agentId: "agent-1",
+      sessionId: "session-xyz",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/resolve returns 400 when agentId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/resolve", {
+      tenantId: "tenant-1",
+      agentId: "   ",
+      sessionId: "session-xyz",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/resolve returns 400 when sessionId is whitespace-only", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/resolve", {
+      tenantId: "tenant-1",
+      agentId: "agent-1",
+      sessionId: "   ",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /agent-versions/deployments/canary returns 400 when canaryPercent is not a number", async () => {
+    const res = await httpRequest(server, "POST", "/agent-versions/deployments/canary", {
+      tenantId: "tenant-1",
+      agentId: "agent-1",
+      canaryVersionId: "ver-002",
+      canaryPercent: "ten",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toMatch(/canaryPercent/);
+  });
+});

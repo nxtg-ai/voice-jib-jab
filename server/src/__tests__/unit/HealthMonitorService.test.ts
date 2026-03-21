@@ -515,3 +515,106 @@ describe("createVoiceAgentHealthChecks()", () => {
     await expect(stt.check()).rejects.toThrow("HTTP 500");
   });
 });
+
+// ── createVoiceAgentHealthChecks() — additional branches ─────────────
+
+describe("createVoiceAgentHealthChecks() — additional branches", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // TTS check ──────────────────────────────────────────────────────────
+
+  it("TTS check passes when fetch returns 403 (server up, forbidden)", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response(null, { status: 403 }));
+
+    const checks = createVoiceAgentHealthChecks({
+      openAiBaseUrl: "https://api.openai.com",
+    });
+    const tts = checks.find((c) => c.name === "tts")!;
+    await expect(tts.check()).resolves.toBeUndefined();
+  });
+
+  it("TTS check throws when fetch returns 500", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response(null, { status: 500 }));
+
+    const checks = createVoiceAgentHealthChecks({
+      openAiBaseUrl: "https://api.openai.com",
+    });
+    const tts = checks.find((c) => c.name === "tts")!;
+    await expect(tts.check()).rejects.toThrow("HTTP 500");
+  });
+
+  // OPA check ──────────────────────────────────────────────────────────
+
+  it("OPA check rejects when opaEnabled=true and bundle file does not exist", async () => {
+    // The default bundle path (policy/bundle.tar.gz) does not exist in the
+    // test environment, so access() throws — exercising the opaEnabled=true branch.
+    delete process.env.OPA_BUNDLE_PATH;
+    const checks = createVoiceAgentHealthChecks({ opaEnabled: true });
+    const opa = checks.find((c) => c.name === "opa")!;
+    await expect(opa.check()).rejects.toThrow();
+  });
+
+  // ChromaDB check ─────────────────────────────────────────────────────
+
+  it("ChromaDB check passes when fetch returns 200", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const checks = createVoiceAgentHealthChecks({
+      chromaDbUrl: "http://localhost:8000",
+    });
+    const chroma = checks.find((c) => c.name === "chromadb")!;
+    await expect(chroma.check()).resolves.toBeUndefined();
+  });
+
+  it("ChromaDB check throws when fetch returns 503", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(new Response(null, { status: 503 }));
+
+    const checks = createVoiceAgentHealthChecks({
+      chromaDbUrl: "http://localhost:8000",
+    });
+    const chroma = checks.find((c) => c.name === "chromadb")!;
+    await expect(chroma.check()).rejects.toThrow("HTTP 503");
+  });
+
+  // Database check ─────────────────────────────────────────────────────
+
+  it("database check passes when postgresUrl has a valid hostname", async () => {
+    const checks = createVoiceAgentHealthChecks({
+      postgresUrl: "postgres://localhost/mydb",
+    });
+    const db = checks.find((c) => c.name === "database")!;
+    await expect(db.check()).resolves.toBeUndefined();
+  });
+
+  it("database check throws when postgresUrl has no hostname", async () => {
+    const checks = createVoiceAgentHealthChecks({
+      postgresUrl: "postgres:///mydb",
+    });
+    const db = checks.find((c) => c.name === "database")!;
+    await expect(db.check()).rejects.toThrow("Invalid PostgreSQL URL");
+  });
+
+  it("database check throws when sqlitePath does not exist", async () => {
+    const checks = createVoiceAgentHealthChecks({
+      sqlitePath: "/nonexistent/test.db",
+    });
+    const db = checks.find((c) => c.name === "database")!;
+    await expect(db.check()).rejects.toThrow();
+  });
+
+  it("database check passes (no-op) when neither postgresUrl nor sqlitePath is set", async () => {
+    const checks = createVoiceAgentHealthChecks({});
+    const db = checks.find((c) => c.name === "database")!;
+    await expect(db.check()).resolves.toBeUndefined();
+  });
+});
