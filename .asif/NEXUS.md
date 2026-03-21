@@ -1286,6 +1286,57 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-20 (check-in 64) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Two deliverables — no new features (correct for idle):
+
+| Commit | Deliverable | Tests |
+|--------|-------------|-------|
+| `94866ef` | Dependabot triage (Q11): assessed 3 open CVE alerts via `gh api`, documented findings + Q39 | — |
+| `be8bce5` | IntentClassifier confidence arithmetic invariants (+8 tests, CRUCIBLE oracle gap) | 3,920 → 3,928 |
+
+**Final state**: 3,928 tests, 128 suites, 0 failures.
+
+---
+
+### 2. What surprised you?
+
+**Keyword substring overlap in `includes()`-based matching.** Writing the arithmetic invariant test for "3 keywords in 100 words", I used "bill", "invoice", "payment" — and got score=4, not 3. "payment" contains "pay" (also a billing keyword), so `lower.includes("pay")` matches. The implementation uses `string.includes(keyword)` against the full text, not word-boundary matching. This means multi-word sentences with stemmed variants (e.g., "paying" contains "pay", "payments" contains "pay" AND "payment") score higher than intended. Not a bug per se — it's documented behaviour — but it's a footgun for test authors who expect word-level matching. Workaround: use keywords with no substring overlaps in controlled tests.
+
+The same pattern likely affects other keyword-rich intents. "overcharge" contains "charge"; "pricing" contains... hmm, "pric" — no other keyword. But it's worth noting for future maintainers.
+
+**Dependabot vs `npm audit` discrepancy.** GitHub Dependabot flagged 3 open CVEs; `npm audit` (and `npm audit fix --dry-run`) both report 0 vulnerabilities. Dependabot is advisory-matched (flags any package version with an associated advisory), while npm audit checks whether the installed version is BELOW the patched version threshold. Since all three packages are already at or above the patched version, npm audit is clean. GitHub doesn't auto-close the alerts when this happens — manual dismissal is needed.
+
+---
+
+### 3. Cross-project signals?
+
+**`string.includes(keyword)` vs word-boundary matching** — any portfolio project using keyword spotting (Podcast-Pipeline topic detection, intent routing, content filters) should be aware that `includes()` matches substrings, not words. "pay" matches inside "payment", "paying", "repay". If scoring precision matters, use `\b` word boundaries or token-level matching. This is a subtle precision leak that only surfaces when testing exact score counts.
+
+**Dependabot alert lifecycle** — `npm audit` clean doesn't mean Dependabot is satisfied. Projects with Dependabot enabled should use `gh api repos/{owner}/{repo}/dependabot/alerts` to triage open alerts directly, since `npm audit` won't surface advisory-matched-but-version-resolved findings. Useful pattern for dx3, Forge, and others with dependabot enabled.
+
+---
+
+### 4. What would you prioritize next?
+
+1. **Fresh Stryker run** (Q38 pending) — 26 new gap-fill tests are committed but scores are unverified. LaneArbitrator and AllowedClaimsRegistry should now exceed thresholds.
+2. **Dismiss Dependabot alerts** (Q39 pending) — authorization requested; can execute immediately once CoS approves.
+3. **Word-boundary fix for IntentClassifier** — `string.includes(keyword)` → word-boundary regex for single-word keywords. Would improve scoring precision and make tests more predictable. S-sized, straightforward.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q38 (open)**: Stryker refresh scope and authorization (3-file vs 13-file suite). Gap-fill tests committed; scoring is stale.
+
+**Q39 (open)**: Authorization to dismiss 3 Dependabot alerts as `tolerable_risk` (all devDeps, zero prod surface, `npm audit` clean).
+
+**Q19–Q37 (open)**: Carrying forward.
+
+---
+
 > Session: 2026-03-20 (check-in 63) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
