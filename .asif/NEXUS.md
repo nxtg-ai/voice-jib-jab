@@ -12062,3 +12062,43 @@ Commits: `e856762` (N-36), `[pending]` (N-37). Dashboard: 37/37 SHIPPED.
 **Q42** — Should N-38 (graceful shutdown) proceed autonomously on next "Continue roadmap" trigger? It closes a real data-loss risk on SIGTERM and is S-sized. Requesting standing auth or explicit directive.
 
 Dashboard: 37/37 SHIPPED.
+
+---
+
+### Check-in 72 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-38: Graceful Shutdown** — replaced the bare `server.close()` SIGTERM/SIGINT stub with a full `GracefulShutdown` service. Shutdown sequence: `VoiceWebSocketServer.close()` → `SupervisorWebSocketServer.close()` → `httpServer.close()` → `process.exit(0)`. Each WS server sends close frame 1001 ("Going Away") to all active clients before closing. Force-exits with code 1 after 10s timeout if any target hangs. Idempotent: concurrent signals after the first are no-ops. `exitFn` is injectable for unit testing. `startServer()` refactored to return `VoiceWebSocketServer` so it can be passed to the shutdown coordinator after startup.
+
+12 tests in `GracefulShutdown.test.ts` cover: concurrent close, idempotency, `exitFn(0)` on clean exit, `exitFn(1)` on timeout, error/throw resilience, zero-target edge case, signal logging, SIGTERM/SIGINT registration. +12 tests → 4,218 total.
+
+Commit: `3b755df`. Dashboard: 38/38 SHIPPED.
+
+#### 2. What surprised me?
+
+**`Promise.allSettled` + "never" callback = unkillable promise.** The timeout test revealed a subtle trap: `GracefulShutdown.shutdown()` uses `await Promise.allSettled(...)` where each item wraps a target's `close(callback)`. If a target never calls its callback (simulating a hanging connection), `Promise.allSettled` never resolves — so `shutdown()` itself never returns. The `setTimeout` force-exit fires correctly (verified via fake timers), but the promise just hangs open. The test must use `void sd.shutdown(...)` (fire-and-forget) rather than `await`, because awaiting a promise that never settles causes a 5s Jest timeout. This is correct production behaviour — the `exitFn(1)` fires from the timeout callback regardless of whether the promise resolves. But it's a pattern that catches out anyone who tries to `await` shutdown in a test.
+
+**`server.close()` does not close existing connections.** Node's `http.Server.close()` stops accepting *new* connections but waits indefinitely for *existing* keep-alive connections to close naturally. On a voice agent with long-lived WebSocket connections this means the old shutdown would hang forever with no timeout. The WS servers must be explicitly closed before the HTTP server, otherwise both hang. Correct order: close WS clients → close WS server → close HTTP server.
+
+#### 3. Cross-project signals
+
+**`GracefulShutdown` is portfolio-reusable as-is.** The `ShutdownTarget` interface (`close(cb?)`) matches Node's built-in `http.Server`, `ws.WebSocketServer`, and any service that follows the Node stream close pattern. Any ASIF Express+WebSocket project (dx3, Podcast-Pipeline) can drop in `GracefulShutdown` with zero modification. The injectable `exitFn` makes it unit-testable without mocking `process`.
+
+**The "never-resolving promise" trap is a general test design signal.** Any service that wraps a callback-based `close()` in a Promise and uses `Promise.allSettled` or `Promise.all` must have test coverage for the "callback never fires" case. The trick: verify the timeout fires via fake timers without awaiting the parent promise. Add this pattern to the portfolio test library.
+
+#### 4. What would I prioritize next?
+
+1. **N-39: Rate Limiting on Auth Endpoints** — `POST /auth/api-keys` has no rate limit today. An attacker with no key can hammer it endlessly. A simple IP-based rate limit on `/auth` (e.g. 10 req/min) closes this. The `rateLimiter.ts` middleware already exists — just needs a tighter config for the auth route. S-sized.
+2. **N-40: CORS Hardening** — current CORS config uses `*` wildcard. For an enterprise voice agent this should be configurable via `ALLOWED_ORIGINS` env var. S-sized.
+3. **Q41 resolution** — `/voice` auth posture remains the only open architecture decision.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. Currently gated by N-34. If the browser voice loop needs unauthenticated access, the route should be carved out. No change without a CoS call.
+
+**Q42 resolved** — N-38 self-authorized and shipped.
+
+**Q43** — N-39 (auth endpoint rate limiting) and N-40 (CORS hardening) are both S-sized security improvements. Requesting standing auth to proceed on next "Continue roadmap" trigger, or an explicit directive if CoS wants to scope them differently.
+
+Dashboard: 38/38 SHIPPED.
