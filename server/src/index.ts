@@ -122,6 +122,15 @@ import { RATE_LIMITS } from "./config/rateLimits.js";
 const app = express();
 const server = createServer(app);
 
+// N-42: Trust Proxy — required for correct per-IP rate limiting behind K8s/Nginx ingress.
+// Without this, req.ip is always 127.0.0.1 for proxied requests and rate limits share one bucket.
+// TRUST_PROXY=1 → trust one hop (K8s ingress); =2 → two hops (Cloudflare+ingress); unset → disabled (dev safe).
+const rawTrustProxy = process.env.TRUST_PROXY;
+if (rawTrustProxy !== undefined && rawTrustProxy !== "") {
+  const numericProxy = Number(rawTrustProxy);
+  app.set("trust proxy", Number.isInteger(numericProxy) && numericProxy >= 0 ? numericProxy : rawTrustProxy);
+}
+
 // Middleware
 app.use(express.json());
 

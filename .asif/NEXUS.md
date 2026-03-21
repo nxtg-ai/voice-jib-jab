@@ -1,7 +1,7 @@
 # NEXUS — voice-jib-jab Vision-to-Execution Dashboard
 
 > **Owner**: Asif Waliuddin
-> **Last Updated**: 2026-03-19
+> **Last Updated**: 2026-03-21
 > **North Star**: A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: bad latency and ungoverned output.
 
 ---
@@ -51,6 +51,7 @@
 | N-39 | Auth Endpoint Rate Limiting | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-40 | CORS Hardening (ALLOWED_ORIGINS) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-41 | Rate Limiter Config Constants | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-42 | Trust Proxy Configuration | GOVERNANCE | SHIPPED | P0 | 2026-03-21 |
 
 ---
 
