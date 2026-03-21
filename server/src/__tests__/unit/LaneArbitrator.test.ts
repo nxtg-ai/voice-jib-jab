@@ -808,6 +808,20 @@ describe("LaneArbitrator", () => {
 
       expect(arbitrator.getMetrics().latencyMs).toBe(1200);
     });
+
+    it("latencyMs is null when neither speechEndTime nor bReadyTime is set", () => {
+      // Kills: `this.speechEndTime && this.bReadyTime` → `true`
+      // (would compute null - null = NaN instead of returning null)
+      arbitrator.startSession();
+      expect(arbitrator.getMetrics().latencyMs).toBeNull();
+    });
+
+    it("latencyMs is null when only speechEndTime is set (bReadyTime not yet recorded)", () => {
+      // Kills: `&&` → `||` mutation (would compute bReadyTime - null with only one side set)
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getMetrics().latencyMs).toBeNull();
+    });
   });
 
   describe("FALLBACK_PLAYING state — barge-in and policy cancel", () => {

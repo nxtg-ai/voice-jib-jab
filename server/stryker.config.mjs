@@ -12,6 +12,7 @@ export default {
     "src/orchestrator/LaneArbitrator.ts",
   ],
   coverageAnalysis: "perTest",
+  ignoreStatic: true, // skips 145 static mutants (~12%) that take 73% of runtime
   reporters: ["progress", "clear-text", "json"],
   jsonReporter: {
     fileName: "reports/mutation/mutation.json",
