@@ -60,8 +60,10 @@ export class LaneA extends EventEmitter {
     this.sessionId = sessionId;
     this.config = { ...DEFAULT_CONFIG, ...config };
 
-    // Start async initialization
-    this.initializeAudioCache();
+    // Start async initialization (skip if disabled — avoids real TTS calls in tests)
+    if (this.config.enabled) {
+      this.initializeAudioCache();
+    }
   }
 
   /**

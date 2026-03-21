@@ -163,14 +163,15 @@ export class VoiceWebSocketServer {
       },
     });
 
-    // Create Lane A (reflex engine)
+    // Create Lane A (reflex engine) — only when enabled in config
+    const laneAEnabled = config.features.enableLaneA;
     const laneA = new LaneA(session.id, {
-      enabled: true,
+      enabled: laneAEnabled,
     });
 
     // Create Lane Arbitrator
     const laneArbitrator = new LaneArbitrator(session.id, {
-      laneAEnabled: true,
+      laneAEnabled,
       minDelayBeforeReflexMs: 150,
       maxReflexDurationMs: 2000,
       preemptThresholdMs: 300,

@@ -812,13 +812,14 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       `[OpenAI] Attempting reconnection (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`,
     );
 
-    setTimeout(() => {
+    const reconnectTimer = setTimeout(() => {
       if (this.sessionId) {
         this.connect(this.sessionId).catch((error) => {
           console.error("[OpenAI] Reconnection failed:", error);
         });
       }
     }, delay);
+    reconnectTimer.unref(); // Don't prevent process exit (e.g. in tests)
   }
 
   /**
