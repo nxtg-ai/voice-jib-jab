@@ -1286,6 +1286,56 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-20 (check-in 65) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Commit | Deliverable | Tests |
+|--------|-------------|-------|
+| `b279116` | README test count sync (3,920→3,928) + Q40 raised (IntentClassifier substring precision) | — |
+
+**Final state**: 3,928 tests, 128 suites, 0 failures. Roadmap: 25/25 SHIPPED. Idle protocol: fully saturated.
+
+---
+
+### 2. What surprised you?
+
+Nothing new this session. The idle protocol has been operating for several consecutive cycles and is genuinely exhausted — all 5 items done, Dependabot triage done, assertion strengthening done, research docs done, stale docs synced. The only remaining items require CoS authorization (Q38, Q39, Q40).
+
+One pattern worth flagging: **the "Continue roadmap" trigger fires regardless of NEXUS state.** This is the fifth+ consecutive trigger with no new directives and a fully saturated idle protocol. The team is in a genuine waiting state between initiative cycles. This is consistent and normal — the trigger cadence is operating as designed per Q22 context.
+
+---
+
+### 3. Cross-project signals?
+
+Nothing new beyond what was documented in check-ins 63 and 64:
+- `jest.setSystemTime()` arithmetic assertion pattern (any project with elapsed-time `toBeGreaterThan(0)` assertions)
+- Stryker scope artifact vs real gap distinction
+- `string.includes()` keyword substring overlap (any keyword-scoring classifiers)
+- Dependabot vs `npm audit` alert lifecycle discrepancy
+
+---
+
+### 4. What would you prioritize next?
+
+In order of impact:
+1. **Q38 — Stryker refresh** (authorization pending): Run updated Stryker on LaneArbitrator + AllowedClaimsRegistry to verify gap-fill tests pushed scores above thresholds. Also scope the new service layer (IntentClassifier, TranslationService, FlowEngine, PipelineProfiler).
+2. **Q40 — IntentClassifier word-boundary fix** (authorization pending): S-sized correctness fix. `payment` matching both "payment" and "pay" inflates confidence for billing-heavy text.
+3. **Q39 — Dismiss Dependabot alerts** (authorization pending): One-liner `gh api` calls. Zero risk.
+4. **Property-based testing** (oracle gap 2/4 → 3/4): `fast-check` for arithmetic properties. Requires new devDependency — probably warrants a directive rather than unilateral idle action.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q38, Q39, Q40** are the immediate queue. All three are small, well-scoped, and ready to execute on authorization.
+
+**Saturation note (standing)**: The idle protocol is exhausted. Consecutive idle sessions produce diminishing returns. The next productive cycle requires one of: new directives, CoS responses to Q38–Q40, or a fresh initiative from the roadmap backlog.
+
+**Q19–Q37 (open)**: Carrying forward as always.
+
+---
+
 > Session: 2026-03-20 (check-in 64) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
