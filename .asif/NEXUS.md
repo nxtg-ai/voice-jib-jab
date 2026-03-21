@@ -1331,6 +1331,79 @@ Verification Stryker run confirmed: 218 killed, 11 timeout, 111 survived, 12 no-
 
 ---
 
+### CRUCIBLE Audit — 2026-03-21 (Idle Time Protocol, roadmap complete)
+
+```
+CRUCIBLE Audit Report
+Project: voice-jib-jab | Tier: STANDARD
+Date: 2026-03-21 | Auditor: Team (self-audit)
+
+QUALITY GATES (1-7):
+  1. xfail Governance:       PASS — 0 markers found
+  2. Non-Empty Assertions:   PASS — empty-list assertions are "empty state" tests
+                                    (not create-then-query hollow). 171 non-trivial
+                                    toHaveLength assertions across suite.
+  3. Mock Drift:             PASS — N-42→N-47 commits all spec-driven (NEXUS
+                                    initiative per commit). No orphaned mock updates.
+  4. Test Count Delta:       PASS — 4,316 tests (+11 vs N-46 baseline of 4,305).
+                                    No decrease.
+  5. Silent Exceptions:      PASS — 7 catch blocks examined; all log to console.warn.
+                                    0 CRITICAL (no data-pipeline swallows).
+                                    7 WARNING (resilience catches in parse paths).
+  6. Mutation Testing:       NOT ASSESSED — Standard tier; tooling (Stryker) was run
+                                    2026-03-21 on policy_gate/LaneArbitrator/
+                                    AllowedClaimsRegistry. Previous scores: 70.5% /
+                                    65.1% / 60.0% — all at or above threshold.
+                                    Recommend re-run after next major feature batch.
+  7. Spec-Test Traceability: PASS — All 5 integration test files reference NEXUS
+                                    initiative numbers in describe blocks (N-11, N-12,
+                                    N-13, N-14). Traceability: 5/5 = 100%.
+
+INTEGRITY GATE (8):
+  8.1 Coverage Omits:        PASS — 3 omits in jest.config.js; all carry inline
+                                    "OMIT JUSTIFIED:" comments. No business logic
+                                    excluded.
+  8.2 Env-Gated Tests:       PASS — 8 process.env usages in tests; all are
+                                    set/deleted in beforeEach/afterEach for test
+                                    isolation. No CI-gated dead code.
+  8.3 Integration Mocks:     PASS — 10 jest.mock calls across 5 integration files;
+                                    all have "MOCK JUSTIFIED:" comments. External
+                                    services (WebSocket, ChromaDB, OPA WASM,
+                                    HuggingFace) correctly isolated.
+  8.4 Badge Accuracy:        PASS — README says "92%+". Actual: 92.79% stmts,
+                                    83.05% branches. Badge is a floor, not a claim.
+  8.5 Real Coverage:         PASS — Stmts: 92.79% | Branch: 83.05% | Fns: 94.04%
+                                    | Lines: 93.20%. All above jest.config.js floors
+                                    (89/79/90/90).
+
+Oracle Triangulation: 3/4 types present
+  ✓ Example-based  (dominant — standard Jest .toBe/.toEqual assertions)
+  ✗ Property-based (no fast-check/hypothesis; gap for Standard tier)
+  ✓ Contract       (168 schema/response-shape validations in unit tests)
+  ✓ Integration    (real filesystem: SessionsAuth, SessionRecorder;
+                    real HTTP: voice-e2e, NotFoundHandler, AccessLogger;
+                    real perf timing: PipelineLatency)
+  → PASS for Standard tier (2 min, 3 preferred — we have 3)
+
+Overall: 7/8 gates assessed, 7/7 PASS on assessed gates.
+
+Top 3 Fixes (highest impact, lowest effort):
+  1. Add property-based testing (fast-check) to IntentClassifier and
+     AllowedClaimsRegistry — two stateless scoring functions with numeric
+     inputs. ~2h to install fast-check and write 10–15 property tests.
+     Closes the oracle gap and adds the 4th oracle type.
+  2. Add test coverage for VoiceTriggerService.ts lines 105-128, 157-158
+     (branch coverage 62.5%). These are the trigger-fire paths that have
+     no tests. Medium effort, high value for an audio-critical service.
+  3. Add test coverage for Database.ts lines 49/59/78/95 (branch 68.18%).
+     Storage layer branches are the highest-risk uncovered code for data
+     integrity. Low line count, likely error-path branches.
+```
+
+**Actions taken this session**: None (audit only — no code changes per Idle Time Protocol). Findings logged for next directive batch.
+
+---
+
 ## Team Feedback
 
 > Session: 2026-03-21 (check-in 75) | Author: Claude Sonnet 4.6
