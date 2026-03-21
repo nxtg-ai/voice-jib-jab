@@ -152,8 +152,18 @@ const requireApiKey = createApiKeyMiddleware(
 app.use("/auth", createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
 // N-29: admin/tenants/webhooks | N-32: sessions | N-33: analytics/audit/recordings/export
+// N-34: remaining enterprise routes (all config/data paths)
 app.use(
-  ["/admin", "/tenants", "/webhooks", "/sessions", "/analytics", "/audit", "/recordings", "/export"],
+  [
+    "/admin", "/tenants", "/webhooks", "/sessions",
+    "/analytics", "/audit", "/recordings", "/export",
+    "/templates", "/language", "/ivr", "/quality", "/playbooks",
+    "/voiceprints", "/personas", "/flows", "/translation", "/intents",
+    "/abtests", "/validate", "/search", "/sla", "/kb-search", "/training",
+    "/compare-agents", "/compliance-dashboard", "/onboarding",
+    "/capacity", "/skills", "/agent-versions", "/routing", "/supervisor",
+    "/voice", "/voices",
+  ],
   requireApiKey,
 );
 // Audit event stream — registered after guard so requireApiKey fires first.
