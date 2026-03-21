@@ -11739,3 +11739,43 @@ Q38, Q39, Q40 remain open. No new blockers. Dashboard: 29/29 SHIPPED.
 ### 5. Blockers / Questions for CoS
 
 Q38, Q39, Q40 remain open. No new blockers. Dashboard: 30/30 SHIPPED.
+
+---
+
+> Session: 2026-03-21 (check-in 65) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+Nothing shipped this check-in — the reflection trigger fired immediately after the N-30 push. Check-in 64 covers N-30 (Real-Time Audit Event Stream). Steady state: 30/30 SHIPPED, 4,107 tests, 0 failures.
+
+---
+
+### 2. What surprised you?
+
+**N-29 + N-30 form a coherent security layer in two sessions.** Auth (N-29) followed immediately by audit logging (N-30) — this is the correct order for enterprise security: you can't audit what you haven't authenticated. The fact that `createApiKeyMiddleware` was refactored to accept an optional `AuditEventLogger` without breaking any existing tests validates the optional-dependency pattern. The two initiatives now form a complete auth+audit pair that enterprise security teams typically require together.
+
+**30 initiatives in one codebase.** The roadmap has grown from the original 15 to 30 shipped initiatives across 8 pillars without regressions. Test count has grown from ~88 to 4,107 — a 46x increase since N-09 (14%→85% coverage push). Coverage floor is still enforced by Jest `coverageThreshold`.
+
+---
+
+### 3. Cross-project signals
+
+**Auth + Audit as a paired pattern.** Any ASIF service exposing a management API should ship auth and audit together, not sequentially. The pattern established in N-29/N-30 — `ApiKeyStore` + `createApiKeyMiddleware(store, enabled, auditLogger?)` + `AuditEventLogger` — is portable to any Express-based ASIF project. No new npm deps required (node:crypto + node:fs only).
+
+**JSONL over JSON for append-only logs.** `audit-events.jsonl` writes one JSON object per line, making appends O(1) without loading the full file. For any ASIF service that needs a growing event log (analytics, audit, replay), JSONL is preferable to a growing JSON array that requires full-file rewrites.
+
+---
+
+### 4. What would you prioritize next?
+
+1. **N-31: API Key TTL/Expiry** — `expiresAt` field on `ApiKeyRecord`, `verifyKey()` rejects expired keys, `POST /auth/api-keys` accepts `ttlDays`. S-sized, zero new deps, closes the obvious gap in N-29. Emits `api_key_rejected` with `reason: "expired"` to the audit log.
+2. **Q40 — IntentClassifier word-boundary fix** — `payment` substring-matches `pay`. S-sized correctness fix, authorization still pending.
+3. **Q39 — Dependabot alert dismissal** — 3 devDep alerts, `npm audit` clean, authorization still pending.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38, Q39, Q40 remain open. No new blockers.
+
+**Q41 — N-31 authorization**: API key TTL/expiry is S-sized and closes a known gap in N-29. Ready to execute immediately on authorization. Design: `ttlDays` param on `POST /auth/api-keys` → `expiresAt` stored, checked in `verifyKey()`, `api_key_rejected` audit event with `reason: "expired"`. No new deps.
