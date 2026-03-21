@@ -708,3 +708,164 @@ describe("TenantConfigMigrator.importTenant", () => {
     expect(result.warnings.some((w) => w.includes("plain string error"))).toBe(true);
   });
 });
+
+// ── Branch coverage: uncovered paths ──────────────────────────────────────────
+//
+// The following tests cover branches that the main test suite left at zero hits:
+//
+//   id:8  L152 — tenant createTenant catch: String(err) when non-Error thrown
+//   id:10 L165 — data.personas ?? [] when personas is null/undefined in export
+//   id:13 L184 — persona createPersona catch: String(err) when non-Error thrown
+//   id:14 L194 — data.knowledgeItems ?? [] when knowledgeItems is null/undefined
+//   id:18 L224 — data.playbooks ?? [] when playbooks is null/undefined
+//   id:21 L242 — playbook createEntry catch: String(err) when non-Error thrown
+//   id:22 L252 — data.ivrMenus ?? [] when ivrMenus is null/undefined
+//   id:25 L268 — IVR createMenu catch: String(err) when non-Error thrown
+
+describe("TenantConfigMigrator — branch coverage", () => {
+  function buildExport(overrides: Partial<TenantExport> = {}): TenantExport {
+    return {
+      version: "1.0",
+      exportedAt: "2026-03-01T00:00:00.000Z",
+      sourceTenantId: TENANT_ID,
+      tenant: TENANT_CONFIG,
+      personas: [CUSTOM_PERSONA],
+      knowledgeItems: [KB_ITEM],
+      playbooks: [PLAYBOOK],
+      ivrMenus: [IVR_MENU],
+      ...overrides,
+    };
+  }
+
+  // ── ?? [] fallback: null collections in export data ──────────────────────
+
+  it("handles null personas field in export (falls back to empty array)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(
+      buildExport({ personas: null as unknown as PersonaConfig[] }),
+      TARGET_ID,
+    );
+
+    expect(result.counts.personas).toBe(0);
+  });
+
+  it("handles null knowledgeItems field in export (falls back to empty array)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(
+      buildExport({ knowledgeItems: null as unknown as KbEntry[] }),
+      TARGET_ID,
+    );
+
+    expect(result.counts.knowledgeItems).toBe(0);
+  });
+
+  it("handles null playbooks field in export (falls back to empty array)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(
+      buildExport({ playbooks: null as unknown as PlaybookEntry[] }),
+      TARGET_ID,
+    );
+
+    expect(result.counts.playbooks).toBe(0);
+  });
+
+  it("handles null ivrMenus field in export (falls back to empty array)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(
+      buildExport({ ivrMenus: null as unknown as IvrMenu[] }),
+      TARGET_ID,
+    );
+
+    expect(result.counts.ivrMenus).toBe(0);
+  });
+
+  // ── String(err) fallback: non-Error thrown in each catch block ───────────
+
+  it("uses String(err) when createTenant throws a non-Error value (tenant registration catch)", async () => {
+    const { migrator, registry, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    registry.getTenant.mockReturnValue(null);
+    registry.createTenant.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "tenant string error";
+    });
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    const result = await migrator.importTenant(buildExport({ tenant: TENANT_CONFIG }), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("tenant string error"))).toBe(true);
+  });
+
+  it("uses String(err) when createPersona throws a non-Error value (persona import catch)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    personaStore.createPersona.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "persona string error";
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("persona string error"))).toBe(true);
+  });
+
+  it("uses String(err) when createEntry throws a non-Error value (playbook import catch)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    playbookStore.createEntry.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "playbook string error";
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("playbook string error"))).toBe(true);
+  });
+
+  it("uses String(err) when createMenu throws a non-Error value (IVR menu import catch)", async () => {
+    const { migrator, personaStore, kbStore, playbookStore, ivrStore } = buildMigrator();
+    personaStore.listPersonas.mockReturnValue([]);
+    kbStore.listEntries.mockReturnValue([]);
+    playbookStore.listEntries.mockReturnValue([]);
+    ivrStore.listMenus.mockReturnValue([]);
+
+    ivrStore.createMenu.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "ivr string error";
+    });
+
+    const result = await migrator.importTenant(buildExport(), TARGET_ID);
+
+    expect(result.warnings.some((w) => w.includes("ivr string error"))).toBe(true);
+  });
+});

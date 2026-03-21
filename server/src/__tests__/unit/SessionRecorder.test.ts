@@ -562,3 +562,194 @@ describe("SessionRecorder — branch coverage gaps", () => {
     })).not.toThrow();
   });
 });
+
+// ── SessionRecorder — branch coverage additions ──────────────────────
+
+describe("SessionRecorder — branch coverage additions", () => {
+  let branchDir: string;
+  let r: SessionRecorder;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionHandlerMap.clear();
+    branchDir = join(tmpdir(), `sr-branch-${randomUUID()}`);
+    mkdirSync(branchDir, { recursive: true });
+    r = new SessionRecorder({ recordingsDir: branchDir, retentionDays: 7 });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    try {
+      const files = readdirSync(branchDir);
+      for (const f of files) unlinkSync(join(branchDir, f));
+    } catch { /* ignore */ }
+  });
+
+  it("recordSentiment() stores sentiment when sessionId is active (buffer truthy branch)", async () => {
+    // L140 if — buffer found (truthy arm)
+    r.startRecording("sess-sent-active", "tenant-Z");
+    r.recordSentiment("sess-sent-active", {
+      sessionId: "sess-sent-active",
+      readingCount: 3,
+      dominantSentiment: "positive",
+      averageScore: 0.75,
+      escalationTriggered: false,
+      trajectory: [],
+    });
+    await r.stopRecording("sess-sent-active");
+    const recording = r.loadRecording("sess-sent-active");
+    expect(recording!.summary.sentiment).toBeDefined();
+    expect(recording!.summary.sentiment!.dominantSentiment).toBe("positive");
+  });
+
+  it("handleEvent() is a no-op when buffer not found for sessionId (L245 guard)", () => {
+    // L245 if — buffer is undefined (session never started)
+    // Directly emit to a session that was never started via startRecording
+    // We set up a fake handler mapping to simulate an event arriving after session was stopped
+    r.startRecording("sess-ghost");
+    // Immediately delete from internal sessions by stopping, then emit via the still-registered handler
+    // Instead, emit to a session that was never registered — nothing should blow up
+    emitToSession("sess-never-started", makeEvent({
+      session_id: "sess-never-started",
+      type: "policy.decision",
+      source: "laneC",
+      t_ms: Date.now(),
+      payload: { decision: "allow", reason_codes: [], severity: 0 },
+    }));
+    // No error thrown and no recording written
+    expect(r.loadRecording("sess-never-started")).toBeNull();
+  });
+
+  it("handleEvent() ignores unknown event types not in TIMELINE_EVENT_TYPES (L260 guard)", async () => {
+    // L260 if — event type not in TIMELINE_EVENT_TYPES and not audio.chunk
+    const baseTime = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(baseTime);
+    r.startRecording("sess-unknown-type");
+
+    emitToSession("sess-unknown-type", makeEvent({
+      session_id: "sess-unknown-type",
+      type: "some.unknown.event.type",
+      source: "orchestrator",
+      t_ms: baseTime + 10,
+      payload: { foo: "bar" },
+    }));
+
+    await r.stopRecording("sess-unknown-type");
+    const recording = r.loadRecording("sess-unknown-type");
+    // The unknown event type should not appear in the timeline
+    expect(recording!.timeline.filter((e) => e.type === "some.unknown.event.type")).toHaveLength(0);
+  });
+
+  it("sanitizePayload() returns undefined when event payload is null (L313 guard)", async () => {
+    // L313 if — payload is null/falsy inside sanitizePayload
+    const baseTime = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(baseTime);
+    r.startRecording("sess-null-pl");
+
+    // Emit a policy.decision with null payload
+    emitToSession("sess-null-pl", {
+      event_id: randomUUID(),
+      t_ms: baseTime + 10,
+      source: "laneC",
+      type: "policy.decision",
+      payload: null,
+      session_id: "sess-null-pl",
+    } as any);
+
+    await r.stopRecording("sess-null-pl");
+    const recording = r.loadRecording("sess-null-pl");
+    // Entry should exist but without a payload field
+    const entry = recording!.timeline.find((e) => e.type === "policy.decision");
+    expect(entry).toBeDefined();
+    expect(entry!.payload).toBeUndefined();
+  });
+
+  it("sanitizePayload() base64-encodes Buffer in data field for storeRawAudio=true (L320 if)", async () => {
+    // L320 if + binary-expr — cleaned.data exists and Buffer.isBuffer(cleaned.data) is true
+    const rawRecorder = new SessionRecorder({ recordingsDir: branchDir, storeRawAudio: true });
+    const baseTime = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(baseTime);
+    rawRecorder.startRecording("sess-buf-data");
+
+    const bufData = Buffer.from("hello audio data");
+    emitToSession("sess-buf-data", {
+      event_id: randomUUID(),
+      t_ms: baseTime + 5,
+      source: "client",
+      type: "audio.chunk",
+      session_id: "sess-buf-data",
+      payload: { data: bufData, size: bufData.length },
+    } as any);
+
+    await rawRecorder.stopRecording("sess-buf-data");
+    const recording = rawRecorder.loadRecording("sess-buf-data");
+    const audioEntry = recording!.timeline.find((e) => e.type === "audio.chunk");
+    expect(audioEntry).toBeDefined();
+    // data should have been converted to base64 string
+    expect(audioEntry!.payload!.data).toBe(bufData.toString("base64"));
+    expect(audioEntry!.payload!.data_encoding).toBe("base64");
+  });
+
+  it("sanitizePayload() base64-encodes Buffer in chunk field for storeRawAudio=true (L324 if)", async () => {
+    // L324 if + binary-expr — cleaned.chunk exists and Buffer.isBuffer(cleaned.chunk) is true
+    const rawRecorder = new SessionRecorder({ recordingsDir: branchDir, storeRawAudio: true });
+    const baseTime = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(baseTime);
+    rawRecorder.startRecording("sess-buf-chunk");
+
+    const bufChunk = Buffer.from("raw pcm chunk data");
+    emitToSession("sess-buf-chunk", {
+      event_id: randomUUID(),
+      t_ms: baseTime + 5,
+      source: "client",
+      type: "audio.chunk",
+      session_id: "sess-buf-chunk",
+      payload: { chunk: bufChunk, size: bufChunk.length },
+    } as any);
+
+    await rawRecorder.stopRecording("sess-buf-chunk");
+    const recording = rawRecorder.loadRecording("sess-buf-chunk");
+    const audioEntry = recording!.timeline.find((e) => e.type === "audio.chunk");
+    expect(audioEntry).toBeDefined();
+    expect(audioEntry!.payload!.chunk).toBe(bufChunk.toString("base64"));
+    expect(audioEntry!.payload!.chunk_encoding).toBe("base64");
+  });
+
+  it("flushToDisk() includes sentiment in recording when buffer.sentiment is set (L351 cond-expr true arm)", async () => {
+    // L351 cond-expr — buffer.sentiment is truthy
+    r.startRecording("sess-flush-sent", "tenant-Y");
+    r.recordSentiment("sess-flush-sent", {
+      sessionId: "sess-flush-sent",
+      readingCount: 5,
+      dominantSentiment: "negative",
+      averageScore: 0.2,
+      escalationTriggered: true,
+      trajectory: [],
+    });
+    await r.stopRecording("sess-flush-sent");
+    const recording = r.loadRecording("sess-flush-sent");
+    expect(recording!.summary.sentiment).toBeDefined();
+    expect(recording!.summary.sentiment!.dominantSentiment).toBe("negative");
+    expect(recording!.summary.sentiment!.escalationTriggered).toBe(true);
+  });
+
+  it("flushToDisk() creates recordingsDir if it does not exist (L363 if branch)", async () => {
+    // L363 if — directory doesn't exist; flushToDisk creates it
+    const newDir = join(tmpdir(), `sr-new-dir-${randomUUID()}`);
+    // Do NOT create the directory — let flushToDisk create it
+    const rNew = new SessionRecorder({ recordingsDir: newDir, retentionDays: 7 });
+    rNew.startRecording("sess-new-dir");
+    await rNew.stopRecording("sess-new-dir");
+
+    // Directory and file should now exist
+    expect(existsSync(newDir)).toBe(true);
+    const recording = rNew.loadRecording("sess-new-dir");
+    expect(recording).not.toBeNull();
+    expect(recording!.sessionId).toBe("sess-new-dir");
+
+    // Clean up
+    try {
+      unlinkSync(join(newDir, "sess-new-dir.json"));
+    } catch { /* ignore */ }
+  });
+});

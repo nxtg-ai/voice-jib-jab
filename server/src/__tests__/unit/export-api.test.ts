@@ -231,6 +231,83 @@ describe("Export API", () => {
     });
   });
 
+    it("treats a non-numeric offset as 0 (isNaN branch at L75)", async () => {
+      mockSvc.exportBulk.mockResolvedValue(makeBulkResult());
+
+      await httpRequest(server, "GET", "/export/sessions?offset=abc");
+
+      expect(mockSvc.exportBulk).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0 }),
+      );
+    });
+
+    it("returns ndjson when Accept header includes application/x-ndjson", async () => {
+      const bulkResult = makeBulkResult({
+        totalSessions: 1,
+        sessions: [makeSessionExport("sess-ndjson")],
+      });
+      mockSvc.exportBulk.mockResolvedValue(bulkResult);
+
+      const res = await httpRequest(server, "GET", "/export/sessions", {
+        accept: "application/x-ndjson",
+      });
+
+      expect(res.status).toBe(200);
+      const lines = res.body.trim().split("\n");
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      const metadata = JSON.parse(lines[0]) as Record<string, unknown>;
+      expect(metadata.exportedAt).toBe(bulkResult.exportedAt);
+      expect(metadata.totalSessions).toBe(1);
+      const session = JSON.parse(lines[1]) as Record<string, unknown>;
+      expect(session.sessionId).toBe("sess-ndjson");
+    });
+
+    it("ndjson metadata line includes from and to when present in result (L100-101 cond-expr)", async () => {
+      const bulkResult = makeBulkResult({
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-31T23:59:59.999Z",
+        sessions: [],
+      });
+      mockSvc.exportBulk.mockResolvedValue(bulkResult);
+
+      const res = await httpRequest(server, "GET", "/export/sessions", {
+        accept: "application/x-ndjson",
+      });
+
+      const metadata = JSON.parse(res.body.trim().split("\n")[0]) as Record<string, unknown>;
+      expect(metadata.from).toBe("2026-03-01T00:00:00.000Z");
+      expect(metadata.to).toBe("2026-03-31T23:59:59.999Z");
+    });
+
+    it("ndjson metadata line includes tenantId when present in result (L102 cond-expr)", async () => {
+      const bulkResult = makeBulkResult({
+        tenantId: "org_acme",
+        sessions: [],
+      });
+      mockSvc.exportBulk.mockResolvedValue(bulkResult);
+
+      const res = await httpRequest(server, "GET", "/export/sessions", {
+        accept: "application/x-ndjson",
+      });
+
+      const metadata = JSON.parse(res.body.trim().split("\n")[0]) as Record<string, unknown>;
+      expect(metadata.tenantId).toBe("org_acme");
+    });
+
+    it("ndjson metadata line omits from, to, tenantId when absent in result (false branches of L100-102)", async () => {
+      const bulkResult = makeBulkResult({ sessions: [] });
+      mockSvc.exportBulk.mockResolvedValue(bulkResult);
+
+      const res = await httpRequest(server, "GET", "/export/sessions", {
+        accept: "application/x-ndjson",
+      });
+
+      const metadata = JSON.parse(res.body.trim().split("\n")[0]) as Record<string, unknown>;
+      expect(metadata.from).toBeUndefined();
+      expect(metadata.to).toBeUndefined();
+      expect(metadata.tenantId).toBeUndefined();
+    });
+
   // ── GET /export/sessions/:id ───────────────────────────────────────────────
 
   describe("GET /export/sessions/:id", () => {

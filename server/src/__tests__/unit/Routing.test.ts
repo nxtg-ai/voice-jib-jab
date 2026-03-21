@@ -622,4 +622,130 @@ describe("Routing API — branch coverage", () => {
       expect(patch).not.toHaveProperty("conditions");
     });
   });
+
+  // ── POST /routing/rules — maxConcurrentSessions as number (id:10 L76) ─────
+
+  describe("POST /routing/rules — maxConcurrentSessions as number", () => {
+    it("forwards numeric maxConcurrentSessions to engine.addRule (consequent branch)", async () => {
+      engine.addRule.mockReturnValue({ ...SAMPLE_RULE, maxConcurrentSessions: 10 } as never);
+      const res = await httpRequest(server, "POST", "/routing/rules", {
+        tenantId: "tenant-acme",
+        priority: 10,
+        conditions: { language: "en" },
+        targetTemplateId: "tmpl-default",
+        active: true,
+        maxConcurrentSessions: 10,
+      });
+      expect(res.status).toBe(201);
+      expect(engine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({ maxConcurrentSessions: 10 }),
+      );
+    });
+  });
+
+  // ── PUT /routing/rules/:ruleId — priority, conditions, targetTemplateId ───
+  //   id:17 L103 if(priority is number), id:19 L104 if(conditions object), id:20 L105 if(targetTemplateId string)
+
+  describe("PUT /routing/rules/:ruleId — priority, conditions, targetTemplateId patches", () => {
+    it("includes priority in patch when body.priority is a number", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue({ ...SAMPLE_RULE, priority: 99 } as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", { priority: 99 });
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch).toHaveProperty("priority", 99);
+    });
+
+    it("includes conditions in patch when body.conditions is an object", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue({ ...SAMPLE_RULE, conditions: { topic: "billing" } } as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", {
+        conditions: { topic: "billing" },
+      });
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch).toHaveProperty("conditions");
+      expect((patch.conditions as Record<string, unknown>).topic).toBe("billing");
+    });
+
+    it("includes targetTemplateId in patch when body.targetTemplateId is a string", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue({ ...SAMPLE_RULE, targetTemplateId: "tmpl-new" } as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", {
+        targetTemplateId: "tmpl-new",
+      });
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch).toHaveProperty("targetTemplateId", "tmpl-new");
+    });
+  });
+
+  // ── PUT /routing/rules/:ruleId — tenantId: non-null non-string (id:15 L100) ─
+
+  describe("PUT /routing/rules/:ruleId — tenantId coerced via String()", () => {
+    it("coerces non-null non-string tenantId to string via String()", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue({ ...SAMPLE_RULE, tenantId: "42" } as never);
+
+      // Sending a numeric tenantId — body.tenantId !== null, not a string, so String() is used
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", { tenantId: 42 });
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch.tenantId).toBe("42");
+    });
+  });
+
+  // ── req.body ?? {} fallback branches (id:1, id:13, id:26, id:32, id:35) ───
+  //   These fire when express.json() does not populate req.body (no content-type,
+  //   no body). Sending a body-less POST triggers req.body === undefined → {} fallback.
+
+  describe("req.body ?? {} fallback — POST /routing/rules with no body", () => {
+    it("returns 400 when POST /routing/rules sent with no body (priority missing)", async () => {
+      // No body sent → req.body is undefined → falls back to {} → priority missing
+      const res = await httpRequest(server, "POST", "/routing/rules");
+      expect(res.status).toBe(400);
+      const body = res.json() as { error: string };
+      expect(body.error).toContain("priority");
+    });
+  });
+
+  describe("req.body ?? {} fallback — PUT /routing/rules/:ruleId with no body", () => {
+    it("applies empty patch and returns 200 when PUT sent with no body", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue(SAMPLE_RULE as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001");
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe("req.body ?? {} fallback — POST /routing/evaluate with no body", () => {
+    it("returns 400 when POST /routing/evaluate sent with no body (tenantId missing)", async () => {
+      const res = await httpRequest(server, "POST", "/routing/evaluate");
+      expect(res.status).toBe(400);
+      const body = res.json() as { error: string };
+      expect(body.error).toContain("tenantId");
+    });
+  });
+
+  describe("req.body ?? {} fallback — POST /routing/queue/enqueue with no body", () => {
+    it("returns 400 when POST /routing/queue/enqueue sent with no body (sessionId missing)", async () => {
+      const res = await httpRequest(server, "POST", "/routing/queue/enqueue");
+      expect(res.status).toBe(400);
+      const body = res.json() as { error: string };
+      expect(body.error).toContain("sessionId");
+    });
+  });
+
+  describe("req.body ?? {} fallback — POST /routing/queue/dequeue with no body", () => {
+    it("returns 400 when POST /routing/queue/dequeue sent with no body (tenantId missing)", async () => {
+      const res = await httpRequest(server, "POST", "/routing/queue/dequeue");
+      expect(res.status).toBe(400);
+      const body = res.json() as { error: string };
+      expect(body.error).toContain("tenantId");
+    });
+  });
 });

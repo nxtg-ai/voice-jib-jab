@@ -521,3 +521,183 @@ describe("AuditReportService", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// AuditReportService — branch coverage additions
+// ---------------------------------------------------------------------------
+
+describe("AuditReportService — branch coverage additions", () => {
+  describe("generateReport() — null/missing field branches", () => {
+    it("handles recording with null durationMs (coalesces to 0)", async () => {
+      const recording = makeRecording({ sessionId: "s-null-dur", durationMs: null as unknown as number });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      // totalDurationMs should be 0 (null coalesced)
+      expect(report.summary.totalDurationMs).toBe(0);
+      expect(report.summary.avgDurationMs).toBe(0);
+    });
+
+    it("handles recording with undefined policyDecisions.escalate (coalesces to 0)", async () => {
+      const recording = makeRecording({
+        sessionId: "s-no-esc",
+        summary: {
+          turnCount: 2,
+          policyDecisions: { allow: 3, refuse: 1 } as any,
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.summary.escalationCount).toBe(0);
+    });
+
+    it("handles recording with undefined policyDecisions.refuse (coalesces to 0)", async () => {
+      const recording = makeRecording({
+        sessionId: "s-no-ref",
+        summary: {
+          turnCount: 2,
+          policyDecisions: { allow: 3, escalate: 0 } as any,
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.summary.refusalCount).toBe(0);
+    });
+
+    it("skips timeline entry with falsy payload when extracting escalation reasons", async () => {
+      const recording = makeRecording({
+        sessionId: "s-null-payload",
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 1, refuse: 0, escalate: 0, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+        timeline: [
+          // entry with type "policy.decision" but no payload
+          { t_ms: 100, type: "policy.decision", payload: undefined },
+        ] as any,
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      // Should not throw, topEscalationReasons is empty
+      expect(report.topEscalationReasons).toHaveLength(0);
+    });
+
+    it("skips non-escalate policy.decision entries in escalation reason extraction", async () => {
+      const recording = makeRecording({
+        sessionId: "s-allow-only",
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 2, refuse: 0, escalate: 0, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+        timeline: [
+          { t_ms: 100, type: "policy.decision", payload: { decision: "allow", reasonCode: "ok" } },
+          { t_ms: 200, type: "policy.decision", payload: { decision: "refuse", reason: "pii" } },
+        ] as any,
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.topEscalationReasons).toHaveLength(0);
+    });
+
+    it("falls back to payload.reason when reasonCode absent for escalation", async () => {
+      const recording = makeRecording({
+        sessionId: "s-reason-fallback",
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 0, refuse: 0, escalate: 1, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+        timeline: [
+          { t_ms: 100, type: "policy.decision", payload: { decision: "escalate", reason: "billing" } },
+        ] as any,
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.topEscalationReasons[0].reason).toBe("billing");
+    });
+
+    it("falls back to 'unknown' when neither reasonCode nor reason is present", async () => {
+      const recording = makeRecording({
+        sessionId: "s-reason-unknown",
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 0, refuse: 0, escalate: 1, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 5,
+          audioOutputChunks: 5,
+        },
+        timeline: [
+          { t_ms: 100, type: "policy.decision", payload: { decision: "escalate" } },
+        ] as any,
+      });
+      const svc = buildService([recording]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.topEscalationReasons[0].reason).toBe("unknown");
+    });
+
+    it("avgQualityScore and avgDurationMs are 0 when totalSessions is 0", async () => {
+      const svc = buildService([]);
+      const report = await svc.generateReport({ tenantId: "tenant-empty", year: 2026, month: 3 });
+
+      expect(report.summary.avgQualityScore).toBe(0);
+      expect(report.summary.avgDurationMs).toBe(0);
+    });
+  });
+
+  describe("generateHtml() — empty-section branches", () => {
+    it("renders 'No sentiment data recorded.' when sentimentBreakdown is empty", async () => {
+      // Recording with no sentiment field — sentimentBreakdown stays empty
+      const svc = buildService([makeRecording({ sessionId: "s-no-sent" })]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(Object.keys(report.sentimentBreakdown)).toHaveLength(0);
+
+      const html = svc.generateHtml(report);
+      expect(html).toContain("No sentiment data recorded.");
+    });
+
+    it("renders 'No escalations recorded.' when topEscalationReasons is empty", async () => {
+      const svc = buildService([makeRecording({ sessionId: "s-no-esc2" })]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      expect(report.topEscalationReasons).toHaveLength(0);
+
+      const html = svc.generateHtml(report);
+      expect(html).toContain("No escalations recorded.");
+    });
+
+    it("renders 'No policy decisions recorded.' when policyDecisions list is empty", async () => {
+      const svc = buildService([makeRecording({ sessionId: "s-no-pd" })]);
+      const report = await svc.generateReport({ tenantId: "tenant-a", year: 2026, month: 3 });
+
+      // Override policyDecisions to empty to exercise the false branch in generateHtml
+      const emptyReport = { ...report, policyDecisions: [] };
+      const html = svc.generateHtml(emptyReport);
+      expect(html).toContain("No policy decisions recorded.");
+    });
+
+    it("renders 'No sessions in this period.' when sessionIds is empty", async () => {
+      const svc = buildService([]);
+      const report = await svc.generateReport({ tenantId: "tenant-empty2", year: 2026, month: 3 });
+
+      expect(report.sessionIds).toHaveLength(0);
+
+      const html = svc.generateHtml(report);
+      expect(html).toContain("No sessions in this period.");
+    });
+  });
+});

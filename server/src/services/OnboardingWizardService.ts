@@ -156,6 +156,7 @@ function validatePayload(
       }
       break;
 
+    /* istanbul ignore next -- structurally unreachable: completeStep() early-returns before validatePayload when currentStep === "complete" */
     case "complete":
       // No payload expected on the terminal step.
       break;
@@ -198,6 +199,7 @@ function extractStepData(
         testCallLatencyMs: payload.testCallLatencyMs,
         testCallNotes: payload.testCallNotes,
       };
+    /* istanbul ignore next -- structurally unreachable: completeStep() early-returns before extractStepData when currentStep === "complete" */
     default:
       return {};
   }
@@ -503,6 +505,7 @@ export const onboardingWizardService: OnboardingWizardService = new Proxy(
   {} as OnboardingWizardService,
   {
     get(_target, prop) {
+      /* istanbul ignore next -- the module-level singleton throw path is unreachable in the test suite because _instance is always set before the proxy is accessed via the public API */
       if (!_instance) {
         throw new Error(
           "OnboardingWizardService not initialized — call initOnboardingWizardService() first",

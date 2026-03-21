@@ -8,7 +8,7 @@
 
 import { tmpdir } from "os";
 import { join } from "path";
-import { existsSync, rmSync } from "fs";
+import { existsSync, rmSync, writeFileSync } from "fs";
 import {
   OnboardingWizardService,
   initOnboardingWizardService,
@@ -656,5 +656,121 @@ describe("OnboardingWizardService — branch coverage", () => {
     const regStep = s.steps.find((step) => step.step === "tenant_registration");
     // status remains "pending" (the !== "pending" branch not taken)
     expect(regStep!.status).toBe("pending");
+  });
+});
+
+// ── OnboardingWizardService — remaining branch coverage ──────────────────────
+
+describe("OnboardingWizardService — remaining branch coverage", () => {
+  let svc: OnboardingWizardService;
+  let file: string;
+
+  beforeEach(() => {
+    file = join(
+      tmpdir(),
+      `onboarding-remaining-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
+    svc = new OnboardingWizardService(file);
+  });
+
+  afterEach(() => {
+    if (existsSync(file)) {
+      rmSync(file, { force: true });
+    }
+  });
+
+  // Branch L125: voice_configuration — voiceId is omitted entirely (if-body skipped)
+  it("completeStep() voice_configuration succeeds when voiceId is omitted", () => {
+    const session = svc.createSession("org_vconfig_novid");
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+    // voiceId omitted — the `if (payload.voiceId !== undefined)` false branch
+    expect(() =>
+      svc.completeStep(session.sessionId, { language: "en" }),
+    ).not.toThrow();
+    expect(svc.getSession(session.sessionId)!.currentStep).toBe("claims_registry");
+  });
+
+  // Branch L126 true arm: voiceId provided but not a string → validation error
+  it("completeStep() voice_configuration throws when voiceId is not a string", () => {
+    const session = svc.createSession("org_vconfig_badtype");
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+
+    let caught: (Error & { validationErrors?: string[] }) | undefined;
+    try {
+      // Pass a numeric voiceId — typeof !== "string" triggers the validation error
+      svc.completeStep(session.sessionId, { voiceId: 42 as unknown as string });
+    } catch (e) {
+      caught = e as Error & { validationErrors?: string[] };
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.validationErrors?.some((e) => e.includes("voiceId"))).toBe(true);
+  });
+
+  // Branch L126 binary-expr right side: voiceId is a string but trims to empty
+  it("completeStep() voice_configuration throws when voiceId is a whitespace-only string", () => {
+    const session = svc.createSession("org_vconfig_blank");
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+
+    let caught: (Error & { validationErrors?: string[] }) | undefined;
+    try {
+      svc.completeStep(session.sessionId, { voiceId: "   " });
+    } catch (e) {
+      caught = e as Error & { validationErrors?: string[] };
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.validationErrors?.some((e) => e.includes("voiceId"))).toBe(true);
+  });
+
+  // Branch L139 true arm: claimsEntries provided but is not an array → validation error
+  it("completeStep() claims_registry throws when claimsEntries is not an array", () => {
+    const session = svc.createSession("org_claims_bad");
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+    svc.completeStep(session.sessionId, { language: "en" });
+
+    let caught: (Error & { validationErrors?: string[] }) | undefined;
+    try {
+      svc.completeStep(session.sessionId, {
+        claimsEntries: "not-an-array" as unknown as [],
+      });
+    } catch (e) {
+      caught = e as Error & { validationErrors?: string[] };
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.validationErrors?.some((e) => e.includes("claimsEntries"))).toBe(true);
+  });
+
+  // Branch L257: nextStep() idx === -1 path — reached by corrupting the stored session
+  // so currentStep is an unknown value not in STEP_ORDER
+  it("completeStep() advances to 'complete' when currentStep is an unrecognised step value", () => {
+    // Create a session then manually corrupt its currentStep in the JSON file
+    const session = svc.createSession("org_corrupt_step");
+    const stored = JSON.parse(require("fs").readFileSync(file, "utf-8"));
+    stored.sessions[0].currentStep = "unknown_step_xyz";
+    writeFileSync(file, JSON.stringify(stored, null, 2), "utf-8");
+
+    // Reload from the corrupted file
+    const svc2 = new OnboardingWizardService(file);
+
+    // nextStep("unknown_step_xyz") → idx === -1 → returns "complete"
+    const result = svc2.completeStep(session.sessionId, {});
+    expect(result.currentStep).toBe("complete");
+  });
+
+  // Branch L393: skipStep() throws for unknown sessionId
+  it("skipStep() throws for an unknown sessionId", () => {
+    expect(() => svc.skipStep("no-such-session-skip")).toThrow();
+  });
+
+  // Branch L429: goBack() throws for an unknown sessionId
+  it("goBack() throws for an unknown sessionId", () => {
+    expect(() => svc.goBack("no-such-session-back")).toThrow();
+  });
+
+  // Branch L465: resetSession() throws for an unknown sessionId
+  it("resetSession() throws for an unknown sessionId", () => {
+    expect(() => svc.resetSession("no-such-session-reset")).toThrow();
   });
 });

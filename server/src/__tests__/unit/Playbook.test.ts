@@ -878,4 +878,146 @@ describe("Playbooks API Endpoints", () => {
     const data = res.json() as { error: string };
     expect(data.error).toContain("entryId");
   });
+
+  // ── Branch coverage: uncovered paths ──────────────────────────────
+  //
+  // The branches below cover conditional expressions that the main test
+  // suite left at zero hits:
+  //
+  //   id:4  L56 GET /suggest — tenantId IS a string (consequent)
+  //   id:5  L61 GET /suggest — scenario IS valid (consequent)
+  //   id:6  L64 GET /suggest — spread {tenantId} when defined
+  //   id:7  L65 GET /suggest — spread {scenario} when defined
+  //   id:8  L77 GET / — tenantId IS a string (consequent)
+  //   id:12 L92 GET / — spread {tenantId} when defined
+  //   id:27 L156 POST / — keywords defaults to [] when absent
+  //   id:28 L157 POST / — tenantId defaults to null when absent / non-string
+  //   id:29 L158 POST / — enabled IS a boolean (consequent = false value)
+  //   id:42 L217 PUT /:entryId — tenantId IS a string (consequent)
+
+  it("GET /playbooks/suggest: passes tenantId to store when provided as query param", async () => {
+    store.createEntry({
+      name: "TenantSuggest",
+      scenario: "faq",
+      script: "Tenanted script.",
+      keywords: ["tenant-kw"],
+      tenantId: "suggest-tenant",
+      enabled: true,
+    });
+    const res = await httpRequest(
+      server,
+      "GET",
+      "/playbooks/suggest?text=tenant-kw&tenantId=suggest-tenant",
+    );
+    expect(res.status).toBe(200);
+    const data = res.json() as { suggestions: unknown[]; count: number };
+    expect(Array.isArray(data.suggestions)).toBe(true);
+  });
+
+  it("GET /playbooks/suggest: passes valid scenario to store when provided as query param", async () => {
+    store.createEntry({
+      name: "ScenarioSuggest",
+      scenario: "greeting",
+      script: "Hello scenario.",
+      keywords: ["scenario-kw"],
+      tenantId: null,
+      enabled: true,
+    });
+    const res = await httpRequest(
+      server,
+      "GET",
+      "/playbooks/suggest?text=scenario-kw&scenario=greeting",
+    );
+    expect(res.status).toBe(200);
+    const data = res.json() as { suggestions: unknown[]; count: number };
+    expect(Array.isArray(data.suggestions)).toBe(true);
+  });
+
+  it("GET /playbooks/suggest: passes both tenantId and valid scenario when both are provided", async () => {
+    store.createEntry({
+      name: "BothParams",
+      scenario: "faq",
+      script: "Both params script.",
+      keywords: ["both-kw"],
+      tenantId: "both-tenant",
+      enabled: true,
+    });
+    const res = await httpRequest(
+      server,
+      "GET",
+      "/playbooks/suggest?text=both-kw&tenantId=both-tenant&scenario=faq",
+    );
+    expect(res.status).toBe(200);
+    const data = res.json() as { suggestions: unknown[]; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("GET /playbooks: passes tenantId filter to store when provided as query param", async () => {
+    store.createEntry({
+      name: "ListTenant",
+      scenario: "closing",
+      script: "Closing for tenant.",
+      keywords: [],
+      tenantId: "list-tenant",
+      enabled: true,
+    });
+    const res = await httpRequest(server, "GET", "/playbooks?tenantId=list-tenant");
+    expect(res.status).toBe(200);
+    const data = res.json() as { entries: Array<{ tenantId: string | null }>; count: number };
+    // All returned entries should be either for list-tenant or global (null)
+    expect(data.entries.every((e) => e.tenantId === "list-tenant" || e.tenantId === null)).toBe(true);
+  });
+
+  it("POST /playbooks: defaults keywords to [] when keywords not provided", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "No Keywords",
+      scenario: "faq",
+      script: "Script without keywords.",
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { keywords: unknown[] };
+    expect(Array.isArray(data.keywords)).toBe(true);
+    expect(data.keywords).toHaveLength(0);
+  });
+
+  it("POST /playbooks: defaults tenantId to null when tenantId not provided", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "No Tenant",
+      scenario: "faq",
+      script: "Script without tenantId.",
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { tenantId: string | null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  it("POST /playbooks: stores enabled=false when explicitly passed as false", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "Disabled Entry",
+      scenario: "faq",
+      script: "Disabled script.",
+      enabled: false,
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { enabled: boolean };
+    expect(data.enabled).toBe(false);
+  });
+
+  it("PUT /playbooks/:entryId: sets tenantId to the provided string when tenantId is a valid string", async () => {
+    const created = store.createEntry({
+      name: "Put Tenant String",
+      scenario: "faq",
+      script: "Script.",
+      keywords: [],
+      tenantId: null,
+      enabled: true,
+    });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      tenantId: "new-tenant-id",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { tenantId: string | null };
+    expect(data.tenantId).toBe("new-tenant-id");
+  });
 });

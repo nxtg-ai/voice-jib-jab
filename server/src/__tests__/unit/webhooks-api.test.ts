@@ -365,6 +365,105 @@ describe("Webhooks API", () => {
       const data = res.json() as { error: string };
       expect(data.error).toContain("wh-999");
     });
+
+    it("defaults testEvent to call_start when event is omitted from body (L82 ?? branch)", async () => {
+      mockSvc.getWebhook.mockReturnValue(WEBHOOK_A);
+      mockSvc.deliver.mockResolvedValue([DELIVERY_A]);
+
+      const res = await httpRequest(server, "POST", "/webhooks/test", {
+        webhookId: "wh-001",
+        // no event field
+      });
+
+      expect(res.status).toBe(200);
+      // deliver was called with "call_start" as the default event
+      expect(mockSvc.deliver).toHaveBeenCalledWith(
+        expect.any(String),
+        "call_start",
+        expect.objectContaining({ event: "call_start" }),
+      );
+    });
+
+    it("falls back to deliveries[0] when no delivery matches webhookId (L107 ?? branch)", async () => {
+      mockSvc.getWebhook.mockReturnValue(WEBHOOK_A);
+      // Delivery belongs to a different webhookId — thisDelivery will be undefined
+      const differentDelivery = { ...DELIVERY_A, deliveryId: "del-fallback", webhookId: "wh-other" };
+      mockSvc.deliver.mockResolvedValue([differentDelivery]);
+
+      const res = await httpRequest(server, "POST", "/webhooks/test", {
+        webhookId: "wh-001",
+        event: "call_start",
+      });
+
+      expect(res.status).toBe(200);
+      const data = res.json() as typeof differentDelivery;
+      // Should return deliveries[0] (del-fallback) since no delivery matched wh-001
+      expect(data.deliveryId).toBe("del-fallback");
+    });
+  });
+
+  // ── PATCH /webhooks/:id — full field coverage ─────────────────────
+
+  describe("PATCH /webhooks/:webhookId — field branches", () => {
+    it("passes events array to updateWebhook when provided (L140/L182 cond-expr typed branch)", async () => {
+      const updated = { ...WEBHOOK_A, events: ["call_end"] };
+      mockSvc.updateWebhook.mockReturnValue(updated);
+
+      const res = await httpRequest(server, "PATCH", "/webhooks/wh-001", {
+        events: ["call_end"],
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockSvc.updateWebhook).toHaveBeenCalledWith(
+        "wh-001",
+        expect.objectContaining({ events: ["call_end"] }),
+      );
+    });
+
+    it("passes secret string to updateWebhook when provided (L141/L185 cond-expr typed branch)", async () => {
+      const updated = { ...WEBHOOK_A, secret: "new-secret" };
+      mockSvc.updateWebhook.mockReturnValue(updated);
+
+      const res = await httpRequest(server, "PATCH", "/webhooks/wh-001", {
+        secret: "new-secret",
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockSvc.updateWebhook).toHaveBeenCalledWith(
+        "wh-001",
+        expect.objectContaining({ secret: "new-secret" }),
+      );
+    });
+
+    it("passes description string to updateWebhook when provided (L142/L187 cond-expr typed branch)", async () => {
+      const updated = { ...WEBHOOK_A, description: "Updated description" };
+      mockSvc.updateWebhook.mockReturnValue(updated);
+
+      const res = await httpRequest(server, "PATCH", "/webhooks/wh-001", {
+        description: "Updated description",
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockSvc.updateWebhook).toHaveBeenCalledWith(
+        "wh-001",
+        expect.objectContaining({ description: "Updated description" }),
+      );
+    });
+
+    it("passes url string to updateWebhook when provided (L140 url branch)", async () => {
+      const updated = { ...WEBHOOK_A, url: "https://updated.example.com/hook" };
+      mockSvc.updateWebhook.mockReturnValue(updated);
+
+      const res = await httpRequest(server, "PATCH", "/webhooks/wh-001", {
+        url: "https://updated.example.com/hook",
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockSvc.updateWebhook).toHaveBeenCalledWith(
+        "wh-001",
+        expect.objectContaining({ url: "https://updated.example.com/hook" }),
+      );
+    });
   });
 });
 
