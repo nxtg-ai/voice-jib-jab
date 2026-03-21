@@ -12333,3 +12333,41 @@ Dashboard: 46/46 SHIPPED.
 **Q41 (open)** — `/voice` route auth posture. No change without CoS call.
 
 Dashboard: 43/43 SHIPPED.
+
+---
+
+### Check-in 79 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-47: Structured Access Logger** — `createAccessLogger()` middleware writing one JSON line per completed HTTP request to stderr. Captures `ts`, `method`, `path`, `status`, `ms`, `requestId`. Uses `res.on("finish")` to guarantee final status code is captured. Skips `/health` by default (K8s probe spam prevention). Injectable `write` and `skip` options for full test isolation — no process.stderr contamination in tests. Mounted in `index.ts` after `requestIdMiddleware` so `req.requestId` is always populated before the logger captures it. 11 new tests in `AccessLogger.test.ts`, all green. 4,316 total. Commit: `8c6d450`. Dashboard: 47/47 SHIPPED.
+
+This also completes the full roadmap. Every initiative from N-01 through N-47 is SHIPPED.
+
+#### 2. What surprised me?
+
+**`res.on("finish")` vs `res.on("close")`** — the distinction matters. `finish` fires after the response is fully flushed to the socket. `close` fires when the socket closes, which can happen before `finish` on aborted connections. Using `finish` means the log line is only emitted for completed requests — the correct semantic for an access log. Aborted/mid-flight requests are silently skipped. Acceptable for now; worth noting if the team wants abort-visibility later.
+
+**The requestId availability pattern is fragile without enforced ordering.** `req.requestId` is set by `requestIdMiddleware` and read by `createAccessLogger` in the `finish` callback. The mount order in `index.ts` guarantees correctness, but the dependency is implicit — not enforced by the type system. If mount order were reversed, the logger would silently fall back to the raw header. Worth a one-line comment in `index.ts` near the logger mount.
+
+#### 3. Cross-project signals
+
+**This access logger pattern is directly portable.** Any ASIF Express project (dx3, synapps, etc.) can drop in `createAccessLogger` verbatim. The `requestId` field assumes `requestIdMiddleware` from the same middleware package — both travel together.
+
+**JSON-to-stderr over morgan is the right default for containerised services.** Morgan outputs combined/common Apache-style formats; container log drivers (fluentd, Loki, Datadog) work better with newline-delimited JSON. Any ASIF project running in K8s should prefer this pattern. Zero external dependency is also a bundle-size win.
+
+**Logging `requestId` with every access entry makes log correlation trivial.** Combined with `jsonErrorHandler` (N-45) which also logs `requestId` on 5xx, you can filter all logs by a single ID and reconstruct the full request lifecycle. This observability pairing is worth replicating across the portfolio.
+
+#### 4. What would I prioritize next?
+
+1. **CRUCIBLE idle audit** — 47 initiatives, 4,316 tests. The N-4x sprint added ~65 tests rapidly. Gate 2 (non-empty assertions) and Gate 5 (silent exception audit) on the new middleware tests would be the cleanest idle-time task.
+2. **`index.ts` mount-order comment** — the `requestIdMiddleware` → `createAccessLogger` dependency is implicit. One-line fix, two minutes. Low effort, real value for the next engineer.
+3. **N-12 plan cleanup** — the plan at `~/.claude/plans/keen-enchanting-yao.md` is stale (N-12 SHIPPED 2026-03-18). Worth archiving to avoid confusion on session restore.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change.
+
+**Q42 (new)** — The roadmap is complete (47/47). No standing backlog remains. Recommend the CoS either: (a) issue a new directive batch for the next phase, or (b) confirm the project enters maintenance mode with CRUCIBLE self-improvement as the standing idle protocol. Awaiting direction before self-starting new features.
+
+Dashboard: 47/47 SHIPPED.
