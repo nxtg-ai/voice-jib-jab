@@ -112,6 +112,8 @@ import { createWebhookRetryRouter } from "./api/webhookRetry.js";
 import { ApiKeyStore } from "./services/ApiKeyStore.js";
 import { createApiKeyMiddleware } from "./middleware/apiKeyAuth.js";
 import { createAuthRouter } from "./api/auth.js";
+import { AuditEventLogger } from "./services/AuditEventLogger.js";
+import { createAuditEventsRouter } from "./api/auditEvents.js";
 
 const app = express();
 const server = createServer(app);
@@ -132,6 +134,12 @@ app.use((_req, res, next) => {
   next();
 });
 
+// ── Audit Event Logger ────────────────────────────────────────────────
+const auditEventLogger = new AuditEventLogger(
+  resolve(dirname(config.storage.databasePath), "audit-events.jsonl"),
+);
+app.use("/audit", createAuditEventsRouter(auditEventLogger));
+
 // ── API Key Authentication ────────────────────────────────────────────
 // Disabled in dev by setting API_KEY_AUTH_ENABLED=false (default: enabled).
 const apiKeyStore = new ApiKeyStore(
@@ -140,6 +148,7 @@ const apiKeyStore = new ApiKeyStore(
 const requireApiKey = createApiKeyMiddleware(
   apiKeyStore,
   process.env.API_KEY_AUTH_ENABLED !== "false",
+  auditEventLogger,
 );
 app.use("/auth", createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
