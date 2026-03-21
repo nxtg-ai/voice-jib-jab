@@ -243,7 +243,6 @@ describe("IntentClassifier — confidence arithmetic invariants", () => {
   });
 
   it("fallback threshold: exactly 0.03 (3 matches in 100 words) does NOT trigger fallback", () => {
-    // "subscription" avoids the "payment"/"pay" substring overlap (both billing keywords)
     const text = ["refund", "invoice", "subscription", ...Array(97).fill("xxx")].join(" ");
     const result = classifier.classify(text);
     expect(result.scores.billing).toBe(3);
@@ -793,5 +792,76 @@ describe("HTTP DELETE /intents/config/:intent", () => {
     );
     expect(res.status).toBe(204);
     expect(store.getMapping("tenant-del", "support")).toBeUndefined();
+  });
+});
+
+// ── 12. Word-boundary regression tests (N-35 / Q40) ──────────────────
+// Verify that short keywords no longer match as substrings inside longer words.
+
+describe("IntentClassifier — word-boundary matching (N-35)", () => {
+  const classifier = new IntentClassifier();
+
+  it("'payment' does NOT also match the 'pay' keyword (billing score = 1 not 2)", () => {
+    // Pre-fix: both "payment" and "pay" would match → billing score 2
+    // Post-fix: only "payment" matches → billing score 1
+    const result = classifier.classify("I had a payment issue");
+    expect(result.scores.billing).toBe(1);
+  });
+
+  it("'pay' keyword matches the standalone word 'pay'", () => {
+    const result = classifier.classify("I need to pay now");
+    expect(result.scores.billing).toBeGreaterThanOrEqual(1);
+    // Verify "pay" is counted
+    const withPay = classifier.classify("pay");
+    expect(withPay.scores.billing).toBe(1);
+  });
+
+  it("'bug' keyword does NOT match inside 'debug'", () => {
+    const result = classifier.classify("how do I debug this issue");
+    // "debug" should not fire "bug"; "issue" should fire support = 1
+    expect(result.scores.support).toBe(1);
+  });
+
+  it("'fail' keyword does NOT match inside 'failure'", () => {
+    const result = classifier.classify("there was a failure in the system");
+    // "failure" should not match "fail"
+    expect(result.scores.support).toBe(0);
+  });
+
+  it("'bug' standalone word matches correctly", () => {
+    const result = classifier.classify("there is a bug");
+    expect(result.scores.support).toBeGreaterThanOrEqual(1);
+  });
+
+  it("'bill' does NOT match inside 'billing' (word boundary prevents it)", () => {
+    // "billing" is not itself a keyword; "bill" should not match inside it
+    const result = classifier.classify("billing question");
+    expect(result.scores.billing).toBe(0);
+  });
+
+  it("'bill' standalone keyword matches correctly", () => {
+    const result = classifier.classify("my bill is too high");
+    expect(result.scores.billing).toBeGreaterThanOrEqual(1);
+  });
+
+  it("multi-word keyword 'not working' still matches after word-boundary fix", () => {
+    const result = classifier.classify("the app is not working");
+    expect(result.scores.support).toBeGreaterThan(0);
+  });
+
+  it("multi-word keyword 'credit card' still matches after word-boundary fix", () => {
+    const result = classifier.classify("my credit card was declined");
+    expect(result.scores.billing).toBeGreaterThan(0);
+  });
+
+  it("'plan' does NOT match inside 'planning'", () => {
+    const result = classifier.classify("we are planning something");
+    expect(result.scores.sales).toBe(0);
+  });
+
+  it("'plan' standalone word matches sales intent", () => {
+    const result = classifier.classify("what is the pricing for the plan");
+    // "pricing" and "plan" both in sales keywords
+    expect(result.scores.sales).toBeGreaterThanOrEqual(2);
   });
 });

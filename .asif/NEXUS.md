@@ -44,6 +44,7 @@
 | N-32 | Session Endpoint Protection | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-33 | Analytics & Audit Access Control | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-34 | Remaining Route Protection Sweep | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-35 | IntentClassifier Word-Boundary Fix | INTERACTION | SHIPPED | P1 | 2026-03-21 |
 
 ---
 

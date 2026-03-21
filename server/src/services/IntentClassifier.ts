@@ -20,28 +20,47 @@ export interface IntentResult {
 
 // ── Keyword lists ──────────────────────────────────────────────────────
 
-const KEYWORDS: Record<Exclude<CallerIntent, "general">, ReadonlySet<string>> = {
-  billing: new Set([
+const KEYWORDS: Record<Exclude<CallerIntent, "general">, ReadonlyArray<string>> = {
+  billing: [
     "bill", "invoice", "payment", "charge", "refund", "subscription",
     "credit card", "pay", "pricing", "cost", "fee", "overcharge", "receipt",
-  ]),
-  support: new Set([
+  ],
+  support: [
     "help", "issue", "problem", "error", "broken", "not working", "fix",
     "stuck", "technical", "support", "crash", "bug", "fail",
-  ]),
-  sales: new Set([
+  ],
+  sales: [
     "buy", "purchase", "demo", "trial", "upgrade", "plan", "quote",
     "pricing", "interested", "product", "feature", "enterprise", "license",
-  ]),
-  complaint: new Set([
+  ],
+  complaint: [
     "complaint", "unhappy", "angry", "frustrated", "disappointed", "terrible",
     "awful", "unacceptable", "worst", "hate", "disgusted", "escalate",
     "manager", "sue",
-  ]),
+  ],
 };
 
 const SCORED_INTENTS = Object.keys(KEYWORDS) as Exclude<CallerIntent, "general">[];
 const CONFIDENCE_THRESHOLD = 0.03;
+
+/** Escape regex metacharacters in a literal string. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Pre-compiled word-boundary patterns for each keyword.
+ * Using \b anchors prevents short keywords (e.g. "pay") from matching
+ * inside longer words (e.g. "payment"). Multi-word phrases like "credit card"
+ * get \b at both phrase edges.
+ */
+const KEYWORD_PATTERNS: Record<Exclude<CallerIntent, "general">, ReadonlyArray<RegExp>> =
+  Object.fromEntries(
+    SCORED_INTENTS.map((intent) => [
+      intent,
+      KEYWORDS[intent].map((k) => new RegExp(`\\b${escapeRegex(k)}\\b`)),
+    ]),
+  ) as unknown as Record<Exclude<CallerIntent, "general">, ReadonlyArray<RegExp>>;
 
 // ── IntentClassifier ───────────────────────────────────────────────────
 
@@ -67,11 +86,13 @@ export class IntentClassifier {
       general: 0,
     };
 
-    // Score each non-general intent: 1 point per distinct keyword match
+    // Score each non-general intent: 1 point per distinct keyword match.
+    // Word-boundary patterns prevent short keywords (e.g. "pay") from
+    // falsely matching inside longer words (e.g. "payment").
     for (const intent of SCORED_INTENTS) {
       let intentScore = 0;
-      for (const keyword of KEYWORDS[intent]) {
-        if (lower.includes(keyword)) {
+      for (const pattern of KEYWORD_PATTERNS[intent]) {
+        if (pattern.test(lower)) {
           intentScore += 1;
         }
       }
