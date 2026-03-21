@@ -1154,3 +1154,336 @@ describe("Templates API — GET /:id/config coverage gaps", () => {
     expect(data.claims).toEqual(["config-test"]);
   });
 });
+
+// ── Branch coverage additions ──────────────────────────────────────────
+
+describe("Agent Templates API — branch coverage additions", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("branch-cov");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  // ── GET /templates — query param false branches (L44/L45/L47) ────────
+
+  it("GET /templates with non-string tenantId query param (array) returns 200", async () => {
+    // When Express receives ?tenantId[]=x the query value is an array, not a string.
+    // The ternary on L44 takes its false branch and tenantId becomes undefined.
+    const res = await httpRequest(server, "GET", "/templates?tenantId[]=x&tenantId[]=y");
+    expect(res.status).toBe(200);
+    const data = res.json() as { templates: unknown[]; count: number };
+    expect(Array.isArray(data.templates)).toBe(true);
+  });
+
+  it("GET /templates with non-string persona query param falls back to listing all", async () => {
+    // When persona is an array (e.g. ?persona[]=custom), the L45 ternary picks undefined,
+    // and the L47 isValidPersona check also resolves to undefined.
+    const res = await httpRequest(server, "GET", "/templates?persona[]=custom&persona[]=sales");
+    expect(res.status).toBe(200);
+    const data = res.json() as { templates: unknown[]; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(7);
+  });
+
+  it("GET /templates with invalid persona string filters nothing (invalid → undefined)", async () => {
+    // L47: isValidPersona(persona) === false → validPersona = undefined (all templates returned)
+    const res = await httpRequest(server, "GET", "/templates?persona=not_a_valid_persona");
+    expect(res.status).toBe(200);
+    const data = res.json() as { templates: unknown[]; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(7);
+  });
+
+  // ── GET /templates/marketplace — query param false branches (L61/L62) ─
+
+  it("GET /templates/marketplace with invalid persona returns all marketplace templates", async () => {
+    // L62: isValidPersona returns false → validPersona = undefined
+    const res = await httpRequest(server, "GET", "/templates/marketplace?persona=not_valid");
+    expect(res.status).toBe(200);
+    const data = res.json() as { templates: unknown[]; count: number };
+    expect(Array.isArray(data.templates)).toBe(true);
+  });
+
+  it("GET /templates/marketplace with array persona param falls back to all", async () => {
+    // L61: typeof req.query.persona !== 'string' → undefined
+    const res = await httpRequest(server, "GET", "/templates/marketplace?persona[]=sales");
+    expect(res.status).toBe(200);
+    const data = res.json() as { templates: unknown[]; count: number };
+    expect(Array.isArray(data.templates)).toBe(true);
+  });
+
+  // ── POST /templates — optional field false branches ───────────────────
+
+  it("POST /templates with non-array claims falls back to empty array (L107 false)", async () => {
+    // L107: isStringArray(body.claims) === false → claims = []
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "Claims Fallback Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: "not-an-array",
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { claims: unknown[] };
+    expect(data.claims).toEqual([]);
+  });
+
+  it("POST /templates with non-array disallowedPatterns falls back to empty array", async () => {
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "Patterns Fallback Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      disallowedPatterns: 42,
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { disallowedPatterns: unknown[] };
+    expect(data.disallowedPatterns).toEqual([]);
+  });
+
+  it("POST /templates without escalationRules uses defaults (L112 false branch)", async () => {
+    // L112: body.escalationRules is falsy → use default object
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "No Escalation Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as {
+      escalationRules: {
+        escalateOnFrustration: boolean;
+        escalateOnKeywords: string[];
+        maxTurnsBeforeEscalate: null;
+      };
+    };
+    expect(data.escalationRules.escalateOnFrustration).toBe(false);
+    expect(data.escalationRules.escalateOnKeywords).toEqual([]);
+    expect(data.escalationRules.maxTurnsBeforeEscalate).toBeNull();
+  });
+
+  it("POST /templates with escalationRules but non-array keywords falls back to [] (L115 false)", async () => {
+    // L115: isStringArray(escalateOnKeywords) === false → []
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "Bad Keywords Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      escalationRules: {
+        escalateOnFrustration: true,
+        escalateOnKeywords: "not-an-array",
+        maxTurnsBeforeEscalate: 10,
+      },
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as {
+      escalationRules: { escalateOnKeywords: string[]; maxTurnsBeforeEscalate: number };
+    };
+    expect(data.escalationRules.escalateOnKeywords).toEqual([]);
+    expect(data.escalationRules.maxTurnsBeforeEscalate).toBe(10);
+  });
+
+  it("POST /templates with escalationRules but non-number maxTurns falls back to null (L118 false)", async () => {
+    // L118: typeof maxTurnsBeforeEscalate !== 'number' → null
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "No MaxTurns Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      escalationRules: {
+        escalateOnFrustration: false,
+        escalateOnKeywords: ["help"],
+        maxTurnsBeforeEscalate: "ten",
+      },
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as {
+      escalationRules: { maxTurnsBeforeEscalate: null };
+    };
+    expect(data.escalationRules.maxTurnsBeforeEscalate).toBeNull();
+  });
+
+  it("POST /templates without ttsVoice falls back to 'nova'", async () => {
+    // Covers the false arm of the ttsVoice ternary on L111
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "Default Voice Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { ttsVoice: string };
+    expect(data.ttsVoice).toBe("nova");
+  });
+
+  it("POST /templates without tenantId results in null tenantId (L123 false)", async () => {
+    // L123: typeof body.tenantId !== 'string' → null
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "No Tenant Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      tenantId: 99,
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // ── PUT /templates/:id — patch field false branches ───────────────────
+
+  it("PUT /templates/:id with invalid persona skips persona patch (L151 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Persona Skip Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    const created = createRes.json() as { templateId: string; persona: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      persona: "not_valid_persona",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { persona: string };
+    // Persona unchanged because isValidPersona returned false
+    expect(data.persona).toBe("custom");
+  });
+
+  it("PUT /templates/:id with non-array claims skips claims patch (L153 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Claims Skip Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: ["original"],
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      claims: "not-an-array",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { claims: string[] };
+    // Claims unchanged because isStringArray returned false
+    expect(data.claims).toEqual(["original"]);
+  });
+
+  it("PUT /templates/:id with non-array disallowedPatterns skips patch (L154 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Patterns Skip Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      disallowedPatterns: ["bad-word"],
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      disallowedPatterns: 123,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { disallowedPatterns: string[] };
+    expect(data.disallowedPatterns).toEqual(["bad-word"]);
+  });
+
+  it("PUT /templates/:id with non-string ttsVoice skips ttsVoice patch (L158 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Voice Skip Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      ttsVoice: "alloy",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      ttsVoice: 42,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { ttsVoice: string };
+    expect(data.ttsVoice).toBe("alloy");
+  });
+
+  it("PUT /templates/:id with escalationRules having non-array keywords uses existing (L162 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Escalation Keywords Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      escalationRules: {
+        escalateOnFrustration: false,
+        escalateOnKeywords: ["help", "urgent"],
+        maxTurnsBeforeEscalate: null,
+      },
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      escalationRules: {
+        escalateOnKeywords: "not-an-array",
+      },
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as {
+      escalationRules: { escalateOnKeywords: string[] };
+    };
+    // Falls back to existing keywords
+    expect(data.escalationRules.escalateOnKeywords).toEqual(["help", "urgent"]);
+  });
+
+  it("PUT /templates/:id with escalationRules having non-number maxTurns uses existing (L165 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "MaxTurns Fallback Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      escalationRules: {
+        escalateOnFrustration: false,
+        escalateOnKeywords: [],
+        maxTurnsBeforeEscalate: 7,
+      },
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      escalationRules: {
+        maxTurnsBeforeEscalate: "seven",
+      },
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as {
+      escalationRules: { maxTurnsBeforeEscalate: number };
+    };
+    expect(data.escalationRules.maxTurnsBeforeEscalate).toBe(7);
+  });
+
+  it("PUT /templates/:id with non-string tenantId sets null (L171 false)", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Tenant Null Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      tenantId: "old-tenant",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      tenantId: 42,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // ── POST /templates/marketplace/:id/install — tenantId false branch ───
+
+  it("POST /marketplace/:id/install with non-string tenantId body returns 400 (L249/L250)", async () => {
+    // L249: body.tenantId is a number, not a string → !body.tenantId check passes but
+    // typeof body.tenantId !== 'string' → the validation on L250 fires 400
+    const res = await httpRequest(server, "POST", "/templates/marketplace/builtin-sales/install", {
+      tenantId: 99,
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("tenantId is required");
+  });
+});

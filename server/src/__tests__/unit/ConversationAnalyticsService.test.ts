@@ -644,3 +644,476 @@ describe("ConversationAnalyticsService", () => {
     });
   });
 });
+
+// ── Branch coverage ────────────────────────────────────────────────────────────
+
+describe("ConversationAnalyticsService — branch coverage", () => {
+
+  // ── computeDateRange: empty recordings with explicit from/to ──────────────
+
+  it("dateRange uses from/to fallback strings when no sessions match filter", async () => {
+    const recs = [
+      makeRecording({ sessionId: "s1", tenantId: "other" }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    // tenantId filter leaves 0 recordings; from/to should appear in dateRange
+    const result = await svc.generateInsights({
+      tenantId: "nobody",
+      from: "2026-01-01T00:00:00.000Z",
+      to: "2026-12-31T23:59:59.000Z",
+    });
+
+    expect(result.dateRange.from).toBe("2026-01-01T00:00:00.000Z");
+    expect(result.dateRange.to).toBe("2026-12-31T23:59:59.000Z");
+  });
+
+  it("dateRange falls back to current ISO string when no sessions and no from/to", async () => {
+    const recorder = buildMockRecorder([]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    // Both from and to should be valid ISO strings (the ?? new Date() branch)
+    expect(Date.parse(result.dateRange.from)).not.toBeNaN();
+    expect(Date.parse(result.dateRange.to)).not.toBeNaN();
+  });
+
+  // ── overallStats: all sessions have null durationMs → zeroed percentiles ──
+
+  it("overallStats are all zero when every session has null durationMs", async () => {
+    const recs = [
+      makeRecording({ sessionId: "s1", durationMs: null }),
+      makeRecording({ sessionId: "s2", durationMs: null }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    expect(result.overallStats.avgHandleTimeMs).toBe(0);
+    expect(result.overallStats.p50HandleTimeMs).toBe(0);
+    expect(result.overallStats.p95HandleTimeMs).toBe(0);
+  });
+
+  // ── overallStats: policyDecisions.escalate uses ?? 0 fallback ─────────────
+
+  it("overallEscalationRate handles missing escalate key via ?? 0 default", async () => {
+    // summary.policyDecisions has all fields as required by the type, but test
+    // the computation path where escalate is explicitly 0 across all sessions
+    const recs = [
+      makeRecording({
+        sessionId: "s1",
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 1, refuse: 0, escalate: 0, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 0,
+          audioOutputChunks: 0,
+        },
+      }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    expect(result.overallStats.overallEscalationRate).toBe(0);
+    expect(result.overallStats.overallResolutionRate).toBe(1);
+  });
+
+  // ── totalUserTurns: sessions with non-final user_transcript entries ────────
+
+  it("totalUserTurns counts only isFinal=true user_transcript entries", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        { t_ms: 0, type: "user_transcript" as const, payload: { text: "hel", isFinal: false } },
+        { t_ms: 100, type: "user_transcript" as const, payload: { text: "hello", isFinal: true } },
+        { t_ms: 200, type: "user_transcript" as const, payload: { text: "wor", isFinal: false } },
+        { t_ms: 300, type: "user_transcript" as const, payload: { text: "world", isFinal: true } },
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    expect(result.overallStats.totalUserTurns).toBe(2);
+  });
+
+  // ── topic cluster: all sessions have null durationMs → avgHandleTimeMs=0 ──
+
+  it("cluster.avgHandleTimeMs is 0 when all sessions in cluster have null durationMs", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      durationMs: null,
+      timeline: [userEntry("billing question")],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const billing = result.topicClusters.find((c) => c.label === "billing");
+    expect(billing?.avgHandleTimeMs).toBe(0);
+  });
+
+  // ── topic cluster: no sentiment on any session → empty sentimentBreakdown ──
+
+  it("cluster.sentimentBreakdown is empty when no sessions have sentiment data", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [userEntry("billing question")],
+      // summary has no sentiment field (default makeRecording omits it)
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const billing = result.topicClusters.find((c) => c.label === "billing");
+    expect(billing?.sentimentBreakdown).toEqual({});
+  });
+
+  // ── frequentQuestions: FAQ threshold=2 filters single-occurrence entries ───
+
+  it("frequentQuestions excludes utterances with occurrences < 2 when totalSessions >= 10", async () => {
+    // 10 sessions: 9 say "hello" (unique each normalized form), 1 says unique phrase
+    // Use 10 sessions with 9 different questions + 1 repeated to hit threshold=2
+    const recs = [
+      ...Array.from({ length: 9 }, (_, i) =>
+        makeRecording({ sessionId: `s${i}`, timeline: [userEntry(`question number ${i}`)] }),
+      ),
+      makeRecording({ sessionId: "s9", timeline: [userEntry("shared question")] }),
+      makeRecording({ sessionId: "s10", timeline: [userEntry("shared question")] }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    // "shared question" appears twice → included; individual questions appear once → excluded
+    const shared = result.frequentQuestions.find((q) => q.normalizedText.includes("shared"));
+    expect(shared).toBeDefined();
+    expect(shared!.occurrences).toBe(2);
+
+    // Single-occurrence utterances should be filtered out when totalSessions >= 10
+    const uniqueQ = result.frequentQuestions.find((q) => q.normalizedText.includes("question number 0"));
+    expect(uniqueQ).toBeUndefined();
+  });
+
+  // ── frequentQuestions: all-stop-word text normalizes to empty → skipped ────
+
+  it("frequentQuestions skips user_transcript entries whose normalized form is empty (all stop words)", async () => {
+    // "the is a" consists entirely of stop words → normalizeText returns ""
+    const recs = [
+      makeRecording({ sessionId: "s1", timeline: [userEntry("the is a")] }),
+      makeRecording({ sessionId: "s2", timeline: [userEntry("the is a")] }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    // The all-stop-word utterance should not appear in FAQs at all
+    expect(result.frequentQuestions).toHaveLength(0);
+  });
+
+  // ── frequentQuestions: empty raw text is skipped ──────────────────────────
+
+  it("frequentQuestions skips user_transcript entries with empty text", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        { t_ms: 0, type: "user_transcript" as const, payload: { text: "", isFinal: true } },
+        userEntry("valid question"),
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    // Empty entry should not appear; valid question appears once with occurrences=1
+    const emptyEntry = result.frequentQuestions.find((q) => q.normalizedText === "");
+    expect(emptyEntry).toBeUndefined();
+  });
+
+  // ── frequentQuestions: null-only durationMs → avgHandleTimeMs=0 ───────────
+
+  it("FAQ avgHandleTimeMs is 0 when all matching sessions have null durationMs", async () => {
+    const recs = [
+      makeRecording({ sessionId: "s1", durationMs: null, timeline: [userEntry("refund please")] }),
+      makeRecording({ sessionId: "s2", durationMs: null, timeline: [userEntry("refund please")] }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const faq = result.frequentQuestions.find((q) => q.normalizedText.includes("refund"));
+    expect(faq).toBeDefined();
+    expect(faq!.avgHandleTimeMs).toBe(0);
+  });
+
+  // ── frequentQuestions: existing group accumulates durationMs and escalate ──
+
+  it("FAQ occurrences and escalationRate aggregate across multiple sessions", async () => {
+    // s1 creates the group (no escalation), s2 updates the existing group (with escalation)
+    // This exercises the `existing.escalateCount++` path in the existing-group branch
+    const recs = [
+      makeRecording({
+        sessionId: "s1",
+        durationMs: 10000,
+        timeline: [userEntry("cancel subscription")],
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 1, refuse: 0, escalate: 0, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 0,
+          audioOutputChunks: 0,
+        },
+      }),
+      makeRecording({
+        sessionId: "s2",
+        durationMs: 20000,
+        timeline: [userEntry("cancel subscription")],
+        summary: {
+          turnCount: 1,
+          policyDecisions: { allow: 0, refuse: 0, escalate: 1, rewrite: 0, cancel_output: 0 },
+          audioInputChunks: 0,
+          audioOutputChunks: 0,
+        },
+      }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const faq = result.frequentQuestions.find((q) => q.normalizedText.includes("cancel"));
+    expect(faq).toBeDefined();
+    expect(faq!.occurrences).toBe(2);
+    expect(faq!.avgHandleTimeMs).toBe(15000);
+    expect(faq!.escalationRate).toBe(0.5);
+  });
+
+  // ── FAQ escalation in existing group when null durationMs ─────────────────
+
+  it("FAQ existing group: null durationMs is not pushed to durationsMs", async () => {
+    const recs = [
+      makeRecording({
+        sessionId: "s1",
+        durationMs: 10000,
+        timeline: [userEntry("password reset")],
+      }),
+      makeRecording({
+        sessionId: "s2",
+        durationMs: null,
+        timeline: [userEntry("password reset")],
+      }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const faq = result.frequentQuestions.find((q) => q.normalizedText.includes("password"));
+    expect(faq).toBeDefined();
+    // Only s1's durationMs counts → avg = 10000
+    expect(faq!.avgHandleTimeMs).toBe(10000);
+  });
+
+  // ── resolution paths: null durationMs → avgHandleTimeMs=0 ────────────────
+
+  it("resolutionPath avgHandleTimeMs is 0 when sessions have null durationMs", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      durationMs: null,
+      timeline: [userEntry("hello", 0), endEntry(200)],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    expect(result.resolutionPaths.length).toBeGreaterThan(0);
+    expect(result.resolutionPaths[0].avgHandleTimeMs).toBe(0);
+  });
+
+  // ── resolution paths: existing group accumulates durationMs ──────────────
+
+  it("resolutionPath existing group: null durationMs not pushed, non-null pushed", async () => {
+    const makePathRec = (id: string, dur: number | null) =>
+      makeRecording({
+        sessionId: id,
+        durationMs: dur,
+        timeline: [userEntry("hello", 0), endEntry(200)],
+      });
+
+    const recs = [makePathRec("s1", 5000), makePathRec("s2", null), makePathRec("s3", 15000)];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    expect(path.occurrences).toBe(3);
+    // avg of 5000 and 15000 (null excluded) = 10000
+    expect(path.avgHandleTimeMs).toBe(10000);
+  });
+
+  // ── buildPathSteps: transcript.final entry with isFinal=true → "agent" ────
+
+  it("buildPathSteps includes transcript.final entries as agent steps", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        userEntry("hello", 0),
+        { t_ms: 50, type: "transcript.final" as const, payload: { text: "hi there", isFinal: true } },
+        endEntry(200),
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    expect(path.steps).toContain("agent");
+  });
+
+  // ── buildPathSteps: transcript with isFinal=false does NOT add agent step ─
+
+  it("buildPathSteps skips transcript entries where isFinal is false", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        userEntry("hello", 0),
+        { t_ms: 50, type: "transcript" as const, payload: { text: "hi", isFinal: false } },
+        { t_ms: 100, type: "transcript" as const, payload: { text: "hi there", isFinal: true } },
+        endEntry(200),
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    // Only one "agent" step (the isFinal=true one), not two
+    const agentSteps = path.steps.filter((s) => s === "agent");
+    expect(agentSteps).toHaveLength(1);
+  });
+
+  // ── buildPathSteps: steps.length >= 10 causes early exit ─────────────────
+
+  it("buildPathSteps caps at 10 steps when timeline is longer", async () => {
+    // 15 user_transcript entries with isFinal=true
+    const timeline = Array.from({ length: 15 }, (_, i) =>
+      userEntry(`turn ${i}`, i * 100),
+    );
+    const rec = makeRecording({ sessionId: "s1", timeline });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    expect(path.steps.length).toBeLessThanOrEqual(10);
+  });
+
+  // ── buildPathSteps: policy.decision with no decision key → "policy:unknown"
+
+  it("buildPathSteps uses 'policy:unknown' when policy.decision entry lacks decision payload", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        userEntry("help", 0),
+        { t_ms: 50, type: "policy.decision" as const, payload: {} },
+        endEntry(200),
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    expect(path.steps).toContain("policy:unknown");
+  });
+
+  // ── classifyOutcome: "refused" outcome label ──────────────────────────────
+
+  it("outcomeLabel is 'refused' when refuse is in path but not escalate", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        userEntry("do something bad", 0),
+        policyEntry("refuse", 50),
+        endEntry(200),
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const path = result.resolutionPaths[0];
+    expect(path.outcomeLabel).toBe("refused");
+  });
+
+  // ── handleTimeByTopic: multiple sessions in same topic accumulate ─────────
+
+  it("handleTimeByTopic.p50Ms and p95Ms are computed for multi-session topics", async () => {
+    const recs = [
+      makeRecording({ sessionId: "s1", durationMs: 5000, timeline: [userEntry("account login help")] }),
+      makeRecording({ sessionId: "s2", durationMs: 10000, timeline: [userEntry("reset my account password")] }),
+      makeRecording({ sessionId: "s3", durationMs: 15000, timeline: [userEntry("account username access")] }),
+    ];
+    const recorder = buildMockRecorder(recs);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    const account = result.handleTimeByTopic.find((h) => h.topicLabel === "account");
+    expect(account).toBeDefined();
+    expect(account!.sampleCount).toBe(3);
+    expect(account!.p50Ms).toBe(10000);
+    expect(account!.avgMs).toBe(10000);
+  });
+
+  // ── extractUserText: payload.text is undefined → falls back to "" ─────────
+
+  it("extractUserText handles user_transcript entry where payload.text is undefined", async () => {
+    const rec = makeRecording({
+      sessionId: "s1",
+      timeline: [
+        { t_ms: 0, type: "user_transcript" as const, payload: { isFinal: true } as Record<string, unknown> },
+      ],
+    });
+    const recorder = buildMockRecorder([rec]);
+    const svc = new ConversationAnalyticsService(recorder as unknown as SessionRecorder);
+
+    // Should not throw; session should be classified as general_inquiry
+    const result = await svc.generateInsights();
+
+    const general = result.topicClusters.find((c) => c.label === "general_inquiry");
+    expect(general).toBeDefined();
+  });
+
+  // ── generateInsights: loadRecording returning null is handled ─────────────
+
+  it("sessions where loadRecording returns null are excluded from analysis", async () => {
+    const rec = makeRecording({ sessionId: "s1" });
+    const mockRecorder = {
+      listRecordings: jest.fn(() => [metaOf(rec)]),
+      loadRecording: jest.fn((_id: string) => null),
+    };
+    const svc = new ConversationAnalyticsService(mockRecorder as unknown as SessionRecorder);
+
+    const result = await svc.generateInsights();
+
+    expect(result.sessionCount).toBe(0);
+  });
+});

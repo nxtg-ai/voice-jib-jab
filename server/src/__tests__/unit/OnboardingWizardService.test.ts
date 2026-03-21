@@ -464,6 +464,26 @@ describe("OnboardingWizardService", () => {
     });
   });
 
+  // ── goBack from complete ───────────────────────────────────────────
+
+  describe("goBack() from complete step", () => {
+    it("un-completes the session and moves back to test_call", () => {
+      const session = svc.createSession("org_goback");
+      svc.completeStep(session.sessionId, { tenantName: "GoBack" });
+      svc.completeStep(session.sessionId, { language: "en" });
+      svc.completeStep(session.sessionId, { claimsEntries: [] });
+      svc.completeStep(session.sessionId, { escalationThreshold: 5 });
+      svc.completeStep(session.sessionId, { testCallSuccess: true, testCallNotes: "ok" });
+
+      expect(svc.getSession(session.sessionId)!.currentStep).toBe("complete");
+
+      const updated = svc.goBack(session.sessionId);
+      expect(updated.currentStep).toBe("test_call");
+      expect(updated.complete).toBe(false);
+      expect(updated.completedAt).toBeUndefined();
+    });
+  });
+
   // ── singleton proxy ───────────────────────────────────────────────
 
   describe("singleton proxy", () => {
@@ -495,5 +515,146 @@ describe("OnboardingWizardService", () => {
         if (existsSync(f)) rmSync(f, { force: true });
       }
     });
+  });
+});
+
+// ── OnboardingWizardService — branch coverage ─────────────────────────
+
+describe("OnboardingWizardService — branch coverage", () => {
+  let svc: OnboardingWizardService;
+  let file: string;
+
+  beforeEach(() => {
+    file = join(
+      tmpdir(),
+      `onboarding-branch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
+    svc = new OnboardingWizardService(file);
+  });
+
+  afterEach(() => {
+    if (existsSync(file)) {
+      rmSync(file, { force: true });
+    }
+  });
+
+  // Branch: validatePayload switch — "complete" arm (never validated in normal flow)
+  // The "complete" arm is reached when completeStep() is called on a session already
+  // at currentStep="complete" — the guard `if (current === "complete") return session`
+  // short-circuits before validate, so we need to call completeStep on a complete session.
+  it('completeStep() on already-complete session returns immediately without throwing', () => {
+    const session = svc.createSession("org_complete_branch");
+    // Advance through all 5 steps
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+    svc.completeStep(session.sessionId, { language: "en" });
+    svc.completeStep(session.sessionId, { claimsEntries: [] });
+    svc.completeStep(session.sessionId, { escalationThreshold: 3 });
+    svc.completeStep(session.sessionId, { testCallSuccess: false, testCallNotes: "failed" });
+
+    const done = svc.getSession(session.sessionId)!;
+    expect(done.currentStep).toBe("complete");
+
+    // Call completeStep again — must not throw; returns the same session
+    expect(() => svc.completeStep(session.sessionId, {})).not.toThrow();
+    const still = svc.getSession(session.sessionId)!;
+    expect(still.currentStep).toBe("complete");
+  });
+
+  // Branch: skipStep() on already-complete session returns immediately
+  it('skipStep() on already-complete session returns without advancing', () => {
+    const session = svc.createSession("org_skip_complete");
+    svc.completeStep(session.sessionId, { tenantName: "X" });
+    svc.completeStep(session.sessionId, { language: "en" });
+    svc.completeStep(session.sessionId, { claimsEntries: [] });
+    svc.completeStep(session.sessionId, { escalationThreshold: 1 });
+    svc.completeStep(session.sessionId, { testCallSuccess: true, testCallNotes: "ok" });
+
+    expect(() => svc.skipStep(session.sessionId)).not.toThrow();
+    expect(svc.getSession(session.sessionId)!.currentStep).toBe("complete");
+  });
+
+  // Branch: extractStepData switch default arm — called with step="complete"
+  // This is internally reached only when completeStep is called on "complete" step, but
+  // the guard returns early. We cover the equivalent path: after all steps are done,
+  // extractStepData is invoked for each step type. The default arm covers any unknown
+  // step value; we trigger it indirectly by confirming no error is thrown for "complete".
+  // Since the default arm is inside private extractStepData, we test via the public API
+  // boundary: completing the session exercises all switch arms except default.
+  // The default arm is exercised when currentStep is "complete" and completeStep is called
+  // — but the early return prevents reaching extractStepData. Coverage tools sometimes
+  // count the default as hit via the switch statement itself. We add this test to ensure
+  // testCallNotes nullish coalescing branch ("" fallback) is hit:
+
+  // Branch: testCallNotes ?? "" — the "" fallback when notes is undefined
+  it('completeStep() for test_call stores empty string for notes when testCallNotes is omitted', () => {
+    const session = svc.createSession("org_notes_branch");
+    svc.completeStep(session.sessionId, { tenantName: "Notes" });
+    svc.completeStep(session.sessionId, { language: "en" });
+    svc.completeStep(session.sessionId, { claimsEntries: [] });
+    svc.completeStep(session.sessionId, { escalationThreshold: 2 });
+
+    // testCallNotes intentionally omitted — triggers the ?? "" fallback
+    const done = svc.completeStep(session.sessionId, { testCallSuccess: true });
+
+    expect(done.testCallResult).toBeDefined();
+    expect(done.testCallResult!.notes).toBe("");
+    expect(done.testCallResult!.latencyMs).toBeUndefined();
+  });
+
+  // Branch: load() — non-ENOENT error is re-thrown
+  it('constructor re-throws non-ENOENT filesystem errors', () => {
+    const fs = require("fs");
+    const original = fs.readFileSync;
+    const permErr = Object.assign(new Error("Permission denied"), { code: "EACCES" });
+    // Make readFileSync throw EACCES so the file "exists" but can't be read
+    fs.readFileSync = () => { throw permErr; };
+
+    try {
+      expect(() => new OnboardingWizardService(file)).toThrow("Permission denied");
+    } finally {
+      fs.readFileSync = original;
+    }
+  });
+
+  // Branch: nextStep() — idx === -1 or idx >= length-1
+  it('nextStep returns "complete" when called from the last real step', () => {
+    const session = svc.createSession("org_nextstep");
+    // Advance to test_call (the last real step)
+    svc.completeStep(session.sessionId, { tenantName: "T" });
+    svc.completeStep(session.sessionId, { language: "en" });
+    svc.completeStep(session.sessionId, { claimsEntries: [] });
+    svc.completeStep(session.sessionId, { escalationThreshold: 0 });
+
+    expect(svc.getSession(session.sessionId)!.currentStep).toBe("test_call");
+
+    const done = svc.completeStep(session.sessionId, { testCallSuccess: true, testCallNotes: "ok" });
+    expect(done.currentStep).toBe("complete");
+    expect(done.complete).toBe(true);
+  });
+
+  // Branch: goBack() prevStep — prevStepState.status !== "pending" sets "in_progress"
+  it('goBack() sets previous step to in_progress when its status was complete', () => {
+    const session = svc.createSession("org_inprogress");
+    // Complete tenant_registration so it becomes "complete", then go back
+    svc.completeStep(session.sessionId, { tenantName: "Acme" });
+    expect(svc.getSession(session.sessionId)!.currentStep).toBe("voice_configuration");
+
+    const backed = svc.goBack(session.sessionId);
+    expect(backed.currentStep).toBe("tenant_registration");
+    const regStep = backed.steps.find((s) => s.step === "tenant_registration");
+    expect(regStep!.status).toBe("in_progress");
+  });
+
+  // Branch: goBack() prevStep — status is already "pending", no change
+  it('goBack() does not change step status when it is already pending', () => {
+    const session = svc.createSession("org_pending_back");
+    // Do not complete any step — tenant_registration is pending
+    // Going back from tenant_registration stays there (idx=0 → STEP_ORDER[0])
+    svc.goBack(session.sessionId);
+    const s = svc.getSession(session.sessionId)!;
+    expect(s.currentStep).toBe("tenant_registration");
+    const regStep = s.steps.find((step) => step.step === "tenant_registration");
+    // status remains "pending" (the !== "pending" branch not taken)
+    expect(regStep!.status).toBe("pending");
   });
 });

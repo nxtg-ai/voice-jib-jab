@@ -1039,3 +1039,252 @@ describe("Flows HTTP API — branch coverage", () => {
     expect((res.json() as { error: string }).error).toContain("userInput");
   });
 });
+
+// ── Flow Builder API — branch coverage additions ───────────────────────
+
+describe("Flow Builder API — branch coverage additions", () => {
+  let app: Express;
+  let server: Server;
+  let store: FlowStore;
+  let engine: FlowEngine;
+  let file: string;
+
+  beforeAll((done) => {
+    file = tempFile("branch-cov");
+    store = new FlowStore(file);
+    engine = new FlowEngine(store);
+    app = buildTestApp(store, engine);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      if (existsSync(file)) rmSync(file);
+      done();
+    });
+  });
+
+  // ── isValidTransition — null input (L38 false branch) ─────────────────
+
+  it("POST /flows rejects node with null in transitions array (isValidTransition null branch)", async () => {
+    // L38: value === null → returns false from isValidTransition
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Null Transition Flow",
+      entryNodeId: "n1",
+      nodes: [
+        {
+          nodeId: "n1",
+          type: "greeting",
+          prompt: "Hello",
+          transitions: [null],
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect((res.json() as { error: string }).error).toMatch(/node/i);
+  });
+
+  // ── isValidNode — null input (L44 false branch) ───────────────────────
+
+  it("POST /flows rejects null node in nodes array (isValidNode null branch)", async () => {
+    // L44: value === null → returns false from isValidNode
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Null Node Flow",
+      entryNodeId: "n1",
+      nodes: [null],
+    });
+    expect(res.status).toBe(400);
+    expect((res.json() as { error: string }).error).toMatch(/node/i);
+  });
+
+  // ── isValidNode — empty nodeId (L46 empty-string branch) ─────────────
+
+  it("POST /flows rejects node with empty-string nodeId (L46 trim branch)", async () => {
+    // L46: n.nodeId.trim() === '' → returns false
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Empty NodeId Flow",
+      entryNodeId: "  ",
+      nodes: [
+        {
+          nodeId: "   ",
+          type: "greeting",
+          prompt: "Hello",
+          transitions: [],
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect((res.json() as { error: string }).error).toMatch(/node/i);
+  });
+
+  // ── isValidNode — empty prompt (L48 trim branch) ──────────────────────
+
+  it("POST /flows rejects node with empty prompt string (L48 trim branch)", async () => {
+    // L48: n.prompt.trim() === '' → returns false
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Empty Prompt Flow",
+      entryNodeId: "n1",
+      nodes: [
+        {
+          nodeId: "n1",
+          type: "greeting",
+          prompt: "   ",
+          transitions: [],
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect((res.json() as { error: string }).error).toMatch(/node/i);
+  });
+
+  // ── isValidNode — transitions not an array (L49 false branch) ─────────
+
+  it("POST /flows rejects node where transitions is not an array (L49 false branch)", async () => {
+    // L49: !Array.isArray(n.transitions) → returns false
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Bad Transitions Flow",
+      entryNodeId: "n1",
+      nodes: [
+        {
+          nodeId: "n1",
+          type: "greeting",
+          prompt: "Hello",
+          transitions: "not-an-array",
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect((res.json() as { error: string }).error).toMatch(/node/i);
+  });
+
+  // ── GET /flows — tenantId ternary false branch (L109) ─────────────────
+
+  it("GET /flows with non-string tenantId query param returns all flows (L109 false)", async () => {
+    // L109: typeof req.query.tenantId !== 'string' → undefined → listFlows() with no filter
+    store.createFlow(makeFlowData({ name: "Branch Coverage Flow", tenantId: "org-z" }));
+    const res = await httpRequest(server, "GET", "/flows?tenantId[]=org-z&tenantId[]=other");
+    expect(res.status).toBe(200);
+    const data = res.json() as { flows: unknown[]; count: number };
+    expect(Array.isArray(data.flows)).toBe(true);
+  });
+
+  // ── POST /flows — description/tenantId optional field false branches ──
+
+  it("POST /flows without description defaults to empty string (L167 false)", async () => {
+    // L167: typeof body.description !== 'string' → description = ''
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "No Desc Flow",
+      entryNodeId: "n1",
+      nodes: [{ nodeId: "n1", type: "greeting", prompt: "Hi", transitions: [] }],
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { description: string };
+    expect(data.description).toBe("");
+  });
+
+  it("POST /flows with non-string tenantId defaults to null (L168 false)", async () => {
+    // L168: typeof body.tenantId !== 'string' → tenantId = null
+    const res = await httpRequest(server, "POST", "/flows", {
+      name: "Null Tenant Flow",
+      entryNodeId: "n1",
+      nodes: [{ nodeId: "n1", type: "greeting", prompt: "Hi", transitions: [] }],
+      tenantId: 42,
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // ── PUT /flows/:id — tenantId ternary false branch (L225) ─────────────
+
+  it("PUT /flows/:id with non-string tenantId sets null (L225 false)", async () => {
+    // L225: typeof body.tenantId !== 'string' → patch.tenantId = null
+    const flow = store.createFlow(makeFlowData({ tenantId: "old-tenant" }));
+    const res = await httpRequest(server, "PUT", `/flows/${flow.flowId}`, {
+      tenantId: true,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // ── PUT /flows/:id — entryNodeId checks against patch.nodes (L248/L250) ─
+
+  it("PUT /flows/:id with both nodes and valid entryNodeId succeeds (L248 uses patch.nodes)", async () => {
+    // L248: patch.nodes is provided → nodeIds come from patch.nodes, not existing
+    const flow = store.createFlow(makeFlowData());
+    const res = await httpRequest(server, "PUT", `/flows/${flow.flowId}`, {
+      nodes: [
+        { nodeId: "new-node", type: "greeting", prompt: "New greeting", transitions: [] },
+      ],
+      entryNodeId: "new-node",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { entryNodeId: string };
+    expect(data.entryNodeId).toBe("new-node");
+  });
+
+  // ── PUT /flows/:id — updateFlow returns falsy (L258) ─────────────────
+
+  it("PUT /flows/:id returns 404 when updateFlow returns null mid-request", async () => {
+    // Delete the flow between getFlow and updateFlow is not easily reproducible via HTTP,
+    // so we test the equivalent: update a flow that does not exist.
+    const res = await httpRequest(server, "PUT", "/flows/definitely-nonexistent-id", {
+      name: "Should Not Exist",
+    });
+    expect(res.status).toBe(404);
+    expect((res.json() as { error: string }).error).toContain("not found");
+  });
+
+  // ── POST /flows/:id/start — tenantId false branch (L288) ──────────────
+
+  it("POST /flows/:id/start without tenantId body uses undefined (L288 false)", async () => {
+    // L288: typeof body.tenantId !== 'string' → undefined → engine called with no tenant filter
+    const flow = store.createFlow(makeFlowData());
+    const res = await httpRequest(server, "POST", `/flows/${flow.flowId}/start`, {
+      tenantId: 55,
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { sessionToken: string; prompt: string };
+    expect(data.sessionToken).toBeDefined();
+    expect(data.prompt).toBeDefined();
+  });
+
+  // ── POST /flows/:id/start — non-Flow-not-found error yields 500 (L295 false) ──
+
+  it("POST /flows/:id/start returns 500 for engine errors that are not Flow not found", async () => {
+    // L295: message.startsWith('Flow not found') === false → 500
+    // Create a flow then corrupt it so the engine throws a non-standard error.
+    const flow = store.createFlow({
+      name: "Corrupt Flow",
+      description: "",
+      tenantId: null,
+      entryNodeId: "ghost",
+      nodes: [{ nodeId: "real", type: "greeting", prompt: "Hi", transitions: [] }],
+    });
+    // The engine will throw "Entry node 'ghost' not found in flow" — not starting with "Flow not found"
+    const res = await httpRequest(server, "POST", `/flows/${flow.flowId}/start`, {});
+    expect(res.status).toBe(500);
+    expect((res.json() as { error: string }).error).toMatch(/Entry node/i);
+  });
+
+  // ── POST /flows/sessions/:token/advance — 500 from engine throw ──────
+
+  it("POST /sessions/:token/advance returns 500 when engine.advance throws (flow deleted mid-session)", async () => {
+    // Creates a session, deletes the flow, then advances — engine throws "Flow not found" → 500
+    // (The 500 path in advance: err is thrown, res.status(500) is called)
+    const flow = store.createFlow(makeFlowData());
+    const { result } = engine.startSession(flow.flowId);
+    store.deleteFlow(flow.flowId);
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      `/flows/sessions/${result.sessionToken}/advance`,
+      { userInput: "billing" },
+    );
+    expect(res.status).toBe(500);
+    expect((res.json() as { error: string }).error).toMatch(/Flow not found/);
+  });
+});

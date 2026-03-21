@@ -954,6 +954,343 @@ describe("IVR API — coverage gaps", () => {
   });
 });
 
+// ── HTTP helper: no-body request (no Content-Type) ─────────────────────
+
+function httpNoBody(
+  server: Server,
+  method: string,
+  path: string,
+): Promise<HttpResponse> {
+  return new Promise((resolve, reject) => {
+    const addr = server.address();
+    if (!addr || typeof addr === "string") {
+      return reject(new Error("Server not listening"));
+    }
+    const options = {
+      hostname: "127.0.0.1",
+      port: (addr as { port: number }).port,
+      path,
+      method,
+      headers: {} as Record<string, string>,
+    };
+    import("http").then(({ default: http }) => {
+      const req = http.request(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const rawBody = Buffer.concat(chunks).toString("utf-8");
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers as Record<string, string | string[] | undefined>,
+            body: rawBody,
+            json: () => JSON.parse(rawBody),
+          });
+        });
+      });
+      req.on("error", reject);
+      req.end();
+    });
+  });
+}
+
+// ── IVR Menu API — branch coverage additions ──────────────────────────
+
+describe("IVR Menu API — branch coverage additions", () => {
+  let app: ReturnType<typeof buildTestApp>;
+  let server: Server;
+  let store: IvrMenuStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("branch");
+    store = new IvrMenuStore(storageFile);
+    app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  // Branch: POST /menus — req.body ?? {} fallback (no Content-Type, no body)
+  it("POST /ivr/menus returns 400 on no-body request (req.body ?? {} fallback)", async () => {
+    const res = await httpNoBody(server, "POST", "/ivr/menus");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/name/);
+  });
+
+  // Branch: PUT /menus/:menuId — req.body ?? {} fallback (no Content-Type)
+  it("PUT /ivr/menus/:menuId returns 404 on no-body request (req.body ?? {} fallback)", async () => {
+    const res = await httpNoBody(server, "PUT", "/ivr/menus/nonexistent");
+    // No body → getMenu returns undefined → 404
+    expect(res.status).toBe(404);
+  });
+
+  // Branch: POST /menus/:menuId/process — req.body ?? {} fallback
+  it("POST /ivr/menus/:menuId/process returns 400 on no-body request", async () => {
+    const menu = store.createMenu({
+      name: "Process No Body",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "menu", prompt: "Hi", tenantId: null } },
+    });
+    const res = await httpNoBody(server, "POST", `/ivr/menus/${menu.menuId}/process`);
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodeId/);
+  });
+
+  // Branch: PUT /menus/:menuId — body.name is undefined (arm[1] of && check)
+  it("PUT /ivr/menus/:menuId with no name field leaves name unchanged (body.name===undefined path)", async () => {
+    const menu = store.createMenu({
+      name: "Unchanged Name",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Hello", tenantId: null } },
+    });
+
+    // Send a PUT with no name field to trigger arm[1] of (body.name !== undefined && ...)
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      rootNodeId: "root",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { name: string };
+    expect(data.name).toBe("Unchanged Name");
+  });
+
+  // Branch: PUT /menus/:menuId — body.rootNodeId is undefined (arm[1] of && check)
+  it("PUT /ivr/menus/:menuId with no rootNodeId field leaves rootNodeId unchanged", async () => {
+    const menu = store.createMenu({
+      name: "RootId Unchanged",
+      tenantId: null,
+      rootNodeId: "orig-root",
+      nodes: { "orig-root": { nodeId: "orig-root", type: "message", prompt: "Hi", tenantId: null } },
+    });
+
+    // No rootNodeId in body → arm[1]: body.rootNodeId === undefined → skip
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      name: "Updated Name",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { rootNodeId: string };
+    expect(data.rootNodeId).toBe("orig-root");
+  });
+
+  // Branch: POST /menus/:menuId/process — nodeId is non-string (binary-expr second arm)
+  // Covered by test below, but also add: nodeId exists but is non-string explicitly
+  it("POST /ivr/menus/:menuId/process returns 400 when nodeId is empty string (falsy check)", async () => {
+    const menu = store.createMenu({
+      name: "Empty NodeId Test",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "menu", prompt: "Hi", tenantId: null } },
+    });
+    const res = await httpRequest(server, "POST", `/ivr/menus/${menu.menuId}/process`, {
+      nodeId: "",
+      input: "press 1",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodeId/);
+  });
+
+  // Branch: POST /menus — body.name is non-string (binary-expr second arm)
+  it("POST /ivr/menus returns 400 when name is a number (non-string type)", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: 42,
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: "root", type: "message", prompt: "Hi", tenantId: null },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/name/);
+  });
+
+  // Branch: POST /menus — tenantId not a string → null arm of cond-expr
+  it("POST /ivr/menus sets tenantId to null when tenantId is a number", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "No String TenantId",
+      tenantId: 12345,
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: "root", type: "message", prompt: "Hi", tenantId: null },
+      },
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // Branch: PUT /menus/:menuId — name provided but not a string (false arm of && check)
+  it("PUT /ivr/menus/:menuId ignores name when it is not a string", async () => {
+    const menu = store.createMenu({
+      name: "Original Name",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Hello", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      name: 999,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { name: string };
+    // name should remain unchanged since 999 is not a string
+    expect(data.name).toBe("Original Name");
+  });
+
+  // Branch: PUT /menus/:menuId — rootNodeId provided but not a string (false arm of && check)
+  it("PUT /ivr/menus/:menuId ignores rootNodeId when it is not a string", async () => {
+    const menu = store.createMenu({
+      name: "RootNodeId Test",
+      tenantId: null,
+      rootNodeId: "original-root",
+      nodes: { "original-root": { nodeId: "original-root", type: "message", prompt: "Hi", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      rootNodeId: true,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { rootNodeId: string };
+    // rootNodeId should remain unchanged since true is not a string
+    expect(data.rootNodeId).toBe("original-root");
+  });
+
+  // Branch: POST /menus/:menuId/process — nodeId is non-string (binary-expr second arm)
+  it("POST /ivr/menus/:menuId/process returns 400 when nodeId is a number", async () => {
+    const menu = store.createMenu({
+      name: "NodeId Type Test",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "menu", prompt: "Hi", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "POST", `/ivr/menus/${menu.menuId}/process`, {
+      nodeId: 42,
+      input: "press 1",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodeId/);
+  });
+
+  // Branch: GET /menus — tenantId query param is not a string (array form → undefined)
+  // When tenantId is absent the cond-expr returns undefined → no filter applied
+  it("GET /ivr/menus without tenantId query returns all menus", async () => {
+    store.createMenu({
+      name: "All Menus Test",
+      tenantId: "t-all",
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Hi", tenantId: "t-all" } },
+    });
+
+    const res = await httpRequest(server, "GET", "/ivr/menus");
+    expect(res.status).toBe(200);
+    const data = res.json() as { menus: unknown[]; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(1);
+  });
+
+  // Branch: isValidIvrNode — node with options where a ref is invalid
+  it("POST /ivr/menus returns 400 when an option ref is missing label", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad Option Ref",
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "menu",
+          prompt: "Press 1",
+          tenantId: null,
+          options: {
+            "1": { nodeId: "dest" }, // missing label — invalid IvrNodeRef
+          },
+        },
+        dest: { nodeId: "dest", type: "message", prompt: "Dest", tenantId: null },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  // Branch: isValidIvrNode — targetTemplateId is not a string
+  it("POST /ivr/menus returns 400 when targetTemplateId is a number", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad TemplateId",
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "transfer",
+          prompt: "Transferring",
+          tenantId: null,
+          targetTemplateId: 99,
+        },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  // Branch: isValidIvrNode — node missing nodeId (not a string)
+  it("POST /ivr/menus returns 400 when a node has a non-string nodeId", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad NodeId",
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: 123, type: "message", prompt: "Hi", tenantId: null },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  // Branch: isValidIvrNode — node missing prompt (not a string)
+  it("POST /ivr/menus returns 400 when a node has a non-string prompt", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad Prompt",
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: "root", type: "message", prompt: null, tenantId: null },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  // Branch: isValidIvrNode — options is not a record (e.g., an array)
+  it("POST /ivr/menus returns 400 when options is an array", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Array Options",
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "menu",
+          prompt: "Hi",
+          tenantId: null,
+          options: ["not", "a", "record"],
+        },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+});
+
 // ── DtmfDetector — step 4 (token scan fallback) ───────────────────────────
 
 describe("DtmfDetector — token scan fallback (step 4)", () => {

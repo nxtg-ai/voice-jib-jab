@@ -531,6 +531,249 @@ describe("Training API — validation branch coverage", () => {
   });
 });
 
+// ── Deep branch coverage: optional fields, filter truthy sides, query params ──
+
+describe("Training API — deep branch coverage", () => {
+  let server: Server;
+
+  beforeEach((done) => {
+    jest.clearAllMocks();
+    server = createServer(buildApp());
+    server.listen(0, "127.0.0.1", done);
+  });
+
+  afterEach((done) => {
+    server.close(done);
+  });
+
+  const req = (method: string, path: string, body?: unknown) =>
+    httpRequest(server, method, `/training${path}`, body);
+
+  // ── L115: note spread — truthy branch (note is a string) ─────────────────────
+
+  it("POST /annotations passes note to service when provided as string", async () => {
+    mockSvc.addAnnotation.mockReturnValue(ANNOTATION_1);
+
+    await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      speaker: "assistant",
+      text: "I can help.",
+      label: "good_response",
+      note: "supervisor review note",
+    });
+
+    expect(mockSvc.addAnnotation).toHaveBeenCalledWith(
+      expect.objectContaining({ note: "supervisor review note" }),
+    );
+  });
+
+  // ── L116: supervisorId spread — truthy branch (supervisorId is a string) ──────
+
+  it("POST /annotations passes supervisorId to service when provided as string", async () => {
+    mockSvc.addAnnotation.mockReturnValue(ANNOTATION_1);
+
+    await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 1,
+      speaker: "assistant",
+      text: "I can help.",
+      label: "good_response",
+      supervisorId: "sup-999",
+    });
+
+    expect(mockSvc.addAnnotation).toHaveBeenCalledWith(
+      expect.objectContaining({ supervisorId: "sup-999" }),
+    );
+  });
+
+  // ── L115+L116: both note and supervisorId present together ───────────────────
+
+  it("POST /annotations passes both note and supervisorId when both are strings", async () => {
+    mockSvc.addAnnotation.mockReturnValue(ANNOTATION_1);
+
+    await req("POST", "/annotations", {
+      sessionId: "sess-abc",
+      turnIndex: 2,
+      speaker: "user",
+      text: "What time is it?",
+      label: "neutral",
+      note: "reviewed",
+      supervisorId: "sup-001",
+    });
+
+    expect(mockSvc.addAnnotation).toHaveBeenCalledWith(
+      expect.objectContaining({ note: "reviewed", supervisorId: "sup-001" }),
+    );
+  });
+
+  // ── L162: PATCH note — truthy branch (note is a string) ──────────────────────
+
+  it("PATCH /annotations/:id passes note to service when provided", async () => {
+    const updated = { ...ANNOTATION_1, label: "neutral", note: "updated note" };
+    mockSvc.updateAnnotationLabel.mockReturnValue(updated);
+
+    const res = await req("PATCH", "/annotations/ann-001", {
+      label: "neutral",
+      note: "updated note",
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockSvc.updateAnnotationLabel).toHaveBeenCalledWith(
+      "ann-001",
+      "neutral",
+      "updated note",
+    );
+  });
+
+  // ── L223: filters ?? {} — right branch (body.filters is undefined/null) ──────
+
+  it("POST /datasets works when filters field is omitted entirely", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", { name: "No Filters DS" });
+
+    expect(res.status).toBe(201);
+    expect(mockSvc.buildDataset).toHaveBeenCalledWith("No Filters DS", {});
+  });
+
+  it("POST /datasets works when filters field is null", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", { name: "Null Filters DS", filters: null });
+
+    expect(res.status).toBe(201);
+    expect(mockSvc.buildDataset).toHaveBeenCalledWith("Null Filters DS", {});
+  });
+
+  // ── L225: filters.labels is an array — truthy branch ─────────────────────────
+
+  it("POST /datasets passes labels array to service when provided", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    await req("POST", "/datasets", {
+      name: "Labelled DS",
+      filters: { labels: ["good_response", "neutral"] },
+    });
+
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters.labels).toEqual(["good_response", "neutral"]);
+  });
+
+  // ── L226: filters.sessionIds is an array — truthy branch ─────────────────────
+
+  it("POST /datasets passes sessionIds array to service when provided", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    await req("POST", "/datasets", {
+      name: "Session DS",
+      filters: { sessionIds: ["sess-1", "sess-2"] },
+    });
+
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters.sessionIds).toEqual(["sess-1", "sess-2"]);
+  });
+
+  // ── L227: filters.from is a string — truthy branch ───────────────────────────
+
+  it("POST /datasets passes from date string to service when provided", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    await req("POST", "/datasets", {
+      name: "From DS",
+      filters: { from: "2026-01-01" },
+    });
+
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters.from).toBe("2026-01-01");
+  });
+
+  // ── L228: filters.to is a string — truthy branch ─────────────────────────────
+
+  it("POST /datasets passes to date string to service when provided", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    await req("POST", "/datasets", {
+      name: "To DS",
+      filters: { to: "2026-12-31" },
+    });
+
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters.to).toBe("2026-12-31");
+  });
+
+  // ── L229: filters.tenantId is a string — truthy branch ───────────────────────
+
+  it("POST /datasets passes tenantId string to service when provided", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    await req("POST", "/datasets", {
+      name: "Tenant DS",
+      filters: { tenantId: "tenant-42" },
+    });
+
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters.tenantId).toBe("tenant-42");
+  });
+
+  // ── L277: req.query.tenantId is a string — truthy branch ─────────────────────
+
+  it("GET /export/good-examples passes tenantId query param to service", async () => {
+    mockSvc.exportGoodExamplesJsonl.mockReturnValue('{"messages":[]}');
+
+    const res = await req("GET", "/export/good-examples?tenantId=tenant-77");
+
+    expect(res.status).toBe(200);
+    expect(mockSvc.exportGoodExamplesJsonl).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "tenant-77" }),
+    );
+  });
+
+  // ── L280: req.query.from is a string — truthy branch ─────────────────────────
+
+  it("GET /export/good-examples passes from query param to service", async () => {
+    mockSvc.exportGoodExamplesJsonl.mockReturnValue('{"messages":[]}');
+
+    const res = await req("GET", "/export/good-examples?from=2026-01-01");
+
+    expect(res.status).toBe(200);
+    expect(mockSvc.exportGoodExamplesJsonl).toHaveBeenCalledWith(
+      expect.objectContaining({ from: "2026-01-01" }),
+    );
+  });
+
+  // ── L281: req.query.to is a string — truthy branch ───────────────────────────
+
+  it("GET /export/good-examples passes to query param to service", async () => {
+    mockSvc.exportGoodExamplesJsonl.mockReturnValue('{"messages":[]}');
+
+    const res = await req("GET", "/export/good-examples?to=2026-12-31");
+
+    expect(res.status).toBe(200);
+    expect(mockSvc.exportGoodExamplesJsonl).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "2026-12-31" }),
+    );
+  });
+
+  // ── All three query params together ──────────────────────────────────────────
+
+  it("GET /export/good-examples passes all three query params when all provided", async () => {
+    mockSvc.exportGoodExamplesJsonl.mockReturnValue('{"messages":[]}');
+
+    const res = await req(
+      "GET",
+      "/export/good-examples?tenantId=t-1&from=2026-01-01&to=2026-12-31",
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSvc.exportGoodExamplesJsonl).toHaveBeenCalledWith({
+      tenantId: "t-1",
+      from: "2026-01-01",
+      to: "2026-12-31",
+    });
+  });
+});
+
 // ── Branch coverage: whitespace strings and malformed filter values ────────────
 
 describe("Training API — whitespace + malformed filter branch coverage", () => {

@@ -544,6 +544,337 @@ describe("Admin API Endpoints", () => {
   });
 });
 
+// ── HTTP helper for no-body requests ─────────────────────────────────
+
+function httpNoBody(
+  server: Server,
+  method: string,
+  path: string,
+): Promise<HttpResponse> {
+  return new Promise((resolve, reject) => {
+    const addr = server.address();
+    if (!addr || typeof addr === "string") {
+      return reject(new Error("Server not listening"));
+    }
+    const options = {
+      hostname: "127.0.0.1",
+      port: (addr as { port: number }).port,
+      path,
+      method,
+      headers: {} as Record<string, string>,
+    };
+    import("http").then(({ default: http }) => {
+      const req = http.request(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const rawBody = Buffer.concat(chunks).toString("utf-8");
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers as Record<string, string | string[] | undefined>,
+            body: rawBody,
+            json: () => JSON.parse(rawBody),
+          });
+        });
+      });
+      req.on("error", reject);
+      req.end();
+    });
+  });
+}
+
+// ── Admin API — branch coverage additions ─────────────────────────────
+
+describe("Admin API — branch coverage additions", () => {
+  let app: Express;
+  let server: Server;
+  let registry: TenantRegistry;
+  let configStore: SystemConfigStore;
+  let filePath: string;
+
+  beforeAll((done) => {
+    filePath = tempPath("admin-branch");
+    registry = new TenantRegistry(filePath);
+    configStore = new SystemConfigStore();
+    app = buildTestApp(registry, configStore);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+      done();
+    });
+  });
+
+  beforeEach(() => {
+    writeFileSync(filePath, "[]", "utf-8");
+    registry.load();
+    configStore.reset();
+  });
+
+  // Branch: POST /tenants — req.body ?? {} — the {} fallback (no Content-Type, no body)
+  // When no Content-Type header is sent, express.json() leaves req.body undefined,
+  // triggering the `req.body ?? {}` fallback path.
+  it("POST /tenants returns 400 on no-body request (req.body ?? {} fallback)", async () => {
+    const res = await httpNoBody(server, "POST", "/admin/tenants");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("tenantId");
+  });
+
+  // Branch: PUT /tenants/:id — req.body ?? {} fallback (no body)
+  it("PUT /tenants/:id returns 404 on no-body request (req.body ?? {} fallback)", async () => {
+    const res = await httpNoBody(server, "PUT", "/admin/tenants/nonexistent");
+    // No body → req.body ?? {} → update attempt on non-existent tenant → 404
+    expect(res.status).toBe(404);
+  });
+
+  // Branch: PUT /config — req.body ?? {} fallback (no body)
+  it("PUT /admin/config returns 200 on no-body request (req.body ?? {} fallback, empty patch)", async () => {
+    const res = await httpNoBody(server, "PUT", "/admin/config");
+    // No body → patch = {} → no validation failures → returns current config
+    expect(res.status).toBe(200);
+    const data = res.json() as { moderationSensitivity: string };
+    expect(data.moderationSensitivity).toBe("medium");
+  });
+
+  // Branch: POST /tenants — req.body ?? {} — the {} fallback (no body / null body)
+  // Express with json() middleware never sets body to null for valid JSON, but when
+  // Content-Type is not json the body is undefined. We simulate by sending a request
+  // with an empty body that exercises the path where tenantId/name are missing.
+  it("POST /tenants returns 400 when both tenantId and name are absent (empty body triggers req.body??{})", async () => {
+    const res = await httpRequest(server, "POST", "/admin/tenants", {});
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("tenantId");
+  });
+
+  // Branch: POST /tenants — claimsThreshold validation — invalid number
+  it("POST /tenants returns 400 when claimsThreshold is out of range", async () => {
+    const res = await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_ct",
+      name: "CT Test",
+      policyLevel: "standard",
+      claimsThreshold: 1.5,
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claimsThreshold");
+  });
+
+  // Branch: POST /tenants — claimsThreshold is a non-number type
+  it("POST /tenants returns 400 when claimsThreshold is a string", async () => {
+    const res = await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_ct_str",
+      name: "CT String",
+      policyLevel: "standard",
+      claimsThreshold: "high",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claimsThreshold");
+  });
+
+  // Branch: POST /tenants — claims is not an array
+  it("POST /tenants returns 400 when claims is not an array", async () => {
+    const res = await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_claims_obj",
+      name: "Claims Object",
+      policyLevel: "standard",
+      claims: { id: "c1", text: "claim" },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claims");
+  });
+
+  // Branch: POST /tenants — claims array with invalid claim object
+  it("POST /tenants returns 400 when a claim is missing required fields", async () => {
+    const res = await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_bad_claim",
+      name: "Bad Claim",
+      policyLevel: "standard",
+      claims: [{ id: "c1" }], // missing 'text'
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claim");
+  });
+
+  // Branch: POST /tenants try/catch — 500 for unexpected errors
+  // We can trigger a 500 by making createTenant throw a non-"already exists" error.
+  // We do this via a mock registry that throws a generic error.
+  it("POST /tenants returns 500 when createTenant throws a non-conflict error", async () => {
+    const badRegistry = {
+      createTenant: () => { throw new Error("Unexpected DB failure"); },
+      listTenants: () => [],
+      getTenant: () => null,
+      updateTenant: () => { throw new Error("not found"); },
+      deleteTenant: () => false,
+      size: 0,
+    } as unknown as TenantRegistry;
+
+    const badApp = buildTestApp(badRegistry, configStore);
+    const badServer = createServer(badApp);
+    await new Promise<void>((resolve) => badServer.listen(0, resolve));
+
+    try {
+      const res = await httpRequest(badServer, "POST", "/admin/tenants", {
+        tenantId: "org_err",
+        name: "Error",
+        policyLevel: "standard",
+      });
+      expect(res.status).toBe(500);
+      const data = res.json() as { error: string };
+      expect(data.error).toContain("Unexpected DB failure");
+    } finally {
+      await new Promise<void>((resolve) => badServer.close(() => resolve()));
+    }
+  });
+
+  // Branch: POST /tenants try/catch — non-Error thrown (String(err) path)
+  it("POST /tenants handles non-Error thrown objects (String coercion)", async () => {
+    const stringThrowRegistry = {
+      createTenant: () => { throw "string error from registry"; },
+      listTenants: () => [],
+      getTenant: () => null,
+      updateTenant: () => { throw new Error("not found"); },
+      deleteTenant: () => false,
+      size: 0,
+    } as unknown as TenantRegistry;
+
+    const strApp = buildTestApp(stringThrowRegistry, configStore);
+    const strServer = createServer(strApp);
+    await new Promise<void>((resolve) => strServer.listen(0, resolve));
+
+    try {
+      const res = await httpRequest(strServer, "POST", "/admin/tenants", {
+        tenantId: "org_str",
+        name: "Str",
+        policyLevel: "standard",
+      });
+      expect(res.status).toBe(500);
+      const data = res.json() as { error: string };
+      expect(data.error).toBe("string error from registry");
+    } finally {
+      await new Promise<void>((resolve) => strServer.close(() => resolve()));
+    }
+  });
+
+  // Branch: PUT /tenants/:id — req.body ?? {} fallback + non-Error thrown (String(err))
+  it("PUT /tenants/:id handles non-Error thrown (String coercion)", async () => {
+    const strPutRegistry = {
+      createTenant: () => { throw new Error("already exists"); },
+      listTenants: () => [],
+      getTenant: () => ({ tenantId: "t" }),
+      updateTenant: () => { throw "put string error"; },
+      deleteTenant: () => false,
+      size: 0,
+    } as unknown as TenantRegistry;
+
+    const putApp = buildTestApp(strPutRegistry, configStore);
+    const putServer = createServer(putApp);
+    await new Promise<void>((resolve) => putServer.listen(0, resolve));
+
+    try {
+      const res = await httpRequest(putServer, "PUT", "/admin/tenants/org_t", { name: "X" });
+      expect(res.status).toBe(500);
+      const data = res.json() as { error: string };
+      expect(data.error).toBe("put string error");
+    } finally {
+      await new Promise<void>((resolve) => putServer.close(() => resolve()));
+    }
+  });
+
+  // Branch: PUT /tenants/:id — claimsThreshold invalid
+  it("PUT /tenants/:id returns 400 when claimsThreshold is invalid", async () => {
+    await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_put_ct",
+      name: "PUT CT",
+      policyLevel: "standard",
+    });
+
+    const res = await httpRequest(server, "PUT", "/admin/tenants/org_put_ct", {
+      claimsThreshold: -0.1,
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claimsThreshold");
+  });
+
+  // Branch: PUT /tenants/:id — claims not an array
+  it("PUT /tenants/:id returns 400 when claims is not an array", async () => {
+    await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_put_claims",
+      name: "PUT Claims",
+      policyLevel: "standard",
+    });
+
+    const res = await httpRequest(server, "PUT", "/admin/tenants/org_put_claims", {
+      claims: "not-array",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claims");
+  });
+
+  // Branch: PUT /tenants/:id — claims array with invalid item (missing id)
+  it("PUT /tenants/:id returns 400 when a claim item is invalid (missing id)", async () => {
+    await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_put_badclaim",
+      name: "PUT Bad Claim",
+      policyLevel: "standard",
+    });
+
+    const res = await httpRequest(server, "PUT", "/admin/tenants/org_put_badclaim", {
+      claims: [{ text: "missing id field" }],
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claim");
+  });
+
+  // Branch: PUT /tenants/:id — claims array item with valid id but missing text (4th arm of || chain)
+  it("PUT /tenants/:id returns 400 when a claim item has id but missing text field", async () => {
+    await httpRequest(server, "POST", "/admin/tenants", {
+      tenantId: "org_put_notext",
+      name: "PUT No Text",
+      policyLevel: "standard",
+    });
+
+    const res = await httpRequest(server, "PUT", "/admin/tenants/org_put_notext", {
+      claims: [{ id: "c1", label: "has id but no text" }], // id present but text missing
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("claim");
+  });
+
+  // Branch: PUT /config — valid moderationSensitivity passes validation
+  it("PUT /admin/config returns 200 when moderationSensitivity is valid", async () => {
+    const res = await httpRequest(server, "PUT", "/admin/config", {
+      moderationSensitivity: "high",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { moderationSensitivity: string };
+    expect(data.moderationSensitivity).toBe("high");
+  });
+
+  // Branch: PUT /config — valid ttsEngine passes validation
+  it("PUT /admin/config returns 200 when ttsEngine is valid", async () => {
+    const res = await httpRequest(server, "PUT", "/admin/config", {
+      ttsEngine: "stub",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { ttsEngine: string };
+    expect(data.ttsEngine).toBe("stub");
+  });
+});
+
 // ── TenantRegistry singleton (proxy branches) ─────────────────────────
 
 describe("TenantRegistry — initTenantRegistry + proxy", () => {
