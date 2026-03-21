@@ -12221,3 +12221,37 @@ Dashboard: 41/41 SHIPPED.
 **Q45 resolved** — N-42 self-started and shipped per K8s deployment evidence.
 
 Dashboard: 42/42 SHIPPED.
+
+---
+
+### Check-in 76 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-43: Helmet.js Security Headers** — replaced the 4-line manual `securityHeaders` middleware with `helmet()` v8. Preserved existing values (`X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`) via explicit Helmet config. Added 9 new headers in one pass: HSTS (180d + includeSubDomains), Content-Security-Policy, X-DNS-Prefetch-Control, X-Download-Options, X-Permitted-Cross-Domain-Policies, Cross-Origin-Embedder-Policy, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, Origin-Agent-Cluster. Updated `SecurityMiddleware.test.ts`: 4 header assertions → 11. Net +7 tests. 4,280 total. Commit: `31e3e39`. Dashboard: 43/43 SHIPPED.
+
+#### 2. What surprised me?
+
+**Helmet v8 sets `X-XSS-Protection: 0`, not omits it.** I initially wrote a test asserting the header was `undefined` (absent), reasoning that disabling it meant not sending it. Failed on first run — Helmet explicitly sets `0`. The design rationale is correct: actively setting `0` signals "filter disabled" to browsers that would otherwise default to "on", which can be worse than off on IE/Safari. The header is present but negated.
+
+**`X-Frame-Options: DENY` is not Helmet's default.** Helmet defaults to `SAMEORIGIN`. For a pure REST API server with no browser-rendered HTML, `DENY` is strictly tighter — there is no same-origin framing scenario to permit. Required an explicit override in Helmet config. Worth noting for any ASIF project using Helmet: the default is fine for SPAs with same-origin iframes, but API-only servers should use `deny`.
+
+#### 3. Cross-project signals
+
+**Helmet v8 is a one-line drop-in for any Express project.** The pattern used here — install, replace the middleware export, configure two overrides — is directly portable to any ASIF Express server. The `frameguard: { action: "deny" }` choice applies specifically to API-only servers; frontend-serving apps should use the default `sameorigin`.
+
+**`X-Frame-Options` default matters if you have any same-origin iframe.** If a future project serves an admin UI that iframes its own dashboard, switching from `DENY` to the Helmet default `SAMEORIGIN` is needed. Worth flagging in CLAUDE.md of any project that adopts this pattern.
+
+**HSTS `includeSubDomains` is a commitment.** Once a browser sees HSTS with `includeSubDomains`, every subdomain of the domain must also serve HTTPS. If staging.voice-jib-jab.io is ever served over HTTP, users who visited the apex domain will get a browser-blocked connection. This is acceptable for a production API but worth documenting in the RUNBOOK.
+
+#### 4. What would I prioritize next?
+
+1. **CRUCIBLE Gate 2 non-empty assertion sweep** — 4,280 tests; the N-3x + N-4x sprint added ~500 tests under shipping pressure. A targeted scan for create-then-query patterns without non-empty assertions would close any hollow tests. Idle-time protocol task, no directive needed.
+2. **N-11 SIP Telephony Phase 2** — Phase 1 is shipped (StubSipTelephonyAdapter). Phase 2 is the LiveKit SIP adapter for real SIP calls. BUILDING status. Could self-start per idle protocol if no directives inbound.
+3. **N-15 dense embeddings** — standing auth exists (Q9 CoS response). Still unstarted. `all-MiniLM-L6-v2` ONNX to replace TF-IDF in `AllowedClaimsRegistry`. M-sized, 2-session sprint.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change without CoS call.
+
+Dashboard: 43/43 SHIPPED.
