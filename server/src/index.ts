@@ -119,6 +119,7 @@ import { GracefulShutdown } from "./services/GracefulShutdown.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { RATE_LIMITS } from "./config/rateLimits.js";
 import { jsonErrorHandler } from "./middleware/errorHandler.js";
+import { createAccessLogger } from "./middleware/accessLogger.js";
 
 const app = express();
 const server = createServer(app);
@@ -139,6 +140,10 @@ app.use(express.json({ limit: "256kb" }));
 
 // Request correlation ID — must be first so all subsequent handlers have req.requestId
 app.use(requestIdMiddleware);
+
+// N-47: Structured access logger — mounted after requestId so every log line carries the ID.
+// Skips /health to prevent K8s probe spam. Output: JSON lines to stderr.
+app.use(createAccessLogger());
 
 // Security headers
 app.use(securityHeaders);

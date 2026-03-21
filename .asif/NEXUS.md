@@ -56,6 +56,7 @@
 | N-44 | Request Body Size Limit (256 KB) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-45 | Global JSON Error Handler | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-46 | JSON 404 Handler (catch-all) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-47 | Structured Access Logger | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
