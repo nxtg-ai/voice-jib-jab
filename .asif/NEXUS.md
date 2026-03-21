@@ -60,6 +60,7 @@
 | N-48 | Property-Based Testing (fast-check) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-49 | Branch Coverage — VoiceTriggerService + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-50 | Branch Coverage — GracefulShutdown + validate + complianceDashboard | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-51 | Branch Coverage — laneC_control + tenantMigration error paths | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12625,4 +12626,24 @@ Continued CRUCIBLE branch coverage fixes from N-49. Targeted three files with <1
 **Q42 (open)** — Next directive batch or maintenance mode?
 **Q43 (open)** — Pre-push lock-file sync check (`npm ci --dry-run`). The N-48 CI break class is still possible on any `npm install` without a subsequent `npm ci --dry-run` check.
 
-Dashboard: 50/50 SHIPPED.
+Dashboard: 51/51 SHIPPED.
+
+---
+
+### N-51: Branch Coverage — laneC_control + tenantMigration error paths (2026-03-21)
+
+Continued CRUCIBLE branch coverage fixes from N-50. Targeted two files with low branch coverage:
+
+- **laneC_control.ts**: 6 new ControlEngine tests covering 8 previously uncovered branch points:
+  - Line 313: constructor with `tenantId` but no explicit `claimsRegistry` → loads tenant-scoped registry
+  - Line 341 (TRUE branch): `opaEvaluator` provided + non-empty `moderationCategories` ternary
+  - Line 418: `reasonCodes.join() || "Policy violation"` fallback when `reasonCodes` is empty
+  - Lines 537/553/557/573/577: `tenantId` ternary branches and `isFinal ?? false` nullish coalescing in transcript event handlers
+- **tenantMigration.ts**: 92.3% → **100% branch** — 6 new tests covering all error paths:
+  - `GET /export` line 41: `String(err)` branch when a non-Error value is thrown
+  - `POST /import` lines 65-67: `!body` guard via middleware injection (express.json() strict mode prevents this via HTTP — injected null body directly)
+  - `POST /import` lines 86-96: entire `importTenant` catch block — "Unsupported export version" → 400, "Invalid export" → 400, generic error → 500, non-Error → 500
+
+Key technique: For the `!body` branch on line 65, `express.json()` with `strict: true` (default) always provides `{}` for no-body requests, making `!body` unreachable via HTTP. Solution: custom test app with raw body injection middleware (`req.body = null`) to directly cover the guard without modifying production code.
+
+4,359 → **4,371 tests** (+12). All passing. Dashboard: 51/51 SHIPPED.

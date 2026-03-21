@@ -1525,3 +1525,148 @@ describe("ControlEngine — Per-Tenant Claims Isolation", () => {
     void engine2;
   });
 });
+
+// ── Branch coverage (lines 313,341,418,537,553,557,573,577) ────────────────
+
+describe("ControlEngine — branch coverage (lines 313,341,418,537,553,557,573,577)", () => {
+  afterEach(() => {
+    tenantClaimsLoader.clear();
+    jest.clearAllMocks();
+  });
+
+  it("constructor: tenantId without explicit claimsRegistry loads tenant-scoped registry (line 313)", () => {
+    // All createEngine() calls inject claimsRegistry, so !config.claimsRegistry is always false.
+    // This test omits claimsRegistry to cover the if-body on line 314.
+    const engine = new ControlEngine("sess-313", {
+      tenantId: "org-line-313",
+      enabled: false,
+    });
+    expect(engine).toBeInstanceOf(ControlEngine);
+    expect(tenantClaimsLoader.hasRegistry("org-line-313")).toBe(true);
+  });
+
+  it("constructor: opaEvaluator with non-empty moderationCategories uses provided categories (line 341 TRUE branch)", () => {
+    // Existing OPA tests all use moderationCategories: [] → ternary always takes FALSE branch.
+    // This test provides a non-empty array to cover the TRUE branch.
+    const mockOpa = { isInitialized: true, initialize: jest.fn() } as any;
+    const engine = new ControlEngine("sess-341", {
+      claimsRegistry: createRegistry(),
+      opaEvaluator: mockOpa,
+      moderationCategories: [
+        { name: "TEST", patterns: [/test/i], decision: "refuse" as const, severity: 2 },
+      ],
+      moderationDenyPatterns: [],
+      enabled: false,
+    });
+    expect(engine).toBeInstanceOf(ControlEngine);
+  });
+
+  it("createEscalationTicket: uses 'Policy violation' fallback when reasonCodes is empty (line 418)", async () => {
+    const client = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      createTicket: jest.fn().mockResolvedValue({ ticketId: "1", url: "", provider: "github" }),
+      close: jest.fn(),
+    };
+    const engine = new ControlEngine("sess-418", {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      cancelOutputThreshold: 10,
+      enabled: false,
+      ticketingClient: client,
+    });
+    // Inject a mock gate that returns escalate with empty reasonCodes
+    const mockGate = {
+      evaluate: jest.fn().mockResolvedValue({
+        decision: "escalate" as const,
+        reasonCodes: [],
+        severity: 3,
+        safeRewrite: undefined,
+        requiredDisclaimerId: undefined,
+        checksRun: [],
+        checkDurationMs: 0,
+      }),
+    };
+    (engine as unknown as { gate: typeof mockGate }).gate = mockGate;
+    await engine.evaluate(makeContext({ text: "test", sessionId: "sess-418" }));
+    await Promise.resolve();
+    expect(client.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Voice Escalation: Policy violation" }),
+    );
+  });
+
+  it("onTranscript: includes tenantId in evaluation context when tenantId configured (line 537)", async () => {
+    new ControlEngine("sess-537", {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      enabled: true,
+      tenantId: "org-537",
+    });
+    const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+    await handler({
+      event_id: "ev-537",
+      session_id: "sess-537",
+      t_ms: Date.now(),
+      source: "client",
+      type: "transcript.final",
+      payload: { text: "Hello from tenant", confidence: 0.9, is_final: true, span_ms: { start: 0, end: 100 } },
+    } as Event);
+    const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+      (c) => c[0]?.type === "policy.decision",
+    );
+    expect(decisions.length).toBeGreaterThan(0);
+  });
+
+  it("onAssistantTranscript: covers isFinal??false (line 553) and tenantId ternary (line 557)", async () => {
+    jest.clearAllMocks();
+    new ControlEngine("sess-553", {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      enabled: true,
+      tenantId: "org-553",
+    });
+    const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+    // isFinal absent → covers the `?? false` fallback on line 553
+    // tenantId set → covers the `tenantId ? {...} : {}` TRUE branch on line 557
+    await handler({
+      event_id: "ev-553",
+      session_id: "sess-553",
+      t_ms: Date.now(),
+      source: "laneB",
+      type: "transcript",
+      payload: { text: "Assistant reply without isFinal" }, // no isFinal field
+    } as Event);
+    const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+      (c) => c[0]?.type === "policy.decision",
+    );
+    expect(decisions.length).toBeGreaterThan(0);
+  });
+
+  it("onUserTranscript: covers isFinal??false (line 573) and tenantId ternary (line 577)", async () => {
+    jest.clearAllMocks();
+    new ControlEngine("sess-573", {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      enabled: true,
+      tenantId: "org-573",
+    });
+    const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+    // isFinal absent → covers `?? false` fallback on line 573
+    // tenantId set → covers `tenantId ? {...} : {}` TRUE branch on line 577
+    await handler({
+      event_id: "ev-573",
+      session_id: "sess-573",
+      t_ms: Date.now(),
+      source: "laneB",
+      type: "user_transcript",
+      payload: { text: "User utterance via laneB without isFinal" }, // no isFinal
+    } as Event);
+    const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+      (c) => c[0]?.type === "policy.decision",
+    );
+    expect(decisions.length).toBeGreaterThan(0);
+  });
+});

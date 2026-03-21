@@ -329,3 +329,126 @@ describe("Tenant Migration API", () => {
     });
   });
 });
+
+// ── Error catch branch coverage ────────────────────────────────────────────
+
+describe("GET /tenants/:tenantId/export — error branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => { server.close(done); });
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  it("returns 500 when exportTenant throws a non-Error value (String(err) branch, line 41)", async () => {
+    // Covers the `err instanceof Error ? ... : String(err)` false branch
+    mockMigrator.exportTenant.mockRejectedValue("disk dead");
+
+    const res = await httpRequest(server, "GET", `/tenants/${TENANT_ID}/export`);
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("Internal server error");
+  });
+});
+
+describe("POST /tenants/:tenantId/import — body type guard and catch branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => { server.close(done); });
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  it("returns 400 when body is null (!body branch, line 65-67)", async () => {
+    // express.json() with strict:true never passes null through to the route;
+    // we inject null directly via middleware to cover the !body guard.
+    const app = express();
+    app.use((_req, _res, next) => { _req.body = null; next(); });
+    app.use("/", createTenantMigrationRouter(mockMigrator as unknown as TenantConfigMigrator));
+    const s = await new Promise<Server>((resolve) => {
+      const srv = createServer(app);
+      srv.listen(0, "127.0.0.1", () => resolve(srv));
+    });
+    try {
+      const res = await httpRequest(s, "POST", `/tenants/org_beta/import`);
+      expect(res.status).toBe(400);
+      const data = res.json() as { error: string };
+      expect(data.error).toBe("Request body is required");
+      expect(mockMigrator.importTenant).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => s.close(() => r()));
+    }
+  });
+
+  it("returns 400 when importTenant throws 'Unsupported export version' (line 89-93)", async () => {
+    mockMigrator.importTenant.mockRejectedValue(
+      new Error("Unsupported export version: 9.9"),
+    );
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      `/tenants/org_beta/import`,
+      EXPORT_PAYLOAD,
+    );
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Unsupported export version");
+  });
+
+  it("returns 400 when importTenant throws 'Invalid export' (line 90-93)", async () => {
+    mockMigrator.importTenant.mockRejectedValue(
+      new Error("Invalid export: schema mismatch"),
+    );
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      `/tenants/org_beta/import`,
+      EXPORT_PAYLOAD,
+    );
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid export");
+  });
+
+  it("returns 500 when importTenant throws a generic Error (line 96)", async () => {
+    mockMigrator.importTenant.mockRejectedValue(new Error("DB connection lost"));
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      `/tenants/org_beta/import`,
+      EXPORT_PAYLOAD,
+    );
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("Internal server error");
+  });
+
+  it("returns 500 when importTenant throws a non-Error value (String(err) branch, line 86)", async () => {
+    // Covers the `err instanceof Error ? ... : String(err)` false branch
+    mockMigrator.importTenant.mockRejectedValue("plain rejection");
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      `/tenants/org_beta/import`,
+      EXPORT_PAYLOAD,
+    );
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("Internal server error");
+  });
+});
