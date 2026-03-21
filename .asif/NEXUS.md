@@ -12186,3 +12186,37 @@ Dashboard: 41/41 SHIPPED.
 **Q45** — Standing auth request for N-42 (`trust proxy`). Given N-28 K8s readiness probe already exists, the deployment is almost certainly proxied. Requesting auth to self-start N-42 on next "Continue roadmap" trigger without a formal directive.
 
 Dashboard: 41/41 SHIPPED.
+
+---
+
+### Check-in 75 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-42: Trust Proxy Configuration** — added `TRUST_PROXY` env var parsing to `index.ts`, applied immediately after `const app = express()`. Numeric values (0/1/2/…) set the hop count; keyword strings (`loopback`, `linklocal`, `uniquelocal`) are passed through to Express directly; unset or empty string leaves trust proxy unconfigured (dev-safe default). Without this, all per-IP rate limiters (N-26, N-39, and any future limiter) see `127.0.0.1` for every proxied request — one client exhausts the budget for all. 8 tests in `TrustProxy.test.ts` assert: unset ignores XFF, trust=1 reflects rightmost XFF entry, trust=1 uses rightmost (not leftmost) for multi-hop chains, trust=2 trusts socket+rightmost, loopback keyword trusts loopback addresses, empty string treated as unset, trust=0 does not trust XFF. +8 → 4,273 total. Commit: `2dd7622`. Dashboard: 42/42 SHIPPED.
+
+#### 2. What surprised me?
+
+**Express trust proxy semantics are subtler than "trust the forwarded IP".** Trust=1 means "trust 1 proxy hop from the socket" — so the socket itself is the first trusted hop, and the *rightmost* XFF entry is `req.ip` (the first untrusted). Not the leftmost as I initially assumed. With trust=2, two hops are trusted (socket + rightmost XFF), so `req.ip` is the second-from-right XFF entry. The semantics are: "skip N rightmost addresses as trusted proxies; the next one is the client."
+
+**Two failing tests on first run exposed wrong mental model.** The tests for "leftmost XFF is client IP" and the trust=2 chain both failed because I had the hop semantics backwards. This is exactly the value of writing the tests with real HTTP requests rather than mocking — the actual Express behaviour corrected my model.
+
+#### 3. Cross-project signals
+
+**Every Express project behind a proxy has a silent rate-limiting correctness bug until trust proxy is set.** Any ASIF project using `express-rate-limit` (or any per-IP logic) deployed behind Kubernetes ingress, nginx, or Cloudflare without `app.set("trust proxy", N)` is effectively applying per-server rate limits, not per-client. The `TRUST_PROXY` env var pattern from N-42 is directly portable — inject at app bootstrap before any middleware.
+
+**The rightmost-not-leftmost XFF gotcha should be documented wherever XFF is read.** Any audit logging code that reads `req.ip` or `req.headers["x-forwarded-for"]` directly should note the trust proxy dependency, or audit events will show proxy IPs instead of client IPs in production.
+
+#### 4. What would I prioritize next?
+
+1. **N-43: Helmet.js security headers audit** — `securityHeaders.ts` sets headers manually; Helmet adds CSP, HSTS, Referrer-Policy, Permissions-Policy in one pass. M-sized, high security value.
+2. **CRUCIBLE Gate 2 idle audit** — 4,273 tests; a non-empty assertion sweep on the N-3x sprint would close any hollow assertions from shipping pressure.
+3. **N-12 plan execution** — ticketing MCP integration plan is saved and ready. ≈50 new tests.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change without CoS call.
+
+**Q45 resolved** — N-42 self-started and shipped per K8s deployment evidence.
+
+Dashboard: 42/42 SHIPPED.
