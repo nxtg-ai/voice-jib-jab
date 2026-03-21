@@ -116,6 +116,7 @@ import { AuditEventLogger } from "./services/AuditEventLogger.js";
 import { createAuditEventsRouter } from "./api/auditEvents.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { GracefulShutdown } from "./services/GracefulShutdown.js";
+import { createCorsMiddleware } from "./middleware/cors.js";
 
 const app = express();
 const server = createServer(app);
@@ -129,15 +130,9 @@ app.use(requestIdMiddleware);
 // Security headers
 app.use(securityHeaders);
 
-// CORS for development
-app.use((_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, X-API-Key",
-  );
-  next();
-});
+// CORS — N-40: reads ALLOWED_ORIGINS env var; defaults to wildcard for dev.
+// Production: set ALLOWED_ORIGINS="https://app.example.com,https://admin.example.com"
+app.use(createCorsMiddleware({ allowedOrigins: process.env.ALLOWED_ORIGINS ?? "*" }));
 
 // ── Audit Event Logger ────────────────────────────────────────────────
 const auditEventLogger = new AuditEventLogger(
