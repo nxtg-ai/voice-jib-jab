@@ -10824,6 +10824,27 @@ The force-exit warning has three independent causes (stryker sandbox, pingInterv
 
 Q37: Upgrade path for `eslint ^8.56` → `^9.x`? The root package.json has eslint v8 but typescript-eslint v7 prefers eslint v9 (flat config). Currently functional but will need migration if typescript-eslint v8 is ever needed. Recommend adding ESLint config file so lint rules are actually enforced.
 
+**Q39 — Dependabot alerts: 3 open, all devDependencies, `npm audit` reports 0 vulnerabilities** _(2026-03-20)_:
+
+Executed Q11 CoS directive ("triage now"). Findings:
+
+| Alert | Package | Version | Severity | Dev? | `npm audit` status |
+|-------|---------|---------|----------|------|--------------------|
+| #8 | `flatted` 3.4.2 | Prototype Pollution in parse() | High | ✅ devDep | Not flagged |
+| #6 | `minimatch` 3.1.5–9.0.9 | ReDoS via GLOBSTAR combinatorics | High | ✅ devDep | Not flagged |
+| #1 | `esbuild` 0.27.2 | Dev server CORS/SSRF | Medium | ✅ devDep | Not flagged |
+
+`npm audit` and `npm audit fix --dry-run` both report "found 0 vulnerabilities" — installed versions satisfy npm's patched-version criteria. GitHub Dependabot is more aggressive (advisory-matched rather than version-gated).
+
+**Exploitability assessment**:
+- `flatted`: Used by Jest test serializer. Never loaded in production runtime. Prototype pollution via `parse()` requires attacker-controlled input to `flatted.parse()` — not reachable in test execution context.
+- `minimatch` 3.1.5: Pinned by `eslint`, `glob`, `test-exclude` (devDeps). ReDoS requires attacker-supplied glob pattern in the test runner — not reachable.
+- `esbuild`: Dev server vulnerability only applies when running `esbuild --serve`. We use esbuild as a bundler (Vite), not as a dev server.
+
+**Production attack surface: ZERO.** All three packages are dev/build tooling only.
+
+**Requesting CoS decision**: Dismiss the 3 Dependabot alerts as "tolerable_risk" (devDeps, zero prod surface, npm audit clean)? Or leave them open for awareness? I can dismiss programmatically via `gh api` if authorized.
+
 ---
 
 > Session: 2026-03-20 (check-in 59) | Author: Claude Sonnet 4.6
