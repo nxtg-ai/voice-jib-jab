@@ -52,7 +52,7 @@ describe("Voice Pipeline Integration", () => {
     mockWs = WebSocketMock.getMockInstance();
 
     // Wait for connection
-    await new Promise((resolve) => process.nextTick(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Simulate session.created
     mockWs.receiveMessage({ type: "session.created" });
@@ -72,14 +72,14 @@ describe("Voice Pipeline Integration", () => {
     // Disconnect unconditionally, even when already disconnected:
     // - sets sessionId=null so any pending reconnect setTimeout bails immediately
     //   (avoids a 30s pingInterval from the reconnect attempt)
-    // - drains the close-event nextTick when the adapter was still connected
+    // - drains the close-event setImmediate when the adapter was still connected
     try {
       await laneB.disconnect();
     } catch {
       // adapter may already be in a closed/error state — ignore
     }
-    // Drain pending process.nextTick callbacks (MockWebSocket close events fire via nextTick).
-    await new Promise((resolve) => process.nextTick(resolve));
+    // Drain pending setImmediate callbacks (MockWebSocket close events fire via setImmediate).
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   describe("Complete Voice Interaction Flow", () => {
@@ -469,7 +469,7 @@ describe("Voice Pipeline Integration", () => {
 
       // Disconnect and set context
       await laneB.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       laneB.setConversationContext(context);
 
@@ -480,7 +480,7 @@ describe("Voice Pipeline Integration", () => {
       const connectPromise = laneB.connect();
       mockWs = WebSocketMock.getMockInstance();
 
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
       mockWs.receiveMessage({ type: "session.created" });
       await connectPromise;
 
@@ -587,7 +587,7 @@ describe("Voice Pipeline Integration", () => {
       mockWs.close(1006, "Connection lost"); // Abnormal closure
 
       // Wait for error to propagate
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       // System should handle gracefully
       expect(errorSpy).toHaveBeenCalled();

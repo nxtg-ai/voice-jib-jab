@@ -115,7 +115,7 @@ describe("T-013: Knowledge Pack Retrieval and Injection", () => {
 
       const connectPromise = laneB.connect();
       mockWs = WebSocketMock.getMockInstance();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
       mockWs.receiveMessage({ type: "session.created" });
       await connectPromise;
       mockWs.clearMessages();
@@ -127,7 +127,7 @@ describe("T-013: Knowledge Pack Retrieval and Injection", () => {
       if (laneB.isConnected()) {
         await laneB.disconnect();
       }
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
       jest.restoreAllMocks();
     });
 

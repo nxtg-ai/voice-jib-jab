@@ -41,7 +41,7 @@ describe("OpenAIRealtimeAdapter", () => {
     mockWs = WebSocketMock.getMockInstance();
 
     // Wait for connection to open
-    await new Promise((resolve) => process.nextTick(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
 
     // Simulate session.created response
     mockWs.receiveMessage({ type: "session.created" });
@@ -57,11 +57,11 @@ describe("OpenAIRealtimeAdapter", () => {
     if (adapter && adapter.isConnected()) {
       await adapter.disconnect();
     }
-    // Always drain pending process.nextTick callbacks (e.g. MockWebSocket close events
-    // fire via nextTick — if a test called disconnect() itself, afterEach skips the
+    // Always drain pending setImmediate callbacks (MockWebSocket open/close events
+    // fire via setImmediate — if a test called disconnect() itself, afterEach skips the
     // block above but the close event is still queued and must be drained here to
     // prevent "Cannot log after tests are done" warnings).
-    await new Promise((resolve) => process.nextTick(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
   describe("Connection Lifecycle", () => {
@@ -83,8 +83,8 @@ describe("OpenAIRealtimeAdapter", () => {
     it("should disconnect cleanly", async () => {
       await adapter.disconnect();
 
-      // Wait for close event to fire (process.nextTick in MockWebSocket)
-      await new Promise((resolve) => process.nextTick(resolve));
+      // Wait for close event to fire (setImmediate in MockWebSocket)
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(adapter.isConnected()).toBe(false);
       expect(mockWs.readyState).toBe(MockWebSocket.CLOSED);
@@ -284,8 +284,8 @@ describe("OpenAIRealtimeAdapter", () => {
   describe("commitAudio - Guard Clause 2: Safety Window", () => {
     beforeEach(() => {
       // Fake timers eliminate real 50ms waits (flaky in CI).
-      // doNotFake: nextTick preserves process.nextTick for MockWebSocket close events.
-      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+      // doNotFake: setImmediate preserves MockWebSocket open/close event delivery.
+      jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
     });
 
     afterEach(() => {
@@ -618,7 +618,7 @@ describe("OpenAIRealtimeAdapter", () => {
       mockWs = WebSocketMock.getMockInstance();
 
       // Wait for connection to open
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Simulate session.created response
       mockWs.receiveMessage({ type: "session.created" });
@@ -791,7 +791,7 @@ describe("OpenAIRealtimeAdapter", () => {
     it("should reject connect() promise when WebSocket constructor throws (line 203-204)", async () => {
       // Disconnect existing adapter first
       await adapter.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       const WebSocketMock = jest.requireMock("ws").default;
       WebSocketMock.resetMock();
@@ -809,7 +809,7 @@ describe("OpenAIRealtimeAdapter", () => {
 
     it("should reject connect() promise when ws emits error before open (line 176)", async () => {
       await adapter.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       const WebSocketMock = jest.requireMock("ws").default;
       WebSocketMock.resetMock();
@@ -822,7 +822,7 @@ describe("OpenAIRealtimeAdapter", () => {
         stub.send = jest.fn();
         stub.close = jest.fn();
         // Fire error on next tick — connected is still false at this point
-        process.nextTick(() => {
+        setImmediate(() => {
           stub.emit("error", new Error("connection refused"));
         });
         return stub;
@@ -875,7 +875,7 @@ describe("OpenAIRealtimeAdapter", () => {
 
     it("should do nothing when not connected", async () => {
       await adapter.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Should not throw
       expect(() => adapter.clearInputBuffer()).not.toThrow();
@@ -902,7 +902,7 @@ describe("OpenAIRealtimeAdapter", () => {
     it("should return early without error if already disconnected (line 501)", async () => {
       // Disconnect once properly
       await adapter.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Second disconnect on already-disconnected adapter — should be silent
       await expect(adapter.disconnect()).resolves.not.toThrow();
@@ -1191,7 +1191,7 @@ describe("OpenAIRealtimeAdapter", () => {
 
   describe("attemptReconnect (lines 816-818)", () => {
     beforeEach(() => {
-      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+      jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
     });
 
     afterEach(() => {
@@ -1248,8 +1248,8 @@ describe("OpenAIRealtimeAdapter", () => {
       jest.advanceTimersByTime(1100);
 
       // Wait for the rejected promise to be handled
-      await new Promise((resolve) => process.nextTick(resolve));
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Reconnection failed"),
@@ -1261,7 +1261,7 @@ describe("OpenAIRealtimeAdapter", () => {
 
   describe("startPingInterval health check (lines 831-841)", () => {
     beforeEach(() => {
-      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+      jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
     });
 
     afterEach(() => {
@@ -1334,7 +1334,7 @@ describe("OpenAIRealtimeAdapter", () => {
 
     it("should throw when not connected", async () => {
       await adapter.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
 
       const freshAdapter = new OpenAIRealtimeAdapter(config);
       await expect(freshAdapter.createResponse("hello")).rejects.toThrow(

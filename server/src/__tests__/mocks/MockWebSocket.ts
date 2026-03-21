@@ -25,11 +25,13 @@ export class MockWebSocket extends EventEmitter {
     super();
     this.url = url;
 
-    // Simulate connection opening on next tick
-    process.nextTick(() => {
+    // Simulate connection opening — use setImmediate (supports .unref()) so this
+    // timer does not prevent Jest workers from exiting after tests complete.
+    const openTimer = setImmediate(() => {
       this.readyState = MockWebSocket.OPEN;
       this.emit("open");
     });
+    openTimer.unref();
   }
 
   /**
@@ -58,11 +60,12 @@ export class MockWebSocket extends EventEmitter {
 
     this.readyState = MockWebSocket.CLOSING;
 
-    // Emit close event on next tick
-    process.nextTick(() => {
+    // Emit close event — use setImmediate (supports .unref()) to avoid blocking exit.
+    const closeTimer = setImmediate(() => {
       this.readyState = MockWebSocket.CLOSED;
       this.emit("close", code, Buffer.from(reason));
     });
+    closeTimer.unref();
   }
 
   /**
