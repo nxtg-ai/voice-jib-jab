@@ -410,3 +410,218 @@ describe("createAuthRouter()", () => {
     });
   });
 });
+
+// ── N-31: TTL / Expiry tests ──────────────────────────────────────────────
+
+describe("ApiKeyStore — TTL / Expiry (N-31)", () => {
+  let store: ApiKeyStore;
+
+  beforeEach(() => {
+    store = new ApiKeyStore(makeTmpFile());
+  });
+
+  describe("createKey() with ttlDays", () => {
+    it("sets expiresAt when ttlDays provided", () => {
+      const result = store.createKey("t1", "d", 30);
+      expect(result.expiresAt).toBeDefined();
+      const expiry = new Date(result.expiresAt!).getTime();
+      expect(expiry).toBeGreaterThan(Date.now());
+    });
+
+    it("expiresAt is ~ttlDays from now", () => {
+      const result = store.createKey("t1", "d", 1);
+      const expiry = new Date(result.expiresAt!).getTime();
+      const expectedMin = Date.now() + 23 * 3600 * 1000;
+      const expectedMax = Date.now() + 25 * 3600 * 1000;
+      expect(expiry).toBeGreaterThan(expectedMin);
+      expect(expiry).toBeLessThan(expectedMax);
+    });
+
+    it("expiresAt is absent when ttlDays not provided", () => {
+      const result = store.createKey("t1", "d");
+      expect(result.expiresAt).toBeUndefined();
+    });
+
+    it("expiresAt is absent when ttlDays is undefined", () => {
+      const result = store.createKey("t1", "d", undefined);
+      expect(result.expiresAt).toBeUndefined();
+    });
+  });
+
+  describe("verifyKey() expiry enforcement", () => {
+    it("returns record for non-expired key", () => {
+      const created = store.createKey("t1", "d", 30);
+      expect(store.verifyKey(created.rawKey)).not.toBeNull();
+    });
+
+    it("returns null for expired key", () => {
+      // Create a key that expires 1ms in the past by manipulating the record directly
+      const created = store.createKey("t1", "d", 30);
+      const record = store["keys"].find((k: { keyId: string }) => k.keyId === created.keyId)!;
+      record.expiresAt = new Date(Date.now() - 1000).toISOString();
+      expect(store.verifyKey(created.rawKey)).toBeNull();
+    });
+
+    it("returns record for key with no expiry set", () => {
+      const created = store.createKey("t1", "no-ttl");
+      expect(store.verifyKey(created.rawKey)).not.toBeNull();
+    });
+  });
+
+  describe("isExpired()", () => {
+    it("returns false for non-expired key", () => {
+      const created = store.createKey("t1", "d", 30);
+      expect(store.isExpired(created.keyId)).toBe(false);
+    });
+
+    it("returns true for expired key", () => {
+      const created = store.createKey("t1", "d", 30);
+      const record = store["keys"].find((k: { keyId: string }) => k.keyId === created.keyId)!;
+      record.expiresAt = new Date(Date.now() - 1000).toISOString();
+      expect(store.isExpired(created.keyId)).toBe(true);
+    });
+
+    it("returns false for key with no expiry", () => {
+      const created = store.createKey("t1", "no-ttl");
+      expect(store.isExpired(created.keyId)).toBe(false);
+    });
+
+    it("returns false for unknown keyId", () => {
+      expect(store.isExpired("nonexistent")).toBe(false);
+    });
+  });
+
+  describe("findRecord()", () => {
+    it("returns record without keyHash for known keyId", () => {
+      const created = store.createKey("t1", "d");
+      const rec = store.findRecord(created.keyId);
+      expect(rec).not.toBeNull();
+      expect(rec!.keyId).toBe(created.keyId);
+      expect(rec).not.toHaveProperty("keyHash");
+    });
+
+    it("returns null for unknown keyId", () => {
+      expect(store.findRecord("unknown")).toBeNull();
+    });
+  });
+
+  describe("findExpiredRecord()", () => {
+    it("returns record for an expired key's raw value", () => {
+      const created = store.createKey("t1", "d", 30);
+      const record = store["keys"].find((k: { keyId: string }) => k.keyId === created.keyId)!;
+      record.expiresAt = new Date(Date.now() - 1000).toISOString();
+      const found = store.findExpiredRecord(created.rawKey);
+      expect(found).not.toBeNull();
+      expect(found!.keyId).toBe(created.keyId);
+    });
+
+    it("returns null for a valid (non-expired) key", () => {
+      const created = store.createKey("t1", "d", 30);
+      expect(store.findExpiredRecord(created.rawKey)).toBeNull();
+    });
+
+    it("returns null for unknown raw key", () => {
+      expect(store.findExpiredRecord("vjj_unknown")).toBeNull();
+    });
+
+    it("returns null for key with no expiry", () => {
+      const created = store.createKey("t1", "no-ttl");
+      expect(store.findExpiredRecord(created.rawKey)).toBeNull();
+    });
+  });
+});
+
+describe("createApiKeyMiddleware() — expiry (N-31)", () => {
+  let store: ApiKeyStore;
+
+  beforeEach(() => {
+    store = new ApiKeyStore(makeTmpFile());
+  });
+
+  it("returns 401 with 'API key expired' message for expired key", () => {
+    const created = store.createKey("acme", "d", 30);
+    const record = store["keys"].find((k: { keyId: string }) => k.keyId === created.keyId)!;
+    record.expiresAt = new Date(Date.now() - 1000).toISOString();
+    const mw = createApiKeyMiddleware(store, true);
+    const req = { headers: { "x-api-key": created.rawKey }, path: "/admin" } as unknown as Parameters<typeof mw>[0];
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as Parameters<typeof mw>[1];
+    const next = jest.fn();
+    mw(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(401);
+    const jsonArg = (res.json as jest.Mock).mock.calls[0][0] as { error: string };
+    expect(jsonArg.error).toContain("expired");
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe("createAuthRouter() — TTL + rotate (N-31)", () => {
+  let store: ApiKeyStore;
+  let server: Server;
+
+  beforeEach(async () => {
+    store = new ApiKeyStore(makeTmpFile());
+    ({ server } = buildAuthApp(store));
+    await startServer(server);
+  });
+
+  afterEach(async () => {
+    await stopServer(server);
+  });
+
+  describe("POST /auth/api-keys with ttlDays", () => {
+    it("returns expiresAt when ttlDays provided", async () => {
+      const res = await httpRequest(server, "POST", "/auth/api-keys", { tenantId: "t1", ttlDays: 30 });
+      expect(res.status).toBe(201);
+      const body = res.json() as Record<string, unknown>;
+      expect(body.expiresAt).toBeDefined();
+    });
+
+    it("returns 400 when ttlDays is 0", async () => {
+      const res = await httpRequest(server, "POST", "/auth/api-keys", { tenantId: "t1", ttlDays: 0 });
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 400 when ttlDays is negative", async () => {
+      const res = await httpRequest(server, "POST", "/auth/api-keys", { tenantId: "t1", ttlDays: -5 });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("POST /auth/api-keys/:keyId/rotate", () => {
+    it("returns 201 with a new rawKey", async () => {
+      const original = store.createKey("acme", "my key");
+      const res = await httpRequest(server, "POST", `/auth/api-keys/${original.keyId}/rotate`, {});
+      expect(res.status).toBe(201);
+      const body = res.json() as Record<string, unknown>;
+      expect(String(body.rawKey)).toMatch(/^vjj_/);
+      expect(body.rawKey).not.toBe(original.rawKey);
+    });
+
+    it("revokes the original key", async () => {
+      const original = store.createKey("acme", "my key");
+      await httpRequest(server, "POST", `/auth/api-keys/${original.keyId}/rotate`, {});
+      expect(store.verifyKey(original.rawKey)).toBeNull();
+    });
+
+    it("new key preserves tenantId and description", async () => {
+      const original = store.createKey("acme", "my key");
+      const res = await httpRequest(server, "POST", `/auth/api-keys/${original.keyId}/rotate`, {});
+      const body = res.json() as Record<string, unknown>;
+      expect(body.tenantId).toBe("acme");
+      expect(body.description).toBe("my key");
+    });
+
+    it("returns 404 for unknown keyId", async () => {
+      const res = await httpRequest(server, "POST", "/auth/api-keys/nonexistent/rotate", {});
+      expect(res.status).toBe(404);
+    });
+
+    it("accepts ttlDays for the replacement key", async () => {
+      const original = store.createKey("acme", "my key");
+      const res = await httpRequest(server, "POST", `/auth/api-keys/${original.keyId}/rotate`, { ttlDays: 90 });
+      expect(res.status).toBe(201);
+      const body = res.json() as Record<string, unknown>;
+      expect(body.expiresAt).toBeDefined();
+    });
+  });
+});

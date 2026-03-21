@@ -20,8 +20,10 @@ export function createApiKeyMiddleware(
     }
     const record = store.verifyKey(rawKey);
     if (!record) {
-      auditLogger?.log({ type: "api_key_rejected", detail: { reason: "invalid_key", path: req.path } });
-      res.status(401).json({ error: "Invalid API key" });
+      // Distinguish expired vs invalid: hash the key to find a matching (but expired) record
+      const reason = store.findExpiredRecord(rawKey) ? "expired" : "invalid_key";
+      auditLogger?.log({ type: "api_key_rejected", detail: { reason, path: req.path } });
+      res.status(401).json({ error: reason === "expired" ? "API key expired" : "Invalid API key" });
       return;
     }
     store.touchKey(record.keyId);

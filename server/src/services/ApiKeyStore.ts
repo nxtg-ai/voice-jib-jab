@@ -8,6 +8,7 @@ export interface ApiKeyRecord {
   keyHash: string;
   createdAt: string;
   lastUsedAt?: string;
+  expiresAt?: string; // ISO timestamp; absent means no expiry
 }
 
 export interface CreateApiKeyResult {
@@ -16,6 +17,7 @@ export interface CreateApiKeyResult {
   tenantId: string;
   description: string;
   createdAt: string;
+  expiresAt?: string;
 }
 
 export class ApiKeyStore {
@@ -44,19 +46,25 @@ export class ApiKeyStore {
     return createHash("sha256").update(rawKey).digest("hex");
   }
 
-  createKey(tenantId: string, description: string): CreateApiKeyResult {
+  createKey(tenantId: string, description: string, ttlDays?: number): CreateApiKeyResult {
     const keyId = randomBytes(16).toString("hex");
     const rawKey = `vjj_${randomBytes(32).toString("hex")}`;
+    const createdAt = new Date().toISOString();
+    const expiresAt =
+      ttlDays !== undefined && ttlDays > 0
+        ? new Date(Date.now() + ttlDays * 86_400_000).toISOString()
+        : undefined;
     const record: ApiKeyRecord = {
       keyId,
       tenantId,
       description,
       keyHash: this.hashKey(rawKey),
-      createdAt: new Date().toISOString(),
+      createdAt,
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
     };
     this.keys.push(record);
     this.save();
-    return { keyId, rawKey, tenantId, description, createdAt: record.createdAt };
+    return { keyId, rawKey, tenantId, description, createdAt, expiresAt };
   }
 
   listKeys(tenantId: string): Omit<ApiKeyRecord, "keyHash">[] {
@@ -77,7 +85,37 @@ export class ApiKeyStore {
 
   verifyKey(rawKey: string): ApiKeyRecord | null {
     const h = this.hashKey(rawKey);
-    return this.keys.find((k) => k.keyHash === h) ?? null;
+    const record = this.keys.find((k) => k.keyHash === h) ?? null;
+    if (!record) return null;
+    if (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now()) return null;
+    return record;
+  }
+
+  isExpired(keyId: string): boolean {
+    const record = this.keys.find((k) => k.keyId === keyId);
+    if (!record || !record.expiresAt) return false;
+    return new Date(record.expiresAt).getTime() < Date.now();
+  }
+
+  /** Returns the key record (without keyHash) by keyId, or null if not found. */
+  findRecord(keyId: string): Omit<ApiKeyRecord, "keyHash"> | null {
+    const record = this.keys.find((k) => k.keyId === keyId);
+    if (!record) return null;
+    const { keyHash: _h, ...rest } = record;
+    return rest;
+  }
+
+  /**
+   * Finds a key record by raw key that exists but has passed its expiry.
+   * Used by middleware to distinguish "expired" from "invalid" rejection reason.
+   */
+  findExpiredRecord(rawKey: string): Omit<ApiKeyRecord, "keyHash"> | null {
+    const h = this.hashKey(rawKey);
+    const record = this.keys.find((k) => k.keyHash === h);
+    if (!record || !record.expiresAt) return null;
+    if (new Date(record.expiresAt).getTime() >= Date.now()) return null;
+    const { keyHash: _h, ...rest } = record;
+    return rest;
   }
 
   touchKey(keyId: string): void {
