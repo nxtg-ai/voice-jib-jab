@@ -208,4 +208,23 @@ describe("Validate API", () => {
     await httpPost(server, "/validate", [1, 2, 3]);
     expect(mockValidator.validate).not.toHaveBeenCalled();
   });
+
+  // ── Error catch branches (lines 42-45) ────────────────────────────
+
+  it("returns 500 when validator.validate rejects with an Error instance", async () => {
+    mockValidator.validate.mockRejectedValue(new Error("validator exploded"));
+    const res = await httpPost(server, "/validate", {});
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("validator exploded");
+  });
+
+  it("returns 500 when validator.validate rejects with a non-Error value", async () => {
+    // Covers the `String(err)` branch of `err instanceof Error ? ... : String(err)`
+    mockValidator.validate.mockRejectedValue("plain string rejection");
+    const res = await httpPost(server, "/validate", {});
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("plain string rejection");
+  });
 });

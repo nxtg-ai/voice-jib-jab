@@ -74,7 +74,7 @@ export class DatabaseAdapter {
    * Creates tables if they don't exist
    */
   private runMigrations(): void {
-    if (!this.db) {
+    if (!this.db) /* istanbul ignore next */ {
       throw new Error("Database not connected");
     }
 

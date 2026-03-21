@@ -279,6 +279,99 @@ describe("GET /compliance-dashboard/tenants/:tenantId/certificate", () => {
   });
 });
 
+// ── Error catch branch coverage (lines 36-37, 49/54, 68/73) ─────────────────
+
+describe("GET /compliance-dashboard/overview — error paths", () => {
+  it("returns 500 when generateOverview throws an Error", async () => {
+    const svc = {
+      generateOverview: jest.fn().mockRejectedValue(new Error("overview failed")),
+      evaluateTenant: jest.fn(),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/overview");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("overview failed");
+  });
+
+  it("returns 500 with 'Internal error' when generateOverview throws a non-Error value", async () => {
+    // Covers the false branch of `err instanceof Error ? err.message : "Internal error"`
+    const svc = {
+      generateOverview: jest.fn().mockRejectedValue("plain rejection"),
+      evaluateTenant: jest.fn(),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/overview");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Internal error");
+  });
+});
+
+describe("GET /compliance-dashboard/tenants/:tenantId — 500 error paths", () => {
+  it("returns 500 when evaluateTenant throws a non-'not found' Error", async () => {
+    const svc = {
+      generateOverview: jest.fn(),
+      evaluateTenant: jest.fn().mockRejectedValue(new Error("database unavailable")),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/tenants/acme");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("database unavailable");
+  });
+
+  it("returns 500 with 'Internal error' when evaluateTenant throws a non-Error value", async () => {
+    const svc = {
+      generateOverview: jest.fn(),
+      evaluateTenant: jest.fn().mockRejectedValue(42),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/tenants/acme");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Internal error");
+  });
+});
+
+describe("GET /compliance-dashboard/tenants/:tenantId/certificate — 500 error paths", () => {
+  it("returns 500 when evaluateTenant throws a non-'not found' Error on certificate endpoint", async () => {
+    const svc = {
+      generateOverview: jest.fn(),
+      evaluateTenant: jest.fn().mockRejectedValue(new Error("upstream failure")),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/tenants/acme/certificate");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("upstream failure");
+  });
+
+  it("returns 500 with 'Internal error' when evaluateTenant throws non-Error on certificate endpoint", async () => {
+    const svc = {
+      generateOverview: jest.fn(),
+      evaluateTenant: jest.fn().mockRejectedValue(null),
+      generateCertificateHtml: jest.fn(),
+    } as unknown as ComplianceDashboardService;
+    server = await startServer(svc);
+
+    const res = await httpGet(server, "/compliance-dashboard/tenants/acme/certificate");
+    expect(res.status).toBe(500);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Internal error");
+  });
+});
+
 describe("GET /compliance-dashboard/dashboard", () => {
   it("returns 200 HTML", async () => {
     mockService = makeMockService({});

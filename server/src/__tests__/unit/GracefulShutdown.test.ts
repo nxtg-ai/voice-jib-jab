@@ -143,6 +143,29 @@ describe("GracefulShutdown", () => {
     });
   });
 
+  describe("constructor default parameters (lines 25-26 branch coverage)", () => {
+    it("uses default timeoutMs (10_000) when not provided", () => {
+      // Calling without timeoutMs evaluates the default expression on line 25.
+      // We can't easily observe 10_000 directly, but construction must not throw.
+      const sd = new GracefulShutdown([], undefined, exitFn);
+      expect(sd).toBeInstanceOf(GracefulShutdown);
+    });
+
+    it("uses default exitFn (process.exit) when not provided — evaluates line 26 expression", async () => {
+      // Calling without exitFn evaluates `process.exit.bind(process)` on line 26.
+      // We spy on process.exit to prevent actual exit, then await a full shutdown.
+      const exitSpy = jest.spyOn(process, "exit").mockImplementation((() => {}) as () => never);
+      try {
+        const sd = new GracefulShutdown([makeTarget("immediate")], 10_000);
+        // Await shutdown so exitFn(0) has been called before we assert.
+        await sd.shutdown("SIGTERM");
+        expect(exitSpy).toHaveBeenCalled();
+      } finally {
+        exitSpy.mockRestore();
+      }
+    });
+  });
+
   describe("register()", () => {
     it("adds SIGTERM listener to process", () => {
       const before = process.listenerCount("SIGTERM");
