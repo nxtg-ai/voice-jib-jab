@@ -1083,3 +1083,84 @@ describe("Personas HTTP API", () => {
     });
   });
 });
+
+// ── PersonaStore — branch coverage ────────────────────────────────────
+
+describe("PersonaStore — branch coverage", () => {
+  let storageFile: string;
+
+  beforeEach(() => {
+    storageFile = tempFile("branch-cov");
+  });
+
+  afterEach(() => {
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  // L139: data.personas ?? [] — right side triggered when 'personas' key absent
+  it("loadFromDisk handles persisted file with no 'personas' key", () => {
+    // Write a file that has tenantAssignments but no personas
+    const { writeFileSync } = require("fs") as typeof import("fs");
+    writeFileSync(storageFile, JSON.stringify({ tenantAssignments: { t1: "persona_friendly_helper" } }), "utf-8");
+
+    const store = new PersonaStore(storageFile);
+    // Built-ins still present; no custom personas loaded (missing key defaulted to [])
+    const personas = store.listPersonas();
+    expect(personas.filter((p) => p.isBuiltIn)).toHaveLength(5);
+    // Tenant assignment was loaded from the file
+    const assigned = store.getTenantPersona("t1");
+    expect(assigned).toBeDefined();
+    expect(assigned!.personaId).toBe("persona_friendly_helper");
+  });
+
+  // L143: data.tenantAssignments ?? {} — right side triggered when key absent
+  it("loadFromDisk handles persisted file with no 'tenantAssignments' key", () => {
+    const { writeFileSync } = require("fs") as typeof import("fs");
+    // Write a valid custom persona but omit tenantAssignments
+    const customPersona = {
+      personaId: "custom-uuid-abc",
+      name: "Loaded Custom",
+      tone: "casual",
+      vocabularyLevel: "standard",
+      responseLengthPreference: "standard",
+      description: "desc",
+      systemPromptSnippet: "snippet",
+      isBuiltIn: false,
+      tenantId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    writeFileSync(storageFile, JSON.stringify({ personas: [customPersona] }), "utf-8");
+
+    const store = new PersonaStore(storageFile);
+    // Custom persona loaded; no assignments (missing key defaulted to {})
+    const fetched = store.getPersona("custom-uuid-abc");
+    expect(fetched).toBeDefined();
+    expect(fetched!.name).toBe("Loaded Custom");
+    // No assignment for any tenant (defaulted to empty object)
+    expect(store.getTenantPersona("any-tenant")).toBeUndefined();
+  });
+
+  // L147: catch block re-throw when error.code !== "ENOENT" (e.g. JSON parse error)
+  it("loadFromDisk rethrows non-ENOENT errors (invalid JSON in storage file)", () => {
+    const { writeFileSync } = require("fs") as typeof import("fs");
+    writeFileSync(storageFile, "{ this is not valid json }", "utf-8");
+
+    expect(() => new PersonaStore(storageFile)).toThrow();
+  });
+
+  // L307: if (!_store) throw — proxy accessed before initPersonaStore()
+  it("personaStore proxy throws before initPersonaStore() is called", () => {
+    let proxyBeforeInit: unknown;
+    jest.isolateModules(() => {
+      // In a fresh module context _store is undefined — no initPersonaStore called
+      const fresh = require("../../services/PersonaStore.js") as {
+        personaStore: { listPersonas: () => unknown[] };
+      };
+      proxyBeforeInit = fresh.personaStore;
+    });
+    expect(() => {
+      (proxyBeforeInit as { listPersonas: () => unknown[] }).listPersonas();
+    }).toThrow("PersonaStore not initialized");
+  });
+});

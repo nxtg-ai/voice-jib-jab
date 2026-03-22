@@ -10,7 +10,7 @@ import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { tmpdir } from "os";
 import { join } from "path";
-import { existsSync, rmSync } from "fs";
+import { existsSync, rmSync, writeFileSync } from "fs";
 import { IntentClassifier } from "../../services/IntentClassifier.js";
 import { IntentStore } from "../../services/IntentStore.js";
 import { createIntentsRouter } from "../../api/intents.js";
@@ -863,5 +863,108 @@ describe("IntentClassifier — word-boundary matching (N-35)", () => {
     const result = classifier.classify("what is the pricing for the plan");
     // "pricing" and "plan" both in sales keywords
     expect(result.scores.sales).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── 13. IntentStore — branch coverage ────────────────────────────────
+
+describe("IntentStore — branch coverage", () => {
+  function tempBranchFile(label: string): string {
+    return join(
+      tmpdir(),
+      `intent-branch-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
+  }
+
+  // L65: Array.isArray(data.logs) false branch
+  // When the JSON file has logs as a non-array value, it should fall back to []
+  it("loadFromDisk: non-array 'logs' field falls back to empty array (L65 false branch)", () => {
+    const file = tempBranchFile("logs-nonarray");
+    writeFileSync(file, JSON.stringify({ logs: "not-an-array", mappings: [] }), "utf-8");
+
+    const store = new IntentStore(file);
+    // logs is not an array — listLogs() should return []
+    expect(store.listLogs()).toEqual([]);
+
+    rmSync(file);
+  });
+
+  // L66: Array.isArray(data.mappings) false branch
+  // When the JSON file has mappings as a non-array value, it should fall back to []
+  it("loadFromDisk: non-array 'mappings' field falls back to empty array (L66 false branch)", () => {
+    const file = tempBranchFile("mappings-nonarray");
+    writeFileSync(file, JSON.stringify({ logs: [], mappings: null }), "utf-8");
+
+    const store = new IntentStore(file);
+    // mappings is not an array — listMappings() should return []
+    expect(store.listMappings()).toEqual([]);
+
+    rmSync(file);
+  });
+
+  // L68: err.code !== "ENOENT" true branch — re-throw non-ENOENT errors
+  // Write invalid JSON to a file that exists; JSON.parse throws a SyntaxError
+  // (code is undefined, not "ENOENT"), so the catch block must re-throw it.
+  it("loadFromDisk: re-throws non-ENOENT errors (L68 true branch)", () => {
+    const file = tempBranchFile("parse-error");
+    writeFileSync(file, "{ this is invalid JSON }", "utf-8");
+
+    expect(() => new IntentStore(file)).toThrow(SyntaxError);
+
+    rmSync(file);
+  });
+
+  // L125: frequencies[entry.intent] ?? 0 — the ?? 0 fallback path
+  // Inject a log entry whose intent is not one of the 5 pre-seeded keys.
+  // This makes the lookup return undefined, exercising the ?? 0 branch.
+  it("getFrequencies: unknown intent key falls back to 0 via nullish coalescing (L125 ?? branch)", () => {
+    const file = tempBranchFile("unknown-intent");
+
+    // Write a valid store file with an intent value not in the seeded frequencies object
+    const storeData = {
+      logs: [
+        {
+          entryId: "abc-123",
+          tenantId: "t1",
+          sessionId: null,
+          text: "test text",
+          intent: "unknown_intent_xyz",
+          confidence: 0.5,
+          detectedAt: new Date().toISOString(),
+        },
+      ],
+      mappings: [],
+    };
+    writeFileSync(file, JSON.stringify(storeData), "utf-8");
+
+    const store = new IntentStore(file);
+    // getFrequencies should not throw; the unknown intent lands in ?? 0 branch
+    // and its count is stored under the unknown key
+    const freq = store.getFrequencies();
+    // The 5 known intents remain at 0
+    expect(freq.billing).toBe(0);
+    expect(freq.support).toBe(0);
+
+    rmSync(file);
+  });
+
+  // L250: if (!_store) true branch — proxy accessed before initIntentStore()
+  // Use jest.resetModules() + dynamic import to get a fresh module where _store is null.
+  it("intentStore proxy: throws before initIntentStore() is called (L250 true branch)", async () => {
+    jest.resetModules();
+    jest.doMock("fs", () => ({
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      existsSync: jest.fn().mockReturnValue(false),
+      mkdirSync: jest.fn(),
+    }));
+
+    const { intentStore } = await import("../../services/IntentStore.js");
+
+    expect(() =>
+      (intentStore as unknown as { listLogs: () => unknown }).listLogs(),
+    ).toThrow("IntentStore not initialized");
+
+    jest.resetModules();
   });
 });

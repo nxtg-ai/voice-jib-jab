@@ -478,3 +478,61 @@ describe("CallQueueService", () => {
     expect(queue.remove("does-not-exist")).toBe(false);
   });
 });
+
+// ===========================================================================
+// CallQueueService — branch coverage
+// ===========================================================================
+
+describe("CallQueueService — branch coverage", () => {
+  let queue: CallQueueService;
+
+  beforeEach(() => {
+    queue = new CallQueueService();
+  });
+
+  // L79: if (!queue) true branch in getPosition()
+  // State needed: meta has the session entry, but the queues map has no key
+  // for that tenantId. Inject via private-field casting.
+  test("getPosition() returns null when meta has session but queues map lacks the tenant key (L79 true branch)", () => {
+    // Directly insert a stale meta entry whose tenantId has no queue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (queue as any).meta.set("sess-stale", {
+      tenantId: "ghost-tenant",
+      enqueuedAt: new Date().toISOString(),
+    });
+    // queues map has no "ghost-tenant" key → L79 if (!queue) is true → returns null
+    expect(queue.getPosition("sess-stale")).toBeNull();
+  });
+
+  // L84: idx === -1 ternary null branch in getPosition()
+  // State needed: meta has session, queues has the tenant key but array does not
+  // contain the session id.
+  test("getPosition() returns null when session is in meta and queue map but not in queue array (L84 null branch)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const queuesMap: Map<string, string[]> = (queue as any).queues;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const metaMap: Map<string, { tenantId: string; enqueuedAt: string }> = (queue as any).meta;
+
+    // Put a different session in the queue so the array exists for "acme"
+    queuesMap.set("acme", ["sess-other"]);
+    // Put a stale meta entry that references "acme" but the id is absent from the array
+    metaMap.set("sess-missing-from-array", {
+      tenantId: "acme",
+      enqueuedAt: new Date().toISOString(),
+    });
+
+    // indexOf returns -1 → ternary takes null branch
+    expect(queue.getPosition("sess-missing-from-array")).toBeNull();
+  });
+
+  // L89: ?? [] fallback in getQueueStatus()
+  // When no queue exists for the requested tenantId the nullish coalescing
+  // operator produces an empty array, yielding an empty status object.
+  test("getQueueStatus() returns empty status when tenant has no queue (L89 ?? [] branch)", () => {
+    const status = queue.getQueueStatus("never-enqueued-tenant");
+    expect(status.tenantId).toBe("never-enqueued-tenant");
+    expect(status.length).toBe(0);
+    expect(status.entries).toEqual([]);
+    expect(status.estimatedWaitMs).toBe(0);
+  });
+});

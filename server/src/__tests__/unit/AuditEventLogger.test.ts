@@ -368,6 +368,31 @@ describe("createAuditEventsRouter()", () => {
     });
   });
 
+  describe("GET /audit/events — from/to non-string params (branch coverage)", () => {
+    beforeEach(() => {
+      logger.log({ type: "session_started", tenantId: "acme", detail: {} });
+      logger.log({ type: "session_ended", tenantId: "acme", detail: {} });
+    });
+
+    it("from repeated as array — branch skipped, returns all events", async () => {
+      // Express sets req.query.from to string[] when param is repeated;
+      // typeof from === "string" is false → L37 if-branch not taken
+      const res = await httpRequest(server, "GET", "/audit/events?from[]=2026-01-01&from[]=2026-02-01");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+
+    it("to repeated as array — branch skipped, returns all events", async () => {
+      // Express sets req.query.to to string[] when param is repeated;
+      // typeof to === "string" is false → L38 if-branch not taken
+      const res = await httpRequest(server, "GET", "/audit/events?to[]=2026-12-31&to[]=2027-01-01");
+      expect(res.status).toBe(200);
+      const body = res.json() as unknown[];
+      expect(body).toHaveLength(2);
+    });
+  });
+
   describe("GET /audit/events/stream", () => {
     it("returns 200 with text/event-stream content-type", async () => {
       // Use raw http to GET the SSE endpoint and immediately destroy

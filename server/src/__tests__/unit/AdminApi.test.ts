@@ -889,3 +889,64 @@ describe("TenantRegistry — initTenantRegistry + proxy", () => {
     if (existsSync(tmpPath)) unlinkSync(tmpPath);
   });
 });
+
+// ── TenantRegistry — branch coverage ──────────────────────────────────
+
+describe("TenantRegistry — branch coverage", () => {
+  let registry: TenantRegistry;
+  let filePath: string;
+
+  beforeEach(() => {
+    filePath = tempPath("branch-cov");
+    registry = new TenantRegistry(filePath);
+  });
+
+  afterEach(() => {
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+  });
+
+  // L76: config.claims ?? [] — right side (nullish fallback) when claims is omitted
+  it("createTenant defaults claims to [] when claims is not provided", () => {
+    const tenant = registry.createTenant({
+      tenantId: "org_no_claims",
+      name: "No Claims",
+      policyLevel: "standard",
+      claimsThreshold: 0.5,
+      disallowedPatterns: [],
+    } as unknown as Parameters<TenantRegistry["createTenant"]>[0]);
+
+    expect(Array.isArray(tenant.claims)).toBe(true);
+    expect(tenant.claims).toHaveLength(0);
+  });
+
+  // L77: config.disallowedPatterns ?? [] — right side (nullish fallback) when omitted
+  it("createTenant defaults disallowedPatterns to [] when not provided", () => {
+    const tenant = registry.createTenant({
+      tenantId: "org_no_patterns",
+      name: "No Patterns",
+      policyLevel: "permissive",
+      claimsThreshold: 0.85,
+      claims: [],
+    } as unknown as Parameters<TenantRegistry["createTenant"]>[0]);
+
+    expect(Array.isArray(tenant.disallowedPatterns)).toBe(true);
+    expect(tenant.disallowedPatterns).toHaveLength(0);
+  });
+
+  // L138: if (!_registry) throw — proxy accessed before initTenantRegistry()
+  it("tenantRegistry proxy throws before initTenantRegistry() is called", () => {
+    let proxyBeforeInit: unknown;
+    jest.isolateModules(() => {
+      // In a fresh module context _registry is null — no initTenantRegistry called
+      const fresh = require("../../services/TenantRegistry.js") as {
+        tenantRegistry: { listTenants: () => unknown[] };
+      };
+      proxyBeforeInit = fresh.tenantRegistry;
+    });
+    expect(() => {
+      (proxyBeforeInit as { listTenants: () => unknown[] }).listTenants();
+    }).toThrow("TenantRegistry not initialized");
+  });
+});
