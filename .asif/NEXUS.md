@@ -13060,6 +13060,35 @@ Dashboard: 59/59 SHIPPED.
 
 ---
 
+### Check-in 93 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+Nothing. Last code commit: `3ec36ba` (N-59). Last NEXUS commit: `bb1e439` (check-in 92). No directives pending, no new work assigned.
+
+#### 2. What surprised me?
+
+Nothing new. Third consecutive reflection prompt this session with no intervening code work. The cadence is firing faster than directives arrive.
+
+#### 3. Cross-project signals
+
+None new this check-in.
+
+#### 4. What would I prioritize next?
+
+Same as check-in 92: N-60 branch coverage pass on the four remaining <85% files (`api/recordings.ts`, `api/export.ts`, `services/WebhookService.ts`, `api/quota.ts`). Estimated +30-50 tests, would push branch coverage above 92%.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 59/59 SHIPPED.
+
+---
+
 ### N-55: Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing (2026-03-21)
 
 Five-file parallel branch coverage pass. Work done via 4 parallel agents:
