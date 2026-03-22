@@ -665,3 +665,81 @@ describe("Quota API", () => {
     });
   });
 });
+
+// ── Quota API — branch coverage ──────────────────────────────────────────
+
+describe("Quota API — branch coverage", () => {
+  let svc: TenantQuotaService;
+  let file: string;
+  let server: Server;
+
+  beforeAll((done) => {
+    file = tempFile("branch");
+    svc = new TenantQuotaService(file);
+    server = createServer(buildApp(svc));
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      if (existsSync(file)) rmSync(file, { force: true });
+      done();
+    });
+  });
+
+  beforeEach(() => {
+    if (existsSync(file)) rmSync(file, { force: true });
+    svc = new TenantQuotaService(file);
+    const newApp = buildApp(svc);
+    server.removeAllListeners("request");
+    server.on("request", newApp);
+  });
+
+  // L70-71: maxConcurrentSessions present but not a number
+  it("returns 400 when maxConcurrentSessions is not a number (L70-71)", async () => {
+    const res = await httpRequest(server, "PUT", "/tenants/acme/quota", {
+      maxConcurrentSessions: "many",
+    });
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("maxConcurrentSessions");
+  });
+
+  // L78: monthlyMinutesQuota present but not a number
+  it("returns 400 when monthlyMinutesQuota is not a number (L78)", async () => {
+    const res = await httpRequest(server, "PUT", "/tenants/acme/quota", {
+      monthlyMinutesQuota: "unlimited",
+    });
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("monthlyMinutesQuota");
+  });
+
+  // L88: requestsPerMinute ternary false arm — field absent in body
+  it("uses undefined for requestsPerMinute when field absent in PUT body (L88 false arm)", async () => {
+    const res = await httpRequest(server, "PUT", "/tenants/acme/quota", {
+      maxConcurrentSessions: 10,
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    // Service fills in default (60) when requestsPerMinute is not supplied
+    expect(data.requestsPerMinute).toBe(60);
+    expect(data.maxConcurrentSessions).toBe(10);
+  });
+
+  // L92: maxConcurrentSessions ternary false arm — field absent in body
+  it("uses undefined for maxConcurrentSessions when field absent in PUT body (L92 false arm)", async () => {
+    const res = await httpRequest(server, "PUT", "/tenants/acme/quota", {
+      requestsPerMinute: 30,
+    });
+
+    expect(res.status).toBe(200);
+    const data = res.json() as Record<string, unknown>;
+    expect(data.requestsPerMinute).toBe(30);
+    // Service fills in default (5) when maxConcurrentSessions is not supplied
+    expect(data.maxConcurrentSessions).toBe(5);
+  });
+});

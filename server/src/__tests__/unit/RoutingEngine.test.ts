@@ -263,6 +263,121 @@ describe("RoutingEngine", () => {
 });
 
 // ===========================================================================
+// RoutingEngine — branch coverage
+// ===========================================================================
+
+describe("RoutingEngine — branch coverage", () => {
+  let engine: RoutingEngine;
+  let storageFile: string;
+
+  beforeEach(() => {
+    storageFile = makeTempFile();
+    engine = new RoutingEngine(storageFile);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // L121: deleteRule() returns false when ruleId is not found
+  test("deleteRule() returns false for unknown ruleId (L121)", () => {
+    const result = engine.deleteRule("does-not-exist");
+    expect(result).toBe(false);
+  });
+
+  // L159/L160: tenant-specific rule whose tenantId does NOT match meta.tenantId — matchRule returns null.
+  // getRules() pre-filters by tenantId, so the only way to reach matchRule with a mismatching
+  // tenant rule is to pass tenantId: undefined to evaluate() (bypassing the getRules filter),
+  // which causes getRules(undefined) to return all active rules unfiltered.
+  test("evaluate() skips tenant-specific rule in matchRule when meta.tenantId does not match (L159/L160)", () => {
+    engine.addRule({
+      tenantId: "acme",
+      priority: 1,
+      conditions: {},
+      targetTemplateId: "acme-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    // Passing tenantId: undefined bypasses getRules filtering, so matchRule receives the
+    // "acme" rule but meta.tenantId is undefined — mismatch fires return null at L160.
+    const decision = engine.evaluate({ tenantId: undefined as unknown as string });
+    expect(decision.ruleId).toBe("default");
+    expect(decision.templateId).toBe("builtin-customer-support");
+  });
+
+  // L159 binary-expr: tenant-specific rule whose tenantId DOES match meta.tenantId
+  // (rule.tenantId !== null is true, but rule.tenantId !== meta.tenantId is false — no early return)
+  test("evaluate() matches tenant-specific rule when tenantId matches exactly (L159 match branch)", () => {
+    engine.addRule({
+      tenantId: "acme",
+      priority: 1,
+      conditions: {},
+      targetTemplateId: "acme-only-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.templateId).toBe("acme-only-tpl");
+    expect(decision.ruleId).not.toBe("default");
+  });
+
+  // L173: topic condition present but meta.topic is undefined (falsy) — returns null
+  test("evaluate() skips rule when topic condition exists but meta has no topic (L173 !meta.topic branch)", () => {
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { topic: "billing" },
+      targetTemplateId: "billing-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    engine.addRule({
+      tenantId: null,
+      priority: 2,
+      conditions: {},
+      targetTemplateId: "fallback-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    // meta has no topic at all
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.templateId).toBe("fallback-tpl");
+  });
+
+  // L192: callerType condition present but meta.callerType does not match
+  test("evaluate() skips rule when callerType condition does not match meta.callerType (L192)", () => {
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { callerType: "returning" },
+      targetTemplateId: "returning-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    engine.addRule({
+      tenantId: null,
+      priority: 2,
+      conditions: {},
+      targetTemplateId: "fallback-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    // meta.callerType is "new" — does not match "returning"
+    const decision = engine.evaluate({ tenantId: "acme", callerType: "new" });
+    expect(decision.templateId).toBe("fallback-tpl");
+  });
+
+  // L241: loadFromDisk re-throws non-ENOENT errors (e.g. corrupt JSON triggers SyntaxError)
+  test("constructor re-throws non-ENOENT error from loadFromDisk when file is corrupt (L241)", () => {
+    const { writeFileSync } = require("fs") as typeof import("fs");
+    // Write invalid JSON so JSON.parse throws a SyntaxError (code undefined, not ENOENT)
+    writeFileSync(storageFile, "NOT_VALID_JSON", "utf-8");
+
+    expect(() => new RoutingEngine(storageFile)).toThrow(SyntaxError);
+  });
+});
+
+// ===========================================================================
 // CallQueueService
 // ===========================================================================
 

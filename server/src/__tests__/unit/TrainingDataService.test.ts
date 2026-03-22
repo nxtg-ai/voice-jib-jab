@@ -465,4 +465,142 @@ describe("TrainingDataService", () => {
       }
     });
   });
+
+  // ── Branch coverage ───────────────────────────────────────────────
+
+  describe("TrainingDataService — branch coverage", () => {
+    let svc: TrainingDataService;
+    let file: string;
+
+    beforeEach(() => {
+      file = tempFile("branch");
+      svc = new TrainingDataService(file);
+    });
+
+    afterEach(() => {
+      if (existsSync(file)) rmSync(file, { force: true });
+    });
+
+    // L111: ann.note !== undefined → true branch — note IS provided to addAnnotation
+    it("addAnnotation includes note field when note is provided", () => {
+      const ann = svc.addAnnotation(
+        makeAnnotationInput({ note: "supervisor note here" }),
+      );
+      expect(ann.note).toBe("supervisor note here");
+    });
+
+    // L112: ann.supervisorId !== undefined → true branch — supervisorId IS provided
+    it("addAnnotation includes supervisorId field when supervisorId is provided", () => {
+      const ann = svc.addAnnotation(
+        makeAnnotationInput({ supervisorId: "sup-001" }),
+      );
+      expect(ann.supervisorId).toBe("sup-001");
+    });
+
+    // L344/L345: filters.to is set AND annotation passes the filter (date <= to)
+    it("applyFilters: annotation within 'to' boundary is included in dataset", () => {
+      // Add one annotation — its createdAt will be "now" (2026-03-21)
+      svc.addAnnotation(makeAnnotationInput({ sessionId: "s1", turnIndex: 1 }));
+
+      // Build dataset with a far-future 'to' date — annotation should be included
+      const ds = svc.buildDataset("DS", {
+        to: "2099-12-31T23:59:59.999Z",
+      });
+      expect(ds.exampleCount).toBe(1);
+    });
+
+    // L344/L345: annotation after 'to' is excluded (false branch of outer if already
+    // covered above; this covers inner if=true: createdAt > to)
+    it("applyFilters: annotation after 'to' boundary is excluded from dataset", () => {
+      // Use a past 'to' date so the annotation (created now) exceeds it
+      svc.addAnnotation(makeAnnotationInput({ sessionId: "s1", turnIndex: 1 }));
+
+      const ds = svc.buildDataset("DS", {
+        to: "2020-01-01T00:00:00.000Z",
+      });
+      expect(ds.exampleCount).toBe(0);
+    });
+
+    // L376: binary-expr in findPriorUserTurn — annotation passes sessionId check
+    // but fails speaker=user check → the && short-circuit
+    it("findPriorUserTurn falls back to empty string when only assistant turns precede", () => {
+      // Two assistant turns in same session — no user turns before turn 3
+      svc.addAnnotation(
+        makeAnnotationInput({ sessionId: "sess-x", turnIndex: 1, speaker: "assistant" }),
+      );
+      svc.addAnnotation(
+        makeAnnotationInput({ sessionId: "sess-x", turnIndex: 2, speaker: "assistant" }),
+      );
+      const annotated = svc.addAnnotation(
+        makeAnnotationInput({ sessionId: "sess-x", turnIndex: 3, speaker: "assistant" }),
+      );
+      const ds = svc.buildDataset("DS", { sessionIds: ["sess-x"] });
+      const jsonl = svc.exportJsonl(ds.datasetId);
+      // The user role message content should be empty string for each example
+      const lines = jsonl.split("\n");
+      const parsed = JSON.parse(lines[lines.length - 1]) as {
+        messages: Array<{ role: string; content: string }>;
+        sourceAnnotationIds: string[];
+      };
+      const userMsg = parsed.messages.find((m) => m.role === "user");
+      expect(userMsg).toBeDefined();
+      // No prior user turn exists → empty string fallback (L382 false branch)
+      expect(userMsg!.content).toBe("");
+      // Confirm we're looking at the right annotation
+      expect(parsed.sourceAnnotationIds).toContain(annotated.annotationId);
+    });
+
+    // L382: sessionAnnotations.length > 0 → true branch — prior user turn exists
+    it("findPriorUserTurn returns prior user turn text when one exists", () => {
+      svc.addAnnotation(
+        makeAnnotationInput({
+          sessionId: "sess-y",
+          turnIndex: 1,
+          speaker: "user",
+          text: "What is the weather?",
+        }),
+      );
+      const assistantAnn = svc.addAnnotation(
+        makeAnnotationInput({
+          sessionId: "sess-y",
+          turnIndex: 2,
+          speaker: "assistant",
+          text: "It is sunny today.",
+        }),
+      );
+      // Build dataset for only the assistant annotation so the JSONL has one line
+      const ds = svc.buildDataset("DS", {
+        sessionIds: ["sess-y"],
+        labels: ["good_response"],
+      });
+      const jsonl = svc.exportJsonl(ds.datasetId);
+      const lines = jsonl.split("\n").filter(Boolean);
+      // Find the line that corresponds to the assistant annotation
+      const line = lines.find((l) => {
+        const obj = JSON.parse(l) as { sourceAnnotationIds: string[] };
+        return obj.sourceAnnotationIds.includes(assistantAnn.annotationId);
+      });
+      expect(line).toBeDefined();
+      const parsed = JSON.parse(line!) as {
+        messages: Array<{ role: string; content: string }>;
+      };
+      const userMsg = parsed.messages.find((m) => m.role === "user");
+      expect(userMsg!.content).toBe("What is the weather?");
+    });
+
+    // L411: proxy get — false branch (instance IS set, delegate to it)
+    it("singleton proxy delegates property access to instance when initialized", () => {
+      const f = tempFile("proxy-branch");
+      try {
+        initTrainingDataService(f);
+        // Access a non-function property via the proxy to exercise the non-function branch
+        // storageFile is a private field so we use a public method instead —
+        // the important thing is the proxy get runs the false branch of !_instance
+        const result = trainingDataService.listDatasets();
+        expect(Array.isArray(result)).toBe(true);
+      } finally {
+        if (existsSync(f)) rmSync(f, { force: true });
+      }
+    });
+  });
 });

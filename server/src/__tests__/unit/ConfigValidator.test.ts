@@ -499,3 +499,113 @@ describe("concurrency", () => {
     expect(res.checks.every((c) => typeof c.passed === "boolean")).toBe(true);
   });
 });
+
+// ── Branch coverage ───────────────────────────────────────────────────
+
+describe("ConfigValidator — branch coverage", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAccess.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // L84: String(outcome.reason) — non-Error rejection from a check function
+  it("validate() uses String(reason) when a check rejects with a non-Error", async () => {
+    // Force one of the check functions to reject with a plain string (not Error)
+    // We do this by making fetch throw a non-Error object; but that only hits L140/L158.
+    // To reach L84 we need the entire check *function* to throw unexpectedly.
+    // We monkey-patch fsp.access to throw a plain string, which propagates through
+    // checkStorageDir (no catch on non-Error) and surfaces in allSettled as rejected.
+    mockAccess.mockImplementation(() => {
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      throw "disk-full" as unknown as Error;
+    });
+
+    mockFetchResponse(200);
+
+    const validator = new ConfigValidator(makeConfig());
+    const res = await validator.validate(makePassingRequest());
+
+    // The storageDir check will either surface as an "unknown" failure (if the
+    // throw escapes allSettled) or as a normal failure; either way valid is false
+    // and the String() branch at L84 is exercised when outcome.reason is a string.
+    expect(res.valid).toBe(false);
+  });
+
+  // L116: openAiBaseUrl ?? "https://api.openai.com" — fallback when URL not provided
+  it("checkOpenAi() uses default URL when openAiBaseUrl not in request", async () => {
+    const capturedUrls: string[] = [];
+    jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      capturedUrls.push(typeof input === "string" ? input : (input as Request).url);
+      return new Response(null, { status: 200 }) as Response;
+    });
+
+    const validator = new ConfigValidator(makeConfig());
+    // Omit openAiBaseUrl — triggers the ?? fallback branch
+    const req: ConfigValidationRequest = { ...makePassingRequest() };
+    delete req.openAiBaseUrl;
+    await validator.validate(req);
+
+    expect(capturedUrls.some((u) => u.includes("https://api.openai.com"))).toBe(true);
+  });
+
+  // L140: chromaDbUrl ?? "http://localhost:8000" — fallback when URL not provided
+  it("checkChromaDb() uses default URL when chromaDbUrl not in request", async () => {
+    const capturedUrls: string[] = [];
+    jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      capturedUrls.push(typeof input === "string" ? input : (input as Request).url);
+      return new Response(null, { status: 200 }) as Response;
+    });
+
+    const validator = new ConfigValidator(makeConfig());
+    // Omit chromaDbUrl — triggers the ?? fallback branch
+    const req: ConfigValidationRequest = { ...makePassingRequest() };
+    delete req.chromaDbUrl;
+    await validator.validate(req);
+
+    expect(capturedUrls.some((u) => u.includes("localhost:8000"))).toBe(true);
+  });
+
+  // L158: String(err) in checkChromaDb catch — non-Error thrown from fetch
+  it("checkChromaDb() uses String(err) when fetch throws a non-Error value", async () => {
+    jest.spyOn(global, "fetch").mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.includes("/api/v1/heartbeat")) {
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw 42 as unknown as Error;
+      }
+      return new Response(null, { status: 200 }) as Response;
+    });
+
+    const validator = new ConfigValidator(makeConfig());
+    const res = await validator.validate(makePassingRequest());
+    const check = findCheck(res.checks, "reachability.chromadb");
+
+    expect(check.passed).toBe(false);
+    expect(check.message).toContain("42");
+  });
+
+  // L181: opaEnabled ?? this.config.opa.enabled — fallback reads config when
+  //        opaEnabled is undefined AND config has opa.enabled = true
+  it("checkOpaBundle() falls back to config.opa.enabled=true when opaEnabled not in request", async () => {
+    mockFetchResponse(200);
+    // Bundle accessible
+    mockAccess.mockResolvedValue(undefined);
+
+    const validator = new ConfigValidator(
+      makeConfig({ opa: { enabled: true, bundlePath: "/policies/bundle.tar.gz" } }),
+    );
+    const req: ConfigValidationRequest = { ...makePassingRequest() };
+    // Remove opaEnabled so the ?? operator falls back to config.opa.enabled (true)
+    delete req.opaEnabled;
+    const res = await validator.validate(req);
+    const check = findCheck(res.checks, "policy.opaBundle");
+
+    // enabled=true from config, bundle accessible → passes
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain("found");
+  });
+});

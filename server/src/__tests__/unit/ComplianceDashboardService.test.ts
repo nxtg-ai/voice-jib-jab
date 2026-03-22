@@ -774,4 +774,98 @@ describe("ComplianceDashboardService", () => {
       expect(html).toContain("</html>");
     });
   });
+
+  // ── Branch coverage ───────────────────────────────────────────────────────
+
+  describe("generateCertificateHtml() — branch coverage", () => {
+    function makeReport(overrides: Partial<TenantComplianceReport> = {}): TenantComplianceReport {
+      const byRegulation = {} as TenantComplianceReport["byRegulation"];
+      for (const reg of ["GDPR", "HIPAA", "SOC2", "PCI_DSS", "CCPA"] as const) {
+        byRegulation[reg] = { status: "compliant", passed: 2, total: 2, requirements: [] };
+      }
+      return {
+        tenantId: "acme-corp",
+        evaluatedAt: "2026-03-20T00:00:00.000Z",
+        overallStatus: "compliant",
+        complianceScorePct: 100,
+        byRegulation,
+        gaps: [],
+        certificateEligible: true,
+        ...overrides,
+      };
+    }
+
+    // L394: passingRegs.length === 0 → "No regulations fully compliant" branch
+    it("shows 'No regulations fully compliant' when no regulation is fully compliant", () => {
+      const noCompliantByReg = {} as TenantComplianceReport["byRegulation"];
+      for (const reg of ["GDPR", "HIPAA", "SOC2", "PCI_DSS", "CCPA"] as const) {
+        noCompliantByReg[reg] = { status: "non_compliant", passed: 0, total: 2, requirements: [] };
+      }
+      const svc = buildService([makeTenant("acme-corp")], []);
+      const html = svc.generateCertificateHtml(
+        makeReport({ byRegulation: noCompliantByReg, overallStatus: "non_compliant" }),
+      );
+      expect(html).toContain("No regulations fully compliant");
+    });
+
+    // L517/L519: nested ternary for overallStatus color — "partial" branch
+    it("uses yellow color token when overallStatus is partial", () => {
+      const partialByReg = {} as TenantComplianceReport["byRegulation"];
+      for (const reg of ["GDPR", "HIPAA", "SOC2", "PCI_DSS", "CCPA"] as const) {
+        partialByReg[reg] = { status: "partial", passed: 1, total: 2, requirements: [] };
+      }
+      const svc = buildService([makeTenant("acme-corp")], []);
+      const html = svc.generateCertificateHtml(
+        makeReport({
+          overallStatus: "partial",
+          complianceScorePct: 69,
+          byRegulation: partialByReg,
+        }),
+      );
+      expect(html).toContain("var(--yellow)");
+    });
+
+    // L517/L519: "non_compliant" branch → var(--red)
+    it("uses red color token when overallStatus is non_compliant", () => {
+      const failByReg = {} as TenantComplianceReport["byRegulation"];
+      for (const reg of ["GDPR", "HIPAA", "SOC2", "PCI_DSS", "CCPA"] as const) {
+        failByReg[reg] = { status: "non_compliant", passed: 0, total: 2, requirements: [] };
+      }
+      const svc = buildService([makeTenant("acme-corp")], []);
+      const html = svc.generateCertificateHtml(
+        makeReport({
+          overallStatus: "non_compliant",
+          complianceScorePct: 20,
+          byRegulation: failByReg,
+        }),
+      );
+      expect(html).toContain("var(--red)");
+    });
+  });
+
+  describe("evaluateTenant() — branch coverage", () => {
+    // L263: escalate key missing from policyDecisions → triggers ?? 0 nullish coalescing
+    it("treats missing escalate key in policyDecisions as zero (no escalation policy)", async () => {
+      const tenants = [makeTenant("tenant-a")];
+      const recordings = [
+        makeRecording({
+          sessionId: "s1",
+          tenantId: "tenant-a",
+          summary: {
+            turnCount: 2,
+            // escalate key intentionally omitted
+            policyDecisions: { allow: 5, refuse: 0 } as Record<string, number>,
+            audioInputChunks: 10,
+            audioOutputChunks: 10,
+          },
+        }),
+      ];
+      const svc = buildService(tenants, recordings);
+      const report = await svc.evaluateTenant("tenant-a");
+      const hipaa2 = report.byRegulation.HIPAA.requirements.find(
+        (r) => r.requirementId === "HIPAA-2",
+      );
+      expect(hipaa2!.passed).toBe(false);
+    });
+  });
 });

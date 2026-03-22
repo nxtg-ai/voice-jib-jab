@@ -599,3 +599,143 @@ describe("WebhookService", () => {
     });
   });
 });
+
+// ── Branch coverage ────────────────────────────────────────────────────
+
+describe("WebhookService — branch coverage", () => {
+  let svc: WebhookService;
+  let file: string;
+  let fetchSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    file = join(
+      tmpdir(),
+      `webhook-branch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+    );
+    svc = new WebhookService(file);
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+      status: 200,
+      ok: true,
+    } as Response);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    if (existsSync(file)) {
+      rmSync(file, { force: true });
+    }
+  });
+
+  // L124: active ?? true — the true fallback when active is not supplied
+  it("createWebhook() defaults active to true when not provided", () => {
+    const webhook = svc.createWebhook({
+      tenantId: "acme",
+      url: "https://example.com/hook",
+      events: ["call_start"],
+      // active intentionally omitted so ?? true fires
+    } as Parameters<typeof svc.createWebhook>[0]);
+
+    expect(webhook.active).toBe(true);
+  });
+
+  // L177-L180: false branches — updateWebhook fields not present in updates
+  it("updateWebhook() skips fields absent from updates object", () => {
+    const created = svc.createWebhook({
+      tenantId: "acme",
+      url: "https://original.com/hook",
+      events: ["call_start"],
+      active: true,
+      secret: "original-secret",
+      description: "original desc",
+    });
+
+    // Pass only description — url, events, secret, active branches all take
+    // the false path (updates.X === undefined)
+    const updated = svc.updateWebhook(created.webhookId, {
+      description: "updated desc",
+    });
+
+    expect(updated).toBeDefined();
+    expect(updated!.url).toBe("https://original.com/hook");
+    expect(updated!.events).toEqual(["call_start"]);
+    expect(updated!.secret).toBe("original-secret");
+    expect(updated!.active).toBe(true);
+    expect(updated!.description).toBe("updated desc");
+  });
+
+  // L285: String(err) — non-Error value thrown from fetch
+  it("deliver() records String(err) when fetch throws a non-Error value", async () => {
+    fetchSpy.mockRejectedValue("plain string error");
+
+    svc.createWebhook({
+      tenantId: "acme",
+      url: "https://example.com/hook",
+      events: ["call_start"],
+      active: true,
+    });
+
+    const [delivery] = await svc.deliver("acme", "call_start", {
+      event: "call_start",
+      tenantId: "acme",
+      timestamp: new Date().toISOString(),
+      data: {},
+    });
+
+    expect(delivery.success).toBe(false);
+    expect(delivery.error).toBe("plain string error");
+  });
+
+  // L314: listDeliveries() tenantId filter — webhookId undefined, tenantId provided
+  it("listDeliveries() filters by tenantId when no webhookId supplied", async () => {
+    svc.createWebhook({
+      tenantId: "acme",
+      url: "https://a.com/hook",
+      events: ["call_start"],
+      active: true,
+    });
+    svc.createWebhook({
+      tenantId: "other",
+      url: "https://b.com/hook",
+      events: ["call_start"],
+      active: true,
+    });
+
+    await svc.deliver("acme", "call_start", {
+      event: "call_start",
+      tenantId: "acme",
+      timestamp: new Date().toISOString(),
+      data: {},
+    });
+    await svc.deliver("other", "call_start", {
+      event: "call_start",
+      tenantId: "other",
+      timestamp: new Date().toISOString(),
+      data: {},
+    });
+
+    // No webhookId filter, tenantId filter only — hits the L314 branch true path
+    // and skips the L311 branch (webhookId undefined)
+    const acmeDeliveries = svc.listDeliveries(undefined, "acme");
+    expect(acmeDeliveries).toHaveLength(1);
+    expect(acmeDeliveries[0].tenantId).toBe("acme");
+  });
+
+  // L356: proxy false branch — non-function property access returns value directly
+  it("webhookService proxy returns non-function values directly (not bound)", () => {
+    const f = join(
+      tmpdir(),
+      `webhook-proxy-nonfn-${Date.now()}.json`,
+    );
+    try {
+      initWebhookService(f);
+      // Access a property that does not exist on WebhookService — yields undefined
+      // (not a function), exercising the `return value` false branch at L356
+      const nonExistent = (webhookService as unknown as Record<string, unknown>)[
+        "__nonExistentProperty__"
+      ];
+      expect(nonExistent).toBeUndefined();
+    } finally {
+      if (existsSync(f)) rmSync(f, { force: true });
+    }
+  });
+});

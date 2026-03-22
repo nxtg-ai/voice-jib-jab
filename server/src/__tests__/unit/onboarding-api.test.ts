@@ -452,3 +452,128 @@ describe("Error paths — catch blocks", () => {
     expect(body.error).toBe("Reset not permitted");
   });
 });
+
+// ── Onboarding API — branch coverage ─────────────────────────────────────
+
+describe("Onboarding API — branch coverage", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    const app = buildApp();
+    server = createServer(app);
+    server.listen(0, "127.0.0.1", done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // L112: validationErrors is present but empty — takes the else branch to plain 400
+  it("complete-step: empty validationErrors array falls through to plain 400 (L112 false branch)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    const errWithEmptyList = new Error("Validation failed") as Error & {
+      validationErrors: string[];
+    };
+    errWithEmptyList.validationErrors = [];
+    mockSvc.completeStep.mockImplementation(() => {
+      throw errWithEmptyList;
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/complete-step",
+      {},
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string; validationErrors?: unknown };
+    expect(body.validationErrors).toBeUndefined();
+    expect(body.error).toBe("Validation failed");
+  });
+
+  // L123: e.message is undefined — "Unknown error" fallback in complete-step
+  it("complete-step: error without message falls back to 'Unknown error' (L123 ?? false branch)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    const errNoMessage = Object.create(Error.prototype) as Error;
+    Object.defineProperty(errNoMessage, "message", { value: undefined, writable: true });
+    mockSvc.completeStep.mockImplementation(() => {
+      throw errNoMessage;
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/complete-step",
+      {},
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Unknown error");
+  });
+
+  // L148: skip — error without message uses "Unknown error" fallback
+  it("skip: error without message falls back to 'Unknown error' (L148 ?? false branch)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    const errNoMessage = Object.create(Error.prototype) as Error;
+    Object.defineProperty(errNoMessage, "message", { value: undefined, writable: true });
+    mockSvc.skipStep.mockImplementation(() => {
+      throw errNoMessage;
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/skip",
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Unknown error");
+  });
+
+  // L173: back — error without message uses "Unknown error" fallback
+  it("back: error without message falls back to 'Unknown error' (L173 ?? false branch)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    const errNoMessage = Object.create(Error.prototype) as Error;
+    Object.defineProperty(errNoMessage, "message", { value: undefined, writable: true });
+    mockSvc.goBack.mockImplementation(() => {
+      throw errNoMessage;
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/back",
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Unknown error");
+  });
+
+  // L198: reset — error without message uses "Unknown error" fallback
+  it("reset: error without message falls back to 'Unknown error' (L198 ?? false branch)", async () => {
+    mockSvc.getSession.mockReturnValue(FIXTURE_SESSION);
+    const errNoMessage = Object.create(Error.prototype) as Error;
+    Object.defineProperty(errNoMessage, "message", { value: undefined, writable: true });
+    mockSvc.resetSession.mockImplementation(() => {
+      throw errNoMessage;
+    });
+
+    const res = await httpRequest(
+      server,
+      "POST",
+      "/onboarding/sessions/sess-001/reset",
+    );
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toBe("Unknown error");
+  });
+});

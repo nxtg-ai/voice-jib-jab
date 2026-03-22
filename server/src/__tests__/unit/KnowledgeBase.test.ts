@@ -428,6 +428,100 @@ describe("KnowledgeBaseStore — branch coverage", () => {
   });
 });
 
+// ── Branch Coverage II: stale idIndex + proxy ──────────────────────────
+
+describe("KnowledgeBaseStore — branch coverage II", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = tempDir("branch2");
+    mkdirSync(dir, { recursive: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * Helpers to create a stale-idIndex state: idIndex points to a tenantId but
+   * the corresponding entry is absent from the cache array. This exercises the
+   * defensive `if (!entry) return undefined/false/void` branches at L182/L204/L223.
+   *
+   * We reach private fields via `(store as any)` — acceptable in unit tests for
+   * coverage of unreachable-via-API defensive guards.
+   */
+  function storeWithStaleIndex(storageDir: string): { store: KnowledgeBaseStore; id: string } {
+    const store = new KnowledgeBaseStore(storageDir);
+    // Add an entry so tenantId is in idIndex and cache is populated.
+    const entry = store.addEntry({
+      tenantId: "org_stale",
+      question: "Stale question?",
+      answer: "Stale answer",
+    });
+    // Remove the entry from the cache array WITHOUT going through deleteEntry
+    // (which would also remove from idIndex). This leaves idIndex pointing to
+    // "org_stale" for entry.id, but the cache array is empty.
+    const s = store as unknown as {
+      cache: Map<string, unknown[]>;
+      idIndex: Map<string, string>;
+    };
+    s.cache.set("org_stale", []);
+    // idIndex still has entry.id -> "org_stale"
+    return { store, id: entry.id };
+  }
+
+  it("updateEntry() returns undefined when idIndex has tenantId but entry is missing from cache (L182)", () => {
+    const { store, id } = storeWithStaleIndex(dir);
+    const result = store.updateEntry(id, { question: "New?" });
+    expect(result).toBeUndefined();
+  });
+
+  it("deleteEntry() returns false when idIndex has tenantId but entry is missing from cache (L204)", () => {
+    const { store, id } = storeWithStaleIndex(dir);
+    const result = store.deleteEntry(id);
+    expect(result).toBe(false);
+  });
+
+  it("incrementHit() returns early when idIndex has tenantId but entry is missing from cache (L223)", () => {
+    const { store, id } = storeWithStaleIndex(dir);
+    // Should not throw — just silently returns
+    expect(() => store.incrementHit(id)).not.toThrow();
+  });
+
+  it("knowledgeBaseStore proxy throws before initKnowledgeBaseStore() is called (L279)", async () => {
+    // Reset the module so _store is null
+    jest.resetModules();
+    const { knowledgeBaseStore: freshProxy } = await import("../../services/KnowledgeBaseStore.js");
+    expect(() => (freshProxy as unknown as { listEntries: (t: string) => unknown }).listEntries("x")).toThrow(
+      "KnowledgeBaseStore not initialized",
+    );
+  });
+
+  it("knowledgeBaseStore proxy returns non-function property without binding (L285 false branch)", async () => {
+    jest.resetModules();
+    const { initKnowledgeBaseStore, knowledgeBaseStore: freshProxy } = await import(
+      "../../services/KnowledgeBaseStore.js"
+    );
+    const tempStorageDir = tempDir("proxy");
+    mkdirSync(tempStorageDir, { recursive: true });
+    initKnowledgeBaseStore(tempStorageDir);
+
+    // Access a non-function property on the proxy (e.g. a non-method).
+    // KnowledgeBaseStore has no public non-function properties, so we
+    // verify that accessing an arbitrary property does NOT throw and
+    // returns undefined (the false branch of `typeof value === "function"`).
+    const value = (freshProxy as unknown as Record<string, unknown>)["nonExistentProp"];
+    expect(value).toBeUndefined();
+
+    if (existsSync(tempStorageDir)) {
+      rmSync(tempStorageDir, { recursive: true, force: true });
+    }
+  });
+});
+
 // ── Unit Tests: FaqExtractor ──────────────────────────────────────────
 
 describe("FaqExtractor", () => {

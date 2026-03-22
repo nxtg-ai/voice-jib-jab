@@ -401,3 +401,92 @@ describe("Recordings API", () => {
     });
   });
 });
+
+// ── Branch coverage ───────────────────────────────────────────────────
+
+describe("Recordings API — branch coverage", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    server = createServer(buildApp());
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // L35: clampInt — n < 0 branch (negative value passed)
+  it("clamps negative limit to default (L35 n < 0 branch)", async () => {
+    mockStore.listRecordings.mockResolvedValue([]);
+
+    const res = await httpRequest(server, "GET", "/recordings?limit=-5");
+
+    expect(res.status).toBe(200);
+    const data = res.json() as { limit: number };
+    expect(data.limit).toBe(100); // DEFAULT_LIMIT
+  });
+
+  it("clamps negative offset to default (L35 n < 0 branch)", async () => {
+    mockStore.listRecordings.mockResolvedValue([]);
+
+    const res = await httpRequest(server, "GET", "/recordings?offset=-1");
+
+    expect(res.status).toBe(200);
+    const data = res.json() as { offset: number };
+    expect(data.offset).toBe(0); // DEFAULT_OFFSET
+  });
+
+  // L66: from param is non-string (array query param)
+  it("returns 400 when from is an array query param (L66 typeof fromRaw !== string)", async () => {
+    const res = await httpRequest(
+      server,
+      "GET",
+      "/recordings?from=2026-01-01&from=2026-02-01",
+    );
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("from");
+  });
+
+  // L79: to param is non-string (array query param)
+  it("returns 400 when to is an array query param (L79 typeof toRaw !== string)", async () => {
+    const res = await httpRequest(
+      server,
+      "GET",
+      "/recordings?to=2026-01-01&to=2026-02-01",
+    );
+
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("to");
+  });
+
+  // L106: err is not an Error instance — String(err) path
+  it("uses String(err) when listRecordings throws a non-Error (L106 cond-expr false branch)", async () => {
+    mockStore.listRecordings.mockRejectedValue("raw string failure");
+
+    const res = await httpRequest(server, "GET", "/recordings");
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("raw string failure");
+  });
+
+  // L158: err is not an Error instance — String(err) path in DELETE
+  it("uses String(err) when deleteRecording throws a non-Error (L158 cond-expr false branch)", async () => {
+    mockStore.hasRecording.mockReturnValue(true);
+    mockStore.deleteRecording.mockRejectedValue("disk full");
+
+    const res = await httpRequest(server, "DELETE", "/recordings/sess-aaa");
+
+    expect(res.status).toBe(500);
+    const data = res.json() as { error: string };
+    expect(data.error).toBe("disk full");
+  });
+});
