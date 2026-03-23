@@ -232,6 +232,24 @@ export class HealthMonitorService extends EventEmitter {
     return "degraded";
   }
 
+  /**
+   * Register a new health check at runtime.
+   *
+   * Useful when a subsystem (e.g. the WebSocket server) is not available at
+   * construction time. The new check is seeded as "unknown" and will be
+   * included in the next runAllChecks() cycle.
+   */
+  registerCheck(def: HealthCheckDefinition): void {
+    this.checks.push(def);
+    this.results.set(def.name, {
+      name: def.name,
+      status: "unknown",
+      latencyMs: 0,
+      checkedAt: new Date().toISOString(),
+      consecutiveFailures: 0,
+    });
+  }
+
   /** Returns true if the periodic check loop is active. */
   isRunning(): boolean {
     return this.running;
@@ -259,8 +277,21 @@ export function createVoiceAgentHealthChecks(opts: {
   openAiBaseUrl?: string;
   sqlitePath?: string;
   postgresUrl?: string;
+  voiceWss?: { isHealthy(): boolean };
 }): HealthCheckDefinition[] {
   const checks: HealthCheckDefinition[] = [];
+
+  // WebSocket — verify voice WebSocket server is open and accepting connections
+  if (opts.voiceWss) {
+    checks.push({
+      name: "websocket",
+      async check() {
+        if (!opts.voiceWss!.isHealthy()) {
+          throw new Error("Voice WebSocket server is not accepting connections");
+        }
+      },
+    });
+  }
 
   // STT — verify OpenAI endpoint is reachable; 401/403 means server is up
   checks.push({

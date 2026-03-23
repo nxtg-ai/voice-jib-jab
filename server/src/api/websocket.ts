@@ -139,6 +139,17 @@ export class VoiceWebSocketServer {
     console.log("[WebSocket] Server initialized");
   }
 
+  /**
+   * Returns true if the WebSocket server is open and accepting connections.
+   * Used by the health monitor to verify the voice WebSocket subsystem is live.
+   */
+  isHealthy(): boolean {
+    // ws.WebSocketServer exposes no explicit readyState, but after .close() is
+    // called the server removes its HTTP upgrade listener. We detect closure by
+    // checking whether the underlying net.Server reference is still set.
+    return (this.wss as unknown as { _server?: object })._server != null;
+  }
+
   /** Close all voice WebSocket connections and shut down the server. */
   close(callback?: (err?: Error) => void): void {
     for (const client of this.wss.clients) {

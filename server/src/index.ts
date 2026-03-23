@@ -192,12 +192,16 @@ app.use(
 // Audit event stream — registered after guard so requireApiKey fires first.
 app.use("/audit", createAuditEventsRouter(auditEventLogger));
 
-// Health check endpoint
+// Health check endpoint — canonical production check, includes HealthMonitor overall status.
+// /health/live (liveness) and /health/ready (deep readiness) are in createHealthRouter.
 app.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
+  const overall = healthMonitor.getOverallStatus();
+  const status = overall === "down" ? "degraded" : "ok";
+  res.status(overall === "down" ? 503 : 200).json({
+    status,
+    overall,
     sessions: sessionManager.getSessionCount(),
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -668,6 +672,16 @@ async function startServer(): Promise<VoiceWebSocketServer> {
 }
 
 startServer().then((voiceWss) => {
+  // N-64: Register WebSocket health check now that voiceWss is available.
+  healthMonitor.registerCheck({
+    name: "websocket",
+    async check() {
+      if (!voiceWss.isHealthy()) {
+        throw new Error("Voice WebSocket server is not accepting connections");
+      }
+    },
+  });
+
   // N-63: Graceful shutdown — drain in-flight requests first, then close WS + HTTP, 10s fallback.
   new GracefulShutdown([voiceWss, supervisorWsServer, server], 10_000, undefined, requestTracker).register();
 }).catch((error) => {

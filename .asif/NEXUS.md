@@ -73,6 +73,7 @@
 | N-61 | Branch Coverage — 5 files: auditEvents + CallQueue + TenantRegistry + PersonaStore + IntentStore | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-62 | Branch Coverage — 5 files: intents + SlaMonitor + VoiceProfileStore + language + rateLimiter | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-63 | Production Hardening — liveness probe + RequestTracker drain + Artillery load tests | OBSERVABILITY | SHIPPED | P1 | 2026-03-22 |
+| N-64 | Production Hardening — WebSocket health check + registerCheck() + enhanced /health | OBSERVABILITY | SHIPPED | P1 | 2026-03-22 |
 
 ---
 
@@ -1524,6 +1525,18 @@ The CoS had 25 idle-cycle triggers to work with but the actual enterprise gaps w
 ### 5. Blockers / questions for CoS?
 
 None on N-26/N-27/N-28 — all shipped clean. Q39/Q40 still pending. Ready for next directive.
+
+---
+
+> Session: 2026-03-22 (check-in 102) | Author: Claude Sonnet 4.6
+
+**N-64 SHIPPED**: WebSocket health check + `registerCheck()` + enhanced `/health` endpoint. 4,963 → 4,976 tests (+13). 64/64 SHIPPED.
+
+**Root cause fixed**: `index.ts` was calling `healthMonitor.registerCheck({name: "websocket", ...})` after `startServer()` returned, but `HealthMonitorService` had no `registerCheck()` method — checks were constructor-only. Added `registerCheck(def)` which pushes to `this.checks` and seeds results as "unknown", matching constructor behavior.
+
+**`VoiceWebSocketServer.isHealthy()`** uses `(this.wss as unknown as { _server?: object })._server != null` — the only available signal that the WSS is still accepting connections (no public readyState on server-side WebSocketServer).
+
+**All 6 subsystems monitored**: stt, tts, opa, chromadb, database, websocket. VJJ is fully production-deployable.
 
 ---
 
@@ -12974,6 +12987,37 @@ startup:   GET /ready           — 503 until serverReady=true (prevent prematur
 ```
 
 4,928 → **4,963 tests** (+35). Dashboard: 63/63 SHIPPED.
+
+---
+
+### N-64: Production Hardening — WebSocket Health Check + registerCheck() + Enhanced /health (2026-03-22)
+
+Final production hardening item: WebSocket subsystem health check + runtime check registration API.
+
+**`VoiceWebSocketServer.isHealthy()` (`src/api/websocket.ts`)**
+Returns `true` if the WebSocket server is open and accepting connections. Detects closure by checking whether the underlying `net.Server` reference (`wss._server`) is still set — `ws.WebSocketServer` exposes no public `readyState` on the server side.
+
+**`HealthMonitorService.registerCheck()` (`src/services/HealthMonitorService.ts`)**
+New `registerCheck(def: HealthCheckDefinition): void` method for runtime check registration. Seeds the result as "unknown" (same as constructor) and pushes to the internal checks array. Enables subsystems unavailable at construction time (e.g. the WebSocket server, which requires `server.listen()` to be called first) to be registered after startup.
+
+**`createVoiceAgentHealthChecks()` — voiceWss option**
+Extended opts with `voiceWss?: { isHealthy(): boolean }`. When provided, prepends a "websocket" check that throws if `isHealthy()` returns false. Existing 5-check output for `{}` opts is unchanged.
+
+**`index.ts` wiring**
+- Enhanced `GET /health` now returns `overall` from `HealthMonitorService.getOverallStatus()` and sends 503 when `overall === "down"`
+- `startServer().then()` calls `healthMonitor.registerCheck(websocket)` using the newly-available `voiceWss` reference
+
+**K8s probe topology after N-64:**
+```
+liveness:  GET /health/live        — restart if 200 stops (process dead/deadlocked)
+readiness: GET /health/ready       — remove from LB if 503 (any subsystem down)
+health:    GET /health             — overall status (now includes WebSocket check)
+startup:   GET /ready              — 503 until serverReady=true (prevent premature traffic)
+```
+
+**All 6 subsystems now monitored**: stt, tts, opa, chromadb, database, websocket.
+
+4,963 → **4,976 tests** (+13). Dashboard: 64/64 SHIPPED.
 
 ---
 

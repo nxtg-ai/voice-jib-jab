@@ -516,6 +516,111 @@ describe("createVoiceAgentHealthChecks()", () => {
   });
 });
 
+// ── registerCheck() ───────────────────────────────────────────────────
+
+describe("HealthMonitorService — registerCheck()", () => {
+  it("adds the new check to getStatus() results", () => {
+    const svc = new HealthMonitorService([passingCheck("a")]);
+    svc.registerCheck(passingCheck("b"));
+    const names = svc.getStatus().map((r) => r.name);
+    expect(names).toContain("a");
+    expect(names).toContain("b");
+    expect(names).toHaveLength(2);
+  });
+
+  it("seeds the new check as 'unknown'", () => {
+    const svc = new HealthMonitorService([]);
+    svc.registerCheck(passingCheck("late"));
+    expect(svc.getSubsystemStatus("late")?.status).toBe("unknown");
+  });
+
+  it("new check runs on next runAllChecks()", async () => {
+    const svc = new HealthMonitorService([]);
+    svc.registerCheck(passingCheck("ws"));
+    await svc.runAllChecks();
+    expect(svc.getSubsystemStatus("ws")?.status).toBe("healthy");
+  });
+
+  it("failing new check is reflected in getOverallStatus()", async () => {
+    const svc = new HealthMonitorService([passingCheck("a")]);
+    svc.registerCheck(failingCheck("ws"));
+    await svc.runAllChecks();
+    expect(svc.getOverallStatus()).toBe("degraded");
+  });
+
+  it("can register multiple checks at runtime", () => {
+    const svc = new HealthMonitorService([]);
+    svc.registerCheck(passingCheck("x"));
+    svc.registerCheck(passingCheck("y"));
+    expect(svc.getStatus()).toHaveLength(2);
+  });
+
+  it("registered check is accessible via getSubsystemStatus()", () => {
+    const svc = new HealthMonitorService([]);
+    svc.registerCheck(passingCheck("probe"));
+    const result = svc.getSubsystemStatus("probe");
+    expect(result).toBeDefined();
+    expect(result?.name).toBe("probe");
+  });
+});
+
+// ── createVoiceAgentHealthChecks() — voiceWss option ─────────────────
+
+describe("createVoiceAgentHealthChecks() — voiceWss option", () => {
+  it("includes 'websocket' check when voiceWss is provided", () => {
+    const checks = createVoiceAgentHealthChecks({
+      voiceWss: { isHealthy: () => true },
+    });
+    expect(checks.map((c) => c.name)).toContain("websocket");
+  });
+
+  it("'websocket' is the first check when voiceWss is provided", () => {
+    const checks = createVoiceAgentHealthChecks({
+      voiceWss: { isHealthy: () => true },
+    });
+    expect(checks[0].name).toBe("websocket");
+  });
+
+  it("returns 6 checks when voiceWss is provided", () => {
+    const checks = createVoiceAgentHealthChecks({
+      voiceWss: { isHealthy: () => true },
+    });
+    expect(checks).toHaveLength(6);
+  });
+
+  it("websocket check resolves when voiceWss.isHealthy() returns true", async () => {
+    const checks = createVoiceAgentHealthChecks({
+      voiceWss: { isHealthy: () => true },
+    });
+    const ws = checks.find((c) => c.name === "websocket")!;
+    await expect(ws.check()).resolves.toBeUndefined();
+  });
+
+  it("websocket check throws when voiceWss.isHealthy() returns false", async () => {
+    const checks = createVoiceAgentHealthChecks({
+      voiceWss: { isHealthy: () => false },
+    });
+    const ws = checks.find((c) => c.name === "websocket")!;
+    await expect(ws.check()).rejects.toThrow(
+      "Voice WebSocket server is not accepting connections",
+    );
+  });
+
+  it("omits 'websocket' check when voiceWss is not provided", () => {
+    const checks = createVoiceAgentHealthChecks({});
+    expect(checks.map((c) => c.name)).not.toContain("websocket");
+  });
+
+  it("isHealthy() is called on each check invocation", async () => {
+    const isHealthy = jest.fn().mockReturnValue(true);
+    const checks = createVoiceAgentHealthChecks({ voiceWss: { isHealthy } });
+    const ws = checks.find((c) => c.name === "websocket")!;
+    await ws.check();
+    await ws.check();
+    expect(isHealthy).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ── createVoiceAgentHealthChecks() — additional branches ─────────────
 
 describe("createVoiceAgentHealthChecks() — additional branches", () => {
