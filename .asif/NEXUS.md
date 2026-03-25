@@ -13853,3 +13853,35 @@ No new code. Q19/Q46/Q47 open. 7th consecutive idle check-in since N-66.
 ### Check-in 118 — 2026-03-25 (empty-delta skip)
 
 No new code. Q19/Q46/Q47 open.
+
+---
+
+### Check-in 119 — 2026-03-25
+
+#### 1. What shipped?
+
+**CRUCIBLE self-improvement pass** (commit `5ba970a`):
+
+- **OpaModeratorCheck flaky test — FIXED** (`Q45 resolved`). Root cause: `ControlEngine.initialize()` called `claimsRegistry.initialize()` which dynamically imports `@huggingface/transformers` and attempts an ONNX model download — no mock was in place. Fixed by adding `jest.spyOn(registry, "initialize").mockResolvedValue(undefined)` in both ControlEngine integration tests. Test was not self-resolved as hypothesised in check-in 110; it was genuinely broken and manifested as a timeout under load.
+- **TrainingDataService**: hollow `toBeGreaterThanOrEqual(0)` → concrete `toBe(2)` (exactly 2 annotations added with current 2026 timestamps, both pass the 2025 filter).
+- **ComplianceDashboardService**: `complianceScorePct >= 0` bounded above with `<= 100`.
+- **Translation**: `latencyMs` and `pipelineLatencyMs` bounded above with `< 1000` (stub is synchronous, actual values ~0ms).
+- **jest.config.js**: branch floor 86% → 90% (actual: 92.57%). Statements floor 92% → 94% (actual: 97.24%). Lines floor 93% → 94% (actual: 97.49%). Q47 executed.
+
+All 4998 tests pass. CI gate green. Pushed.
+
+#### 2. What surprised me?
+
+Q45 was not self-resolved. The flaky timeout in the full-suite run was consistent — it just didn't appear in the previous post-N-66 run due to scheduling luck. The root cause (`@huggingface/transformers` dynamic import hitting network in CI) is now properly mocked. This is a more robust fix than the previous hypothesis.
+
+#### 3. Cross-project signals
+
+OpaModeratorCheck pattern (unguarded dynamic import in `initialize()` causing timeout in full-suite runs) may recur in any project using `@huggingface/transformers` or similar lazy-loaded ML runtimes. The fix pattern is: always spy on `initialize()` in integration tests that call `engine.initialize()`.
+
+#### 4. What would I prioritize next?
+
+1. N-67 — RBAC/supervisor WS auth (Q19, production blocker)
+2. N-68 — session persistence
+3. Q46 — `collectDefaultMetrics` XS addition
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. Branch 92.57% / floor 90%.**
