@@ -301,16 +301,16 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260324-01 — P1: N-66 Prometheus Metrics Endpoint
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-24 21:45 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-24 21:45 | **Estimate**: S | **Status**: DONE
 
 **Context**: VJJ is production-ready (65/65 shipped, 4,996 tests). Phase 2 enterprise features start with observability.
 
 **Action Items**:
-1. [ ] Install prom-client: `npm install prom-client`
-2. [ ] Create GET /metrics endpoint that exports Prometheus format
-3. [ ] Metrics to export: httpRequestsTotal (counter), httpRequestDurationMs (histogram), wsConnectionsActive (gauge), ttsProcessingDurationMs (histogram)
-4. [ ] Register metrics in app startup, increment in middleware
-5. [ ] Tests for /metrics endpoint (returns text/plain, contains expected metric names)
+1. [x] Install prom-client: `npm install prom-client`
+2. [x] Create GET /metrics endpoint that exports Prometheus format
+3. [x] Metrics to export: httpRequestsTotal (counter), httpRequestDurationMs (histogram), wsConnectionsActive (gauge), ttsProcessingDurationMs (histogram)
+4. [x] Register metrics in app startup, increment in middleware
+5. [x] Tests for /metrics endpoint (returns text/plain, contains expected metric names)
 
 **Constraints**:
 - Standard Prometheus exposition format
@@ -318,6 +318,17 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Run bash .git/hooks/pre-push before pushing
 
 **Response** (filled by team):
+
+> **DONE 2026-03-24.** Files created:
+> - `src/metrics/registry.ts` — isolated Registry with 4 metrics; wsConnectionsActive uses `collect()` callback + `setWsConnectionGetter()` for lazy WS server injection
+> - `src/middleware/prometheusMiddleware.ts` — records httpRequestsTotal + httpRequestDurationMs on `res.on("finish")` with route normalisation via `req.route?.path`
+>
+> Files modified:
+> - `src/index.ts` — imports + mounts prometheus middleware; replaces JSON /metrics with Prometheus handler; wires `setWsConnectionGetter(() => voiceWss.getConnectionCount())` after voiceWss creation
+> - `src/services/OpenAITTS.ts` — records `ttsProcessingDurationMs` via lazy dynamic import (non-blocking, won't break TTS on metrics failure)
+> - `src/__tests__/unit/MetricsEndpoint.test.ts` — updated from JSON to Prometheus assertions; 9 /metrics tests cover: 200 status, text/plain content-type, all 4 metric names, HELP/TYPE lines, counter increment verification, non-JSON format assertion
+>
+> Test count: **4,996 → 4,998** (+2). All 4,998 passing. OpaModeratorCheck flaky test also now consistently passing in full suite.
 
 ---
 

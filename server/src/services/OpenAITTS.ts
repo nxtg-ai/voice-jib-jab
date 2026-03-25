@@ -48,6 +48,7 @@ export class OpenAITTS {
 
     console.log(`[TTS] Generating speech for: "${text}"`);
 
+    const ttsStart = Date.now();
     try {
       const response = await this.client.audio.speech.create({
         model: "tts-1",
@@ -64,9 +65,15 @@ export class OpenAITTS {
       // Cache the result
       this.cache.set(cacheKey, buffer);
 
+      const durationMs = Date.now() - ttsStart;
       console.log(
         `[TTS] Generated ${buffer.length} bytes for: "${text}" (${(buffer.length / 48000).toFixed(2)}s)`,
       );
+
+      // N-66: Record TTS processing latency for Prometheus scraping.
+      import("../metrics/registry.js").then(({ ttsProcessingDurationMs }) => {
+        ttsProcessingDurationMs.observe(durationMs);
+      }).catch(() => { /* metrics not critical */ });
 
       return buffer;
     } catch (error) {

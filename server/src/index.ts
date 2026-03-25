@@ -121,6 +121,8 @@ import { createCorsMiddleware } from "./middleware/cors.js";
 import { RATE_LIMITS } from "./config/rateLimits.js";
 import { jsonErrorHandler } from "./middleware/errorHandler.js";
 import { createAccessLogger } from "./middleware/accessLogger.js";
+import { createPrometheusMiddleware } from "./middleware/prometheusMiddleware.js";
+import { register, setWsConnectionGetter } from "./metrics/registry.js";
 
 const app = express();
 const server = createServer(app);
@@ -149,6 +151,9 @@ app.use(requestTracker.middleware());
 // N-47: Structured access logger — mounted after requestId so every log line carries the ID.
 // Skips /health to prevent K8s probe spam. Output: JSON lines to stderr.
 app.use(createAccessLogger());
+
+// N-66: Prometheus HTTP metrics — records httpRequestsTotal + httpRequestDurationMs.
+app.use(createPrometheusMiddleware());
 
 // Security headers
 app.use(securityHeaders);
@@ -236,31 +241,16 @@ app.get("/status", (_req, res) => {
   });
 });
 
-// Metrics endpoint
-app.get("/metrics", (_req, res) => {
-  const activeSessions = sessionManager.getActiveSessions();
-  res.json({
-    timestamp: new Date().toISOString(),
-    uptime_seconds: Math.floor(process.uptime()),
-    sessions: {
-      active: activeSessions.length,
-      total: sessionManager.getSessionCount(),
-    },
-    memory: {
-      rss_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
-      heap_used_mb: Math.round(
-        process.memoryUsage().heapUsed / 1024 / 1024,
-      ),
-      heap_total_mb: Math.round(
-        process.memoryUsage().heapTotal / 1024 / 1024,
-      ),
-    },
-    session_detail: activeSessions.map((s) => ({
-      id: s.id,
-      state: s.state,
-      uptime_ms: Date.now() - s.createdAt,
-    })),
-  });
+// N-66: Prometheus metrics endpoint — standard exposition format for scraping.
+// No auth required; Prometheus scrapes this directly.
+app.get("/metrics", async (_req, res) => {
+  try {
+    const metrics = await register.metrics();
+    res.set("Content-Type", register.contentType);
+    res.end(metrics);
+  } catch (err) {
+    res.status(500).end(String(err));
+  }
 });
 
 // Monitoring dashboard — full voice agent ops view
@@ -549,6 +539,9 @@ async function startServer(): Promise<VoiceWebSocketServer> {
     ? new ClaimVerificationService(fpBaseUrl, fpApiKey)
     : undefined;
   const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore, verificationService, recordingStore);
+
+  // N-66: Wire Prometheus wsConnectionsActive gauge to pull from voiceWss at scrape time.
+  setWsConnectionGetter(() => voiceWss.getConnectionCount());
 
   // Register whisper handler so supervisors can inject hints into live sessions
   supervisorRegistry.setWhisperHandler((sessionId, message) => voiceWss.injectWhisper(sessionId, message));

@@ -1,14 +1,51 @@
 /**
- * Metrics & Dashboard Endpoint Tests
+ * Metrics & Dashboard Endpoint Tests — N-66
  *
- * Tests the /metrics and /dashboard routes defined in index.ts.
- * Since the express app is not exported from index.ts, we replicate the route
- * handlers here with mocked sessionManager to verify response shape and content.
- * This approach avoids importing index.ts (which triggers server startup side effects).
+ * Tests the /metrics (Prometheus) and /dashboard routes.
+ * Uses an isolated prom-client Registry to avoid cross-test pollution.
+ * The production /metrics handler uses register.metrics() from metrics/registry.ts;
+ * here we replicate that pattern with a local registry to test the exposition format.
  */
 
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
+import { Registry, Counter, Histogram, Gauge } from "prom-client";
+import { createPrometheusMiddleware } from "../../middleware/prometheusMiddleware.js";
+
+// ── Isolated test registry (never the global default) ────────────────────
+
+const testRegister = new Registry();
+
+const testHttpRequestsTotal = new Counter({
+  name: "http_requests_total",
+  help: "Total HTTP requests",
+  labelNames: ["method", "route", "status"] as const,
+  registers: [testRegister],
+});
+
+const testHttpRequestDurationMs = new Histogram({
+  name: "http_request_duration_ms",
+  help: "HTTP request duration in milliseconds",
+  labelNames: ["method", "route", "status"] as const,
+  buckets: [5, 10, 25, 50, 100, 200, 400],
+  registers: [testRegister],
+});
+
+// wsConnectionsActive and ttsProcessingDurationMs are registered in the test
+// registry so they appear in /metrics output — not called directly in tests.
+new Gauge({
+  name: "ws_connections_active",
+  help: "Active WebSocket connections",
+  registers: [testRegister],
+  collect() { this.set(0); },
+});
+
+new Histogram({
+  name: "tts_processing_duration_ms",
+  help: "TTS processing duration in milliseconds",
+  buckets: [50, 100, 250, 500, 1000],
+  registers: [testRegister],
+});
 
 // ── Mock sessionManager ──────────────────────────────────────────────────
 
@@ -22,10 +59,16 @@ const mockSessionManager = {
   getSessionCount: jest.fn(() => 3),
 };
 
-// ── Build a test app with the same route handlers as index.ts ────────────
+// ── Build a test app ─────────────────────────────────────────────────────
 
 function buildTestApp(): Express {
   const app = express();
+
+  // Prometheus middleware using isolated test instances
+  app.use(createPrometheusMiddleware({
+    counter: testHttpRequestsTotal,
+    histogram: testHttpRequestDurationMs,
+  }));
 
   app.get("/health", (_req, res) => {
     res.json({
@@ -49,30 +92,15 @@ function buildTestApp(): Express {
     });
   });
 
-  app.get("/metrics", (_req, res) => {
-    const activeSessions = mockSessionManager.getActiveSessions();
-    res.json({
-      timestamp: new Date().toISOString(),
-      uptime_seconds: Math.floor(process.uptime()),
-      sessions: {
-        active: activeSessions.length,
-        total: mockSessionManager.getSessionCount(),
-      },
-      memory: {
-        rss_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
-        heap_used_mb: Math.round(
-          process.memoryUsage().heapUsed / 1024 / 1024,
-        ),
-        heap_total_mb: Math.round(
-          process.memoryUsage().heapTotal / 1024 / 1024,
-        ),
-      },
-      session_detail: activeSessions.map((s) => ({
-        id: s.id,
-        state: s.state,
-        uptime_ms: Date.now() - s.createdAt,
-      })),
-    });
+  // N-66: Prometheus /metrics endpoint
+  app.get("/metrics", async (_req, res) => {
+    try {
+      const metrics = await testRegister.metrics();
+      res.set("Content-Type", testRegister.contentType);
+      res.end(metrics);
+    } catch (err) {
+      res.status(500).end(String(err));
+    }
   });
 
   app.get("/dashboard", (_req, res) => {
@@ -81,6 +109,11 @@ function buildTestApp(): Express {
 <head><title>voice-jib-jab — Live Metrics</title></head>
 <body><h1>voice-jib-jab</h1></body>
 </html>`);
+  });
+
+  // Trigger route — used to verify counter increments
+  app.get("/trigger", (_req, res) => {
+    res.json({ ok: true });
   });
 
   return app;
@@ -138,6 +171,7 @@ describe("Metrics & Dashboard Endpoints", () => {
   });
 
   afterAll((done) => {
+    testRegister.clear();
     server.close(done);
   });
 
@@ -147,87 +181,64 @@ describe("Metrics & Dashboard Endpoints", () => {
     mockSessionManager.getSessionCount.mockReturnValue(3);
   });
 
-  // ── GET /metrics ────────────────────────────────────────────────────
+  // ── GET /metrics — Prometheus exposition format (N-66) ───────────────
 
   describe("GET /metrics", () => {
-    it("returns 200 with JSON content type", async () => {
+    it("returns 200", async () => {
       const res = await request(server, "/metrics");
       expect(res.status).toBe(200);
-      expect(res.headers["content-type"]).toContain("application/json");
     });
 
-    it("includes a valid ISO timestamp", async () => {
+    it("returns text/plain content type", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as Record<string, unknown>;
-      expect(typeof data.timestamp).toBe("string");
-      expect(new Date(data.timestamp as string).toISOString()).toBe(
-        data.timestamp,
-      );
+      expect(res.headers["content-type"]).toContain("text/plain");
     });
 
-    it("includes uptime_seconds as a non-negative number", async () => {
+    it("contains http_requests_total metric", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as Record<string, unknown>;
-      expect(typeof data.uptime_seconds).toBe("number");
-      expect(data.uptime_seconds).toBeGreaterThanOrEqual(0);
+      expect(res.body).toContain("http_requests_total");
     });
 
-    it("includes sessions.active matching active session count", async () => {
+    it("contains http_request_duration_ms metric", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as {
-        sessions: { active: number; total: number };
-      };
-      expect(data.sessions.active).toBe(mockSessions.length);
-      expect(data.sessions.total).toBe(3);
+      expect(res.body).toContain("http_request_duration_ms");
     });
 
-    it("includes memory usage with rss_mb, heap_used_mb, heap_total_mb", async () => {
+    it("contains ws_connections_active metric", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as {
-        memory: {
-          rss_mb: number;
-          heap_used_mb: number;
-          heap_total_mb: number;
-        };
-      };
-      expect(typeof data.memory.rss_mb).toBe("number");
-      expect(typeof data.memory.heap_used_mb).toBe("number");
-      expect(typeof data.memory.heap_total_mb).toBe("number");
-      expect(data.memory.rss_mb).toBeGreaterThan(0);
-      expect(data.memory.heap_used_mb).toBeGreaterThan(0);
+      expect(res.body).toContain("ws_connections_active");
     });
 
-    it("includes session_detail as an array with correct shape", async () => {
+    it("contains tts_processing_duration_ms metric", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as {
-        session_detail: Array<{
-          id: string;
-          state: string;
-          uptime_ms: number;
-        }>;
-      };
-      expect(Array.isArray(data.session_detail)).toBe(true);
-      expect(data.session_detail).toHaveLength(2);
-      expect(data.session_detail[0]).toEqual(
-        expect.objectContaining({
-          id: "sess-001",
-          state: "listening",
-        }),
-      );
-      expect(typeof data.session_detail[0].uptime_ms).toBe("number");
-      expect(data.session_detail[0].uptime_ms).toBeGreaterThan(0);
+      expect(res.body).toContain("tts_processing_duration_ms");
     });
 
-    it("returns empty session_detail when no active sessions", async () => {
-      mockSessionManager.getActiveSessions.mockReturnValue([]);
-      mockSessionManager.getSessionCount.mockReturnValue(0);
+    it("contains HELP and TYPE lines for each metric", async () => {
       const res = await request(server, "/metrics");
-      const data = res.json() as {
-        sessions: { active: number; total: number };
-        session_detail: unknown[];
-      };
-      expect(data.sessions.active).toBe(0);
-      expect(data.session_detail).toEqual([]);
+      expect(res.body).toMatch(/^# HELP http_requests_total/m);
+      expect(res.body).toMatch(/^# TYPE http_requests_total counter/m);
+      expect(res.body).toMatch(/^# HELP http_request_duration_ms/m);
+      expect(res.body).toMatch(/^# TYPE http_request_duration_ms histogram/m);
+      expect(res.body).toMatch(/^# HELP ws_connections_active/m);
+      expect(res.body).toMatch(/^# TYPE ws_connections_active gauge/m);
+      expect(res.body).toMatch(/^# HELP tts_processing_duration_ms/m);
+      expect(res.body).toMatch(/^# TYPE tts_processing_duration_ms histogram/m);
+    });
+
+    it("increments http_requests_total after a request is made", async () => {
+      // Make a request to /trigger to increment the counter
+      await request(server, "/trigger");
+      const res = await request(server, "/metrics");
+      // The counter should have been incremented — look for a non-zero total
+      expect(res.body).toMatch(/http_requests_total\{[^}]*\} [1-9]/);
+    });
+
+    it("body is in standard Prometheus exposition format (no JSON braces)", async () => {
+      const res = await request(server, "/metrics");
+      // Prometheus format uses lines, not JSON objects
+      expect(res.body).not.toMatch(/^\{/);
+      expect(res.body).toContain("\n");
     });
   });
 
