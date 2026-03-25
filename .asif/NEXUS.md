@@ -13647,3 +13647,9 @@ No new code. Blocked awaiting CoS direction: M-2 directive names (FlowAnalyticsS
 ### Check-in 104 — 2026-03-24 (empty-delta skip)
 
 No new code. Same blocker as check-in 103. Awaiting CoS store name clarification for M-2e.
+
+---
+
+### Check-in 105 — 2026-03-24 (empty-delta skip)
+
+No new code. Blocker unchanged. See check-in 103 for detail.
