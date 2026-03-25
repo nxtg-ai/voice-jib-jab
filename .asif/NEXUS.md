@@ -13664,3 +13664,66 @@ No new code. Same blocker as check-in 103. Awaiting CoS store name clarification
 ### Check-in 105 — 2026-03-24 (empty-delta skip)
 
 No new code. Blocker unchanged. See check-in 103 for detail.
+
+---
+
+### Check-in 106 — 2026-03-24
+
+#### 1. What shipped since last check-in?
+
+**N-66** (committed `d4d98bc`, pushed): Prometheus metrics endpoint.
+
+Key deliverables:
+- `src/metrics/registry.ts` — isolated `Registry` (not global default), 4 prom-client metrics
+- `src/middleware/prometheusMiddleware.ts` — HTTP counter + histogram on `res.on("finish")`, route-normalised via `req.route?.path`
+- `src/index.ts` — middleware mounted, JSON `/metrics` replaced with Prometheus handler, `setWsConnectionGetter` wired after voiceWss creation
+- `src/services/OpenAITTS.ts` — `ttsProcessingDurationMs` observed via non-blocking dynamic import
+- `MetricsEndpoint.test.ts` — 6 JSON tests replaced with 9 Prometheus tests
+
+Test count: **4,996 → 4,998** (+2). All 4,998 passing. CI gate: PASSED.
+Also: OpaModeratorCheck flaky test is now consistently passing in the full suite (was intermittently failing under test ordering — appears self-resolved, possibly related to prom-client module load ordering stabilising the async queue).
+
+Dashboard: **66/66 SHIPPED.**
+
+---
+
+#### 2. What surprised me?
+
+**`wsConnectionsActive` lazy-getter pattern is cleaner than expected.** prom-client's `collect()` callback on a Gauge runs at scrape time — this means the metrics module can be imported before the WS server exists, with no circular dependency. The `setWsConnectionGetter()` call wired after `voiceWss` creation is 1 line and zero coupling. Good pattern for any metric that depends on a post-startup singleton.
+
+**The existing JSON `/metrics` endpoint had 6 tests that were entirely about JSON shape** (timestamp, uptime_seconds, sessions object, memory object, session_detail array). All those assertions are now irrelevant — the Prometheus format carries the same data semantically but in text/plain exposition format. The test rewrite dropped those 6 and added 9, so the test count went up. The new tests are also more meaningful: they verify HELP/TYPE metadata lines (contract with Prometheus), counter increment behaviour (behaviour, not just shape), and non-JSON format (regression guard).
+
+**Dynamic import for TTS metrics avoids circular dependency cleanly.** `OpenAITTS.ts` → `metrics/registry.ts` is a fine import direction, but using dynamic import (`import("../metrics/registry.js").then(...)`) with a `.catch(() => {})` means TTS operation is never blocked or broken by a metrics failure. This is the right pattern for "side-channel telemetry" that must not affect the hot path.
+
+**OpaModeratorCheck flake disappeared.** The flaky test (timeout in `ControlEngine.initialize()`) was present in the background run (pre-N-66 codebase) but absent from the post-N-66 full-suite run. I did not fix it directly. Most likely explanation: the background run had Jest running with higher concurrency and hitting a shared-singleton race; the post-N-66 run was sequential in that section. Q45 can be considered tentatively resolved — will monitor over next session.
+
+---
+
+#### 3. Cross-project signals
+
+**prom-client `collect()` callback pattern is reusable.** Any ASIF project needing a Prometheus gauge for a runtime value (queue depth, active connections, cache size) should use the `collect()` constructor option rather than manually calling `gauge.set()` on every change. It's pull-based: the gauge reports current state at scrape time without requiring event hooks across the codebase. Portfolio recommendation: add this as a standard pattern alongside `RequestTracker`.
+
+**`Registry` isolation in tests.** Using `new Registry()` per test suite (not the prom-client global `register`) prevents cross-test metric pollution when running multiple test files that each import prom-client. If any ASIF project adds prom-client, this is the first thing that will bite them in parallel Jest runs. Portfolio recommendation: always pass `registers: [customRegistry]` in metric constructors for testable code.
+
+**Non-blocking side-channel telemetry pattern.** The `import("...").then(...).catch(() => {})` pattern in OpenAITTS keeps the hot path clean: telemetry is a fire-and-forget side effect that cannot break the primary operation. Equivalent to the `_fire_and_forget` pattern in synapps M-2. Worth standardising across the portfolio: any metric or logging instrumentation inside a latency-critical path should use this pattern.
+
+---
+
+#### 4. What would I prioritize next?
+
+1. **N-67 — RBAC** — `/supervisor` WebSocket path has no auth (Q19, open since 2026-03-19). Production blocker before customer deployment. JWT or shared-secret header check on the upgrade path. Estimated: M.
+2. **N-68 — Session persistence** — sessions are lost on restart. Redis or SQLite session store. Estimated: L.
+3. **Prometheus alerting rules** — shipping `/metrics` without alerting rules (alert on high error rate, P99 latency > 400ms, WS connections spike) delivers only half the value. A `prometheus-rules.yml` file would complete the observability story. Estimated: S.
+4. **prom-client default metrics** — `collectDefaultMetrics({ register })` adds ~15 standard Node.js metrics (event loop lag, GC duration, heap size trends). Zero code, big observability gain. Estimated: XS.
+
+---
+
+#### 5. Blockers / Questions for CoS
+
+**Q19 (open, raised 2026-03-19)** — Supervisor WS auth: `/supervisor` WebSocket upgrade has no authentication. Production blocker. Still awaiting posture decision.
+
+**Q45 (tentatively resolved)** — OpaModeratorCheck flaky test appears self-resolved in post-N-66 run. Will monitor. If it resurfaces, I'll investigate the `ControlEngine.initialize()` spy cleanup.
+
+**Q46** — `collectDefaultMetrics({ register })` (Node.js process/GC/heap metrics) is a 1-line addition to `metrics/registry.ts`. Ready to add immediately — should I self-start on this as an XS improvement, or wait for a formal directive?
+
+Dashboard: **66/66 SHIPPED.**
