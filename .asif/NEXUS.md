@@ -13745,3 +13745,63 @@ No new code since check-in 106. Q19/Q46 open. M-2 store-name blocker confirmed b
 ### Check-in 109 — 2026-03-24 (empty-delta skip)
 
 No new code since check-in 106. Three consecutive idle check-ins. Per Idle Time Protocol, initiating CRUCIBLE Gates 1-7 self-audit in next available cycle if no directives arrive.
+
+---
+
+### Check-in 110 — 2026-03-25
+
+#### 1. What did you ship since last check-in?
+
+Nothing code-wise since N-66 (`d4d98bc`). Executed **CRUCIBLE Gates 1-7 self-audit** per Idle Time Protocol (4+ consecutive idle check-ins).
+
+---
+
+#### 2. What surprised me?
+
+**310 `toBeDefined()` assertions — most are hollow.** Ran Gate 1 on the full unit test suite. Findings:
+
+| Pattern | Count | Risk |
+|---|---|---|
+| `.toBeTruthy()` | 0 | — |
+| `.toBeDefined()` | 310 | Medium — checks existence, not correctness |
+| `.toBeGreaterThan(0)` | 117 | Low-medium — many are post-operation guards |
+| `.toBeGreaterThanOrEqual(0)` | 26 | High — any non-negative number passes |
+
+A spot check of `.toBeDefined()` calls shows a mixed picture: some are legitimate guard checks before deeper assertions (e.g., `expect(entry).toBeDefined()` followed by `expect(entry.id).toBe(...)`), but many are standalone — they verify an operation "returned something" without verifying what it returned. `ConversationAnalyticsService.test.ts` has 4 consecutive `toBeDefined()` assertions with no deeper checks on the returned value. This is a real hollow-test pattern.
+
+The 26 `toBeGreaterThanOrEqual(0)` instances are near-universally hollow — they pass for `0` (no work done), `1`, or `1000000`. These are the highest-confidence CRUCIBLE violations.
+
+**Coverage thresholds are set 3-4% below actual.** The comment in `jest.config.js` says thresholds were set at N-58. Actual coverage at N-66 is ~93.5% stmts, ~92.7% branch, ~94% fn. Thresholds: 92/86/93/93. The branch threshold (86%) is 6.7% below actual — enough slack for a significant regression to go undetected before CI fails.
+
+---
+
+#### 3. Cross-project signals
+
+**`toBeGreaterThanOrEqual(0)` is a portfolio-wide CRUCIBLE anti-pattern.** Any numeric return value where 0 is a valid "failure" state (count of items found, records created, etc.) should be tested with a specific value, not `>= 0`. Portfolio signal: add this to the CRUCIBLE Gate 1 checklist as a named anti-pattern: "zero-pass assertion."
+
+**Branch coverage threshold drift.** If thresholds are set once and never updated, they drift further below actual over time, eventually providing no signal. Portfolio recommendation: after each coverage pass, update thresholds to `actual - 2%` to keep the safety margin tight. voice-jib-jab branch threshold should be raised from 86% → 90%.
+
+---
+
+#### 4. What would I prioritize next?
+
+**Idle-time self-improvement** (per protocol, no architecture changes):
+1. Raise `coverageThreshold.branches` from 86% → 90% in `jest.config.js` (XS, 1 line)
+2. Strengthen the 26 `toBeGreaterThanOrEqual(0)` assertions — replace with specific expected values (S, ~26 targeted fixes)
+3. Strengthen the highest-value hollow `toBeDefined()` standalone assertions in `ConversationAnalyticsService.test.ts` and `SessionRecorder.test.ts` (S)
+
+**With fresh directives:**
+1. N-67 — RBAC/supervisor WS auth (Q19, production blocker)
+2. N-68 — session persistence (Redis/SQLite store)
+3. `collectDefaultMetrics` for Node.js process metrics (Q46, XS)
+
+---
+
+#### 5. Blockers / Questions for CoS
+
+**Q19 (open)** — Supervisor WS auth, production blocker.
+**Q46 (open)** — Self-start `collectDefaultMetrics`?
+
+**Q47** — Branch coverage threshold is 86%, actual is 92.7% — a 6.7% gap. Requesting standing auth to raise threshold to 90% (still 2.7% below actual, but a meaningful safety margin). Also requesting standing auth to replace the 26 `toBeGreaterThanOrEqual(0)` hollow assertions with specific values as a self-improvement pass.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests.**
