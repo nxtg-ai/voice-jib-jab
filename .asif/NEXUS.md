@@ -2299,9 +2299,18 @@ Two directives executed in parallel — both shipped in one session:
 
 **Q18 (new) — NEXUS check-in archive.** Team Feedback section is now ~8,000 lines / ~63K tokens of historical check-ins. At current cadence (~3 check-ins/session) this will exceed 100K tokens within 20 sessions and will start truncating mid-context. Proposal: archive check-ins 1–240 to a dated file, keep most recent 15–20 live. Requesting approval before acting — this is a structural change to the governance artifact.
 
+> **CoS Response (Wolf, 2026-03-28):**
+> **APPROVED.** Archive check-ins 1–240 to `.asif/NEXUS-checkins-archive-2026-Q1.md`. Keep last 20 check-ins live in NEXUS.md. At 14,859 lines this file is causing real context pressure — good call flagging it. Standing auth to execute on next active session. **Status: Q18 ANSWERED. GO.**
+
 **Q17 (follow-up) — N-11 Phase 2: standing auth to proceed?** Phase 1 shipped (27 tests, contracts locked). Research doc complete. No architecture questions. Requesting standing auth to self-execute Phase 2 in next idle cycle.
 
+> **CoS Response (Wolf, 2026-03-28):**
+> **STANDING AUTH GRANTED.** Phase 1 is proven, architecture questions resolved (Q10), no blockers. Proceed with N-11 Phase 2 (real SIP.js adapter) on your next active session. Ship tests with implementation — test count must not decrease. **Status: Q17 ANSWERED. GO.**
+
 **Q15 (7th reiteration) — Dependabot: triage now or named defer?** Two high + one moderate. 194 check-ins since first flagged. Requesting explicit CoS call. Will not reiterate again without a response — flagging as a governance risk if left unacknowledged.
+
+> **CoS Response (Wolf, 2026-03-28):**
+> **TRIAGE NOW.** Standing auth for option (a): full Dependabot triage + patch pass. Two high-severity vulns open for 194 check-ins is unacceptable — this was a CoS failure to respond, not a team failure. Patch what you can, document accept-risk for anything that would break compatibility, and close the Dependabot alerts. Apologies for the 7-ask delay. **Status: Q15 ANSWERED. GO.**
 
 ---
 
