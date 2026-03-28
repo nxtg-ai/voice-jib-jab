@@ -17,10 +17,14 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Tone of voice for an agent persona. */
 export type PersonaTone = "formal" | "casual" | "empathetic";
+/** Vocabulary complexity level for agent responses. */
 export type VocabularyLevel = "simple" | "standard" | "technical";
+/** Preferred response length for an agent persona. */
 export type ResponseLengthPreference = "brief" | "standard" | "detailed";
 
+/** Full persona definition including tone, vocabulary, and system prompt snippet. */
 export interface PersonaConfig {
   personaId: string;
   name: string;
@@ -113,6 +117,7 @@ interface PersistedData {
 
 // ── PersonaStore ───────────────────────────────────────────────────────
 
+/** CRUD store for agent personas with built-in defaults and tenant assignments. */
 export class PersonaStore {
   /** User-created personas only (built-ins are never stored here). */
   private customPersonas: Map<string, PersonaConfig> = new Map();

@@ -12,10 +12,12 @@ import type { SessionRecorder } from "./SessionRecorder.js";
 
 // ── Regulation types ───────────────────────────────────────────────────────
 
+/** Supported regulatory framework identifiers. */
 export type RegulationId = "GDPR" | "HIPAA" | "SOC2" | "PCI_DSS" | "CCPA";
 
 // ── Context built from session recordings ──────────────────────────────────
 
+/** Session-derived compliance context used to evaluate a tenant against regulatory requirements. */
 export interface TenantComplianceContext {
   tenantId: string;
   sessionCount: number;
@@ -30,6 +32,7 @@ export interface TenantComplianceContext {
 
 // ── Requirement definition ─────────────────────────────────────────────────
 
+/** A single regulatory requirement with a predicate that checks tenant compliance context. */
 export interface PolicyRequirement {
   requirementId: string;
   description: string;
@@ -39,6 +42,7 @@ export interface PolicyRequirement {
 
 // ── Report types ───────────────────────────────────────────────────────────
 
+/** Pass/fail result for a single requirement evaluation. */
 export interface RequirementStatus {
   requirementId: string;
   description: string;
@@ -46,6 +50,7 @@ export interface RequirementStatus {
   regulation: RegulationId;
 }
 
+/** Full compliance report for a single tenant, grouped by regulation. */
 export interface TenantComplianceReport {
   tenantId: string;
   evaluatedAt: string;
@@ -61,6 +66,7 @@ export interface TenantComplianceReport {
   certificateEligible: boolean;    // true if complianceScorePct >= 80
 }
 
+/** Portfolio-level compliance overview aggregating all tenant reports. */
 export interface ComplianceOverview {
   generatedAt: string;
   totalTenants: number;
@@ -192,6 +198,7 @@ function computeOverallStatus(
 
 // ── ComplianceDashboardService ─────────────────────────────────────────────
 
+/** Evaluates tenants against built-in regulatory requirements and generates compliance reports. */
 export class ComplianceDashboardService {
   constructor(
     private readonly tenantRegistry: TenantRegistry,

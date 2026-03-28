@@ -14,6 +14,7 @@ import type { VoiceQualityScorer } from "./VoiceQualityScorer.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** A single speaker turn in the exported transcript with timing metadata. */
 export interface TranscriptTurn {
   speaker: "user" | "assistant";
   text: string;
@@ -21,6 +22,7 @@ export interface TranscriptTurn {
   isFinal: boolean;
 }
 
+/** A policy decision event extracted from the session timeline. */
 export interface PolicyEvent {
   decision: string;       // "allow" | "refuse" | "escalate" | "rewrite" | "cancel_output"
   reasonCodes: string[];
@@ -28,12 +30,14 @@ export interface PolicyEvent {
   timestampMs: number;
 }
 
+/** A sentiment measurement at a point in the session timeline. */
 export interface SentimentSample {
   sentiment: string;      // "positive" | "negative" | "neutral" | "frustrated"
   score?: number;
   timestampMs: number;
 }
 
+/** Structured export of a single session including transcript, policy events, and quality score. */
 export interface SessionExport {
   sessionId: string;
   tenantId?: string;
@@ -55,6 +59,7 @@ export interface SessionExport {
   };
 }
 
+/** Result of a bulk session export containing multiple session exports and metadata. */
 export interface BulkExportResult {
   exportedAt: string;
   from?: string;
@@ -64,6 +69,7 @@ export interface BulkExportResult {
   sessions: SessionExport[];
 }
 
+/** Filters for narrowing bulk exports by tenant, date range, or explicit session IDs. */
 export interface ExportFilters {
   tenantId?: string;
   from?: string;           // ISO date
@@ -77,6 +83,7 @@ export interface ExportFilters {
 // SessionExportService
 // ---------------------------------------------------------------------------
 
+/** Assembles rich structured exports from session recordings for compliance audit and analytics. */
 export class SessionExportService {
   constructor(
     private readonly recorder: SessionRecorder,

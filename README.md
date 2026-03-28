@@ -2,7 +2,7 @@
 
 A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based and SIP-ready speech-to-speech assistant with three-lane orchestration, async policy enforcement, retrieval-augmented generation, and a full enterprise feature stack.
 
-**Status:** 65/65 initiatives SHIPPED | 4,996 server tests | 92%+ branch coverage
+**Status:** 66/66 initiatives SHIPPED | 4,998 server tests | 92%+ branch coverage
 
 ---
 
@@ -660,12 +660,12 @@ Useful for outbound campaign automation — CRM systems or workflow engines can 
 
 | Metric | Value |
 |--------|-------|
-| Server test suite | 3,930 tests, 0 failures |
-| Test suites | 128 (unit + integration + performance + load) |
-| Statement coverage | 92.77% (floor: 89%) |
-| Branch coverage | 82.37% (floor: 79%) |
-| Function coverage | 94.38% (floor: 90%) |
-| Line coverage | 93.18% (floor: 90%) |
+| Server test suite | 4,998 tests, 0 failures |
+| Test suites | 153 (unit + integration + performance + load) |
+| Statement coverage | 97.24% (floor: 88%) |
+| Branch coverage | 92.71% (floor: 78%) |
+| Function coverage | 96.83% (floor: 87%) |
+| Line coverage | 97.49% (floor: 88%) |
 | React SDK tests | 79 (separate Vitest suite) |
 | Coverage floor enforcement | jest.config.js `coverageThreshold` — CI fails on breach |
 | Mutation testing baseline | Stryker (PolicyGate 72.0% ✅, AllowedClaimsRegistry 60.0% ✅, LaneArbitrator 65.1% ✅ — refreshed 2026-03-21) |
@@ -746,11 +746,11 @@ voice-jib-jab/
 │       └── events/            # Event handling
 ├── server/                    # Node.js orchestrator
 │   └── src/
-│       ├── api/               # 22 HTTP routers
+│       ├── api/               # 58 HTTP routers
 │       ├── orchestrator/      # SessionManager, EventBus, LaneArbitrator
 │       ├── lanes/             # Lane A (reflex), Lane B (RAG), Lane C (policy)
 │       ├── providers/         # OpenAI Realtime adapter, TTS, SIP
-│       ├── services/          # 36 service modules
+│       ├── services/          # 60 service modules
 │       ├── insurance/         # PolicyGate, OPA, audit, claims
 │       ├── retrieval/         # RAG pipeline, ChromaDB vector store
 │       ├── middleware/        # Rate limiter, security headers
@@ -779,7 +779,7 @@ voice-jib-jab/
 | N-08 | Knowledge Pack Retrieval | SHIPPED |
 | N-09 | Unit Test Coverage (14% → 92%) | SHIPPED |
 | N-10 | Production Readiness QA | SHIPPED |
-| N-11 | SIP Telephony | BUILDING |
+| N-11 | SIP Telephony | SHIPPED |
 | N-12 | Ticketing Integration (MCP) | SHIPPED |
 | N-13 | Multi-Tenant Isolation | SHIPPED |
 | N-14 | Lane C v2: Semantic Governance | SHIPPED |
@@ -794,6 +794,34 @@ voice-jib-jab/
 | N-23 | Real-Time Translation Pipeline | SHIPPED |
 | N-24 | Intent Detection — Smart Caller Routing | SHIPPED |
 | N-25 | Voice Pipeline Profiler | SHIPPED |
+| N-26 | Per-Tenant Rate Limiting & Quota | SHIPPED |
+| N-27 | Webhook Retry Queue + Dead-Letter | SHIPPED |
+| N-28 | Kubernetes Readiness Probe | SHIPPED |
+| N-29 | API Key Authentication | SHIPPED |
+| N-30 | Real-Time Audit Event Stream | SHIPPED |
+| N-31 | API Key TTL / Expiry + Rotation | SHIPPED |
+| N-32 | Session Endpoint Protection | SHIPPED |
+| N-33 | Analytics & Audit Access Control | SHIPPED |
+| N-34 | Remaining Route Protection Sweep | SHIPPED |
+| N-35 | IntentClassifier Word-Boundary Fix | SHIPPED |
+| N-36 | Audit Event Enrichment | SHIPPED |
+| N-37 | Request Correlation ID Middleware | SHIPPED |
+| N-38 | Graceful Shutdown (SIGTERM/SIGINT) | SHIPPED |
+| N-39 | Auth Endpoint Rate Limiting | SHIPPED |
+| N-40 | CORS Hardening | SHIPPED |
+| N-41 | Rate Limiter Config Constants | SHIPPED |
+| N-42 | Trust Proxy Configuration | SHIPPED |
+| N-43 | Helmet.js Security Headers | SHIPPED |
+| N-44 | Request Body Size Limit (256 KB) | SHIPPED |
+| N-45 | Global JSON Error Handler | SHIPPED |
+| N-46 | JSON 404 Handler | SHIPPED |
+| N-47 | Structured Access Logger | SHIPPED |
+| N-48 | Property-Based Testing (fast-check) | SHIPPED |
+| N-49–N-62 | Branch Coverage Campaigns (92.71%) | SHIPPED |
+| N-63 | Production Hardening — Liveness Probe | SHIPPED |
+| N-64 | Production Hardening — WebSocket Health | SHIPPED |
+| N-65 | Production Hardening — Graceful WS Drain | SHIPPED |
+| N-66 | Prometheus Metrics Endpoint | SHIPPED |
 
 ---
 

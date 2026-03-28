@@ -27,6 +27,7 @@ import type { OpaEvaluator, OpaCheckInput } from "./opa_evaluator.js";
 
 // ── Check result returned by each individual policy check ──────────────
 
+/** Result from an individual policy check with decision, severity, and reason codes. */
 export interface CheckResult {
   decision: PolicyDecision;
   reasonCodes: string[];
@@ -37,6 +38,7 @@ export interface CheckResult {
 
 // ── Context supplied to the gate for each evaluation ───────────────────
 
+/** Context supplied to the policy gate for each content evaluation. */
 export interface EvaluationContext {
   sessionId: string;
   role: "user" | "assistant";
@@ -48,6 +50,7 @@ export interface EvaluationContext {
 
 // ── Gate result (aggregated) ───────────────────────────────────────────
 
+/** Aggregated result from PolicyGate after running all checks. */
 export interface GateResult {
   decision: PolicyDecision;
   reasonCodes: string[];
@@ -60,6 +63,7 @@ export interface GateResult {
 
 // ── Individual check interfaces (implemented by subcomponents) ─────────
 
+/** Interface for individual policy checks evaluated by the PolicyGate. */
 export interface PolicyCheck {
   readonly name: string;
   evaluate(ctx: EvaluationContext): Promise<CheckResult>;
@@ -137,6 +141,7 @@ export class ModeratorCheck implements PolicyCheck {
 
 // ── ClaimsChecker check ────────────────────────────────────────────────
 
+/** Validates assistant output against an approved claims registry, flagging or rewriting unverified claims. */
 export class ClaimsCheck implements PolicyCheck {
   readonly name = "claims_checker";
 
@@ -584,11 +589,13 @@ export class PIIRedactorCheck implements PolicyCheck {
   }
 }
 
+/** Result of PII redaction containing the sanitized text and detected PII types. */
 export interface PIIRedactionResult {
   redactedText: string;
   detectedTypes: string[];
 }
 
+/** Configuration for PIIRedactorCheck including mode, patterns, and metadata scanning options. */
 export interface PIIRedactorConfig {
   mode?: "redact" | "flag";
   includeMetadata?: boolean;
@@ -617,6 +624,7 @@ const DECISION_PRIORITY: Record<PolicyDecision, number> = {
   cancel_output: 4,
 };
 
+/** Orchestrates multiple policy checks with short-circuit on critical decisions, optionally delegating to OPA. */
 export class PolicyGate {
   private checks: PolicyCheck[];
   private opaEvaluator?: OpaEvaluator;

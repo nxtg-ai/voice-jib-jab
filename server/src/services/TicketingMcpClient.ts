@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
+/** Data required to create an escalation ticket from a voice session. */
 export interface TicketPayload {
   title: string;
   summary: string;
@@ -11,18 +12,21 @@ export interface TicketPayload {
   customerContext?: Record<string, string>;
 }
 
+/** Result returned after successfully creating an escalation ticket. */
 export interface TicketResult {
   ticketId: string;
   url: string;
   provider: string;
 }
 
+/** Abstract ticketing client interface for escalation integrations. */
 export interface TicketingClient {
   connect(): Promise<void>;
   createTicket(ticket: TicketPayload): Promise<TicketResult>;
   close(): Promise<void>;
 }
 
+/** Configuration for the GitHub Issues MCP ticketing client. */
 export interface GitHubIssuesMcpClientConfig {
   owner: string;
   repo: string;
@@ -30,6 +34,7 @@ export interface GitHubIssuesMcpClientConfig {
   labels?: string[];
 }
 
+/** MCP-based client that creates GitHub Issues for voice session escalations. */
 export class GitHubIssuesMcpClient implements TicketingClient {
   private client: Client | null = null;
   private connected = false;

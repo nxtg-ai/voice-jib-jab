@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 
 // -- Types ------------------------------------------------------------------
 
+/** Conditions a routing rule checks against incoming session metadata. */
 export interface RoutingConditions {
   language?: string;
   topic?: string;
@@ -23,6 +24,7 @@ export interface RoutingConditions {
   callerType?: "new" | "returning";
 }
 
+/** A prioritized routing rule mapping conditions to a target agent template. */
 export interface RoutingRule {
   ruleId: string;
   tenantId: string | null;
@@ -34,6 +36,7 @@ export interface RoutingRule {
   createdAt: string;
 }
 
+/** Metadata about an incoming session used for routing rule evaluation. */
 export interface RoutingSessionMeta {
   tenantId: string;
   language?: string;
@@ -42,6 +45,7 @@ export interface RoutingSessionMeta {
   currentSessionCount?: number;
 }
 
+/** The result of routing evaluation: which template to use and which rule matched. */
 export interface RoutingDecision {
   templateId: string;
   ruleId: string | "default";
@@ -54,6 +58,7 @@ const DEFAULT_TEMPLATE_ID = "builtin-customer-support";
 
 // -- RoutingEngine ----------------------------------------------------------
 
+/** Rule-based call routing engine with tenant isolation and disk persistence. */
 export class RoutingEngine {
   private rules: RoutingRule[] = [];
   private storageFile: string;
@@ -254,6 +259,7 @@ export class RoutingEngine {
 
 // -- Module-level factory ---------------------------------------------------
 
+/** Create and return a new RoutingEngine backed by the given JSON file. */
 export function initRoutingEngine(storageFile: string): RoutingEngine {
   return new RoutingEngine(storageFile);
 }

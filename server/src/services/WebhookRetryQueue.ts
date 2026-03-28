@@ -21,6 +21,7 @@ import type {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** An in-flight webhook delivery awaiting retry. */
 export interface RetryQueueItem {
   itemId: string;
   webhookId: string;
@@ -34,6 +35,7 @@ export interface RetryQueueItem {
   lastError?: string;
 }
 
+/** A webhook delivery that exhausted all retry attempts. */
 export interface DeadLetterItem {
   itemId: string;
   webhookId: string;
@@ -51,12 +53,14 @@ interface StorageFormat {
   deadLetter: DeadLetterItem[];
 }
 
+/** Snapshot of retry queue and dead-letter depths. */
 export interface RetryQueueStats {
   queueDepth: number;
   deadLetterDepth: number;
   totalEnqueued: number;
 }
 
+/** Configuration options for retry attempts and backoff timing. */
 export interface WebhookRetryQueueOptions {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -64,6 +68,7 @@ export interface WebhookRetryQueueOptions {
 
 // ── WebhookRetryQueue ──────────────────────────────────────────────────
 
+/** Retries failed webhook deliveries with exponential backoff and dead-letter handling. */
 export class WebhookRetryQueue {
   private readonly webhookService: WebhookService;
   private readonly storageFile: string;

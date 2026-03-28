@@ -15,6 +15,7 @@ import type { SessionRecording, RecordingEntry } from "./SessionRecorder.js";
 
 // ── Public types ──────────────────────────────────────────────────────
 
+/** Per-session computed metrics including quality score, compliance rate, and escalation count. */
 export interface SessionMetrics {
   sessionId: string;
   tenantId: string | null;
@@ -28,11 +29,13 @@ export interface SessionMetrics {
   qualityScore: number;
 }
 
+/** Session count and average quality score for a single tenant in aggregate breakdown. */
 export interface TenantBreakdownEntry {
   sessions: number;
   avgQualityScore: number;
 }
 
+/** Counts of sessions by dominant sentiment category. */
 export interface SentimentDistribution {
   positive: number;
   neutral: number;
@@ -40,6 +43,7 @@ export interface SentimentDistribution {
   frustrated: number;
 }
 
+/** Aggregated metrics for a single tenant, used in cross-tenant comparison views. */
 export interface TenantComparisonEntry {
   tenantId: string;
   sessions: number;
@@ -49,6 +53,7 @@ export interface TenantComparisonEntry {
   avgComplianceRate: number;
 }
 
+/** Aggregate analytics across all (or filtered) sessions with breakdowns and trends. */
 export interface AggregateMetrics {
   totalSessions: number;
   filteredSessions: number;
@@ -66,6 +71,7 @@ export interface AggregateMetrics {
   topPolicyViolations: Array<{ violation: string; count: number }>;
 }
 
+/** Optional filters for narrowing analytics queries by tenant, date range, or pagination. */
 export interface AnalyticsFilter {
   tenantId?: string;
   fromDate?: string;
@@ -132,6 +138,7 @@ function sumDecisions(policyDecisions: Record<string, number>): number {
 
 // ── AnalyticsService ─────────────────────────────────────────────────
 
+/** Derives aggregate and per-session metrics from session recordings on demand. */
 export class AnalyticsService {
   private recorder: RecordingSource;
 

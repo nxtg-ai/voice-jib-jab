@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Classification category for agent skills. */
 export type SkillCategory =
   | "customer_lookup"
   | "order_management"
@@ -24,6 +25,7 @@ export type SkillCategory =
   | "escalation"
   | "custom";
 
+/** Typed parameter definition for a skill invocation. */
 export interface SkillParameter {
   name: string;
   type: "string" | "number" | "boolean" | "date";
@@ -31,6 +33,7 @@ export interface SkillParameter {
   description: string;
 }
 
+/** Agent skill definition with trigger phrases and optional webhook endpoint. */
 export interface Skill {
   skillId: string;
   name: string;
@@ -49,6 +52,7 @@ export interface Skill {
   usageCount: number;
 }
 
+/** A skill matched to a caller utterance with a relevance score. */
 export interface SkillSuggestion {
   skill: Skill;
   /** 0–1 relevance score. */
@@ -75,6 +79,7 @@ interface StorageFormat {
 
 // ── SkillStore ─────────────────────────────────────────────────────────
 
+/** CRUD store for agent skills with token-overlap auto-suggest. */
 export class SkillStore {
   private storageFile: string;
   private data: StorageFormat;

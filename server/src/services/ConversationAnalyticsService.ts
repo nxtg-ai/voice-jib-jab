@@ -32,6 +32,7 @@ const TOPIC_SEEDS: Record<string, string[]> = {
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+/** A group of sessions classified under the same topic with aggregate statistics. */
 export interface TopicCluster {
   topicId: string;
   label: string;
@@ -43,6 +44,7 @@ export interface TopicCluster {
   sentimentBreakdown: Record<string, number>;
 }
 
+/** A recurring user utterance with occurrence count and associated metrics. */
 export interface FrequentQuestion {
   text: string;
   normalizedText: string;
@@ -52,6 +54,7 @@ export interface FrequentQuestion {
   escalationRate: number;
 }
 
+/** A compact event-type sequence representing how sessions progress to resolution. */
 export interface ResolutionPath {
   pathId: string;
   steps: string[];
@@ -60,6 +63,7 @@ export interface ResolutionPath {
   outcomeLabel: "resolved" | "escalated" | "refused" | "abandoned";
 }
 
+/** Handle time percentiles and averages for a single topic cluster. */
 export interface HandleTimeByTopic {
   topicLabel: string;
   avgMs: number;
@@ -68,6 +72,7 @@ export interface HandleTimeByTopic {
   sampleCount: number;
 }
 
+/** Complete conversation analytics report with topics, FAQs, resolution paths, and overall stats. */
 export interface ConversationInsights {
   generatedAt: string;
   tenantId?: string;
@@ -87,6 +92,7 @@ export interface ConversationInsights {
   };
 }
 
+/** Options for filtering and limiting conversation analytics generation. */
 export interface AnalyticsOptions {
   tenantId?: string;
   from?: string;
@@ -96,6 +102,7 @@ export interface AnalyticsOptions {
 
 // ── ConversationAnalyticsService ──────────────────────────────────────────────
 
+/** Generates offline conversation analytics from session recordings using keyword-seed topic classification. */
 export class ConversationAnalyticsService {
   constructor(private recorder: SessionRecorder) {}
 

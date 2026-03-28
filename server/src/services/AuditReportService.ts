@@ -15,24 +15,28 @@ import type { VoiceQualityScorer } from "./VoiceQualityScorer.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** Filter criteria for generating a monthly audit report. */
 export interface AuditReportFilters {
   tenantId: string;
   year: number;
   month: number; // 1-12
 }
 
+/** Aggregated count and percentage for a single policy decision type. */
 export interface PolicyDecisionSummary {
   decision: string;
   count: number;
   pct: number;
 }
 
+/** Session count and percentage within a quality score range. */
 export interface QualityBand {
   band: "excellent" | "good" | "fair" | "poor"; // 80-100, 60-79, 40-59, 0-39
   count: number;
   pct: number;
 }
 
+/** Complete monthly compliance audit report for a tenant. */
 export interface AuditReport {
   reportId: string;
   generatedAt: string;
@@ -89,6 +93,7 @@ function isInMonth(startedAt: string, year: number, month: number): boolean {
 // AuditReportService
 // ---------------------------------------------------------------------------
 
+/** Generates and caches per-tenant monthly compliance audit reports. */
 export class AuditReportService {
   private cache = new Map<string, AuditReport>();
 

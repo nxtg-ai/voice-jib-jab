@@ -1,18 +1,20 @@
 # Voice Jib-Jab Gap Analysis
 
-**Date:** 2026-01-10
+**Date:** 2026-01-10 (initial) | **Last Updated:** 2026-03-26
 **Compared Against:** `docs/PROJECT-SPEC.md` and `spec-jib-jab.md`
 
 ---
 
 ## Executive Summary
 
-The project has a solid foundation for Milestones 1 and 2, but the user's concern about **"no persistent memory"** is valid. The OpenAI Realtime API maintains conversation context within a single WebSocket session, but there is:
+**All gaps identified in this analysis have been resolved.** As of 2026-03-26, all 4 milestones are shipped, all 66/66 initiatives are complete, and test coverage stands at 97.24% stmt / 92.71% branch (4,998 tests / 153 suites). All 5 UAT bugs were fixed and verified 2026-03-12.
 
-1. **No cross-session conversation persistence** - When the user disconnects and reconnects, all context is lost
-2. **No server-side conversation history storage** - Transcripts are emitted to EventBus but never persisted
-3. **Milestone 3 (Control Plane) is NOT implemented** - Only stubs exist
-4. **Milestone 4 (RAG Integration) is NOT implemented** - Knowledge files exist but are unused
+The original gaps were:
+
+1. ~~No cross-session conversation persistence~~ -- **RESOLVED** (ChromaDB persistent memory)
+2. ~~No server-side conversation history storage~~ -- **RESOLVED** (AuditTrail + TranscriptStore)
+3. ~~Milestone 3 (Control Plane) is NOT implemented~~ -- **RESOLVED** (Lane C shipped)
+4. ~~Milestone 4 (RAG Integration) is NOT implemented~~ -- **RESOLVED** (RAG pipeline shipped)
 
 ---
 
@@ -28,7 +30,7 @@ The project has a solid foundation for Milestones 1 and 2, but the user's concer
 | Basic barge-in             | ✅ Done | `user.barge_in` message handling, audio stops immediately    |
 | TTFB/Latency metrics       | ✅ Done | `LatencyBudget.ts` - p50/p95/p99 calculations                |
 
-**Milestone 1: COMPLETE**
+**Milestone 1: COMPLETE** ✅
 
 ---
 
@@ -42,7 +44,7 @@ The project has a solid foundation for Milestones 1 and 2, but the user's concer
 | State machine validation     | ✅ Done | States: IDLE, LISTENING, A_PLAYING, B_RESPONDING, B_PLAYING, ENDED |
 | No audio overlap             | ✅ Done | Single audio owner enforced via arbitrator                         |
 
-**Milestone 2: COMPLETE**
+**Milestone 2: COMPLETE** ✅
 
 ---
 
@@ -50,18 +52,18 @@ The project has a solid foundation for Milestones 1 and 2, but the user's concer
 
 | Feature                    | Status     | Notes                                        |
 | -------------------------- | ---------- | -------------------------------------------- |
-| Transcript collection      | 🔶 Partial | Events emitted to EventBus but NOT persisted |
-| PolicyGate stub            | ❌ Missing | Config flag exists, NO implementation        |
-| Moderator (allow/refuse)   | ❌ Missing | Not implemented                              |
-| ClaimsChecker              | ❌ Missing | Not implemented                              |
-| PIIRedactor                | ❌ Missing | Not implemented                              |
-| OverrideController         | ❌ Missing | Not implemented                              |
-| Audit timeline             | ❌ Missing | No persistence layer                         |
-| AuditTrail module          | ❌ Missing | Not created                                  |
-| FallbackPlanner            | ❌ Missing | Not created                                  |
-| Policy cancel stops Lane B | ❌ Missing | Lane C doesn't exist to trigger              |
+| Transcript collection      | ✅ Done | Persisted via AuditTrail + TranscriptStore |
+| PolicyGate stub            | ✅ Done | Full implementation shipped                 |
+| Moderator (allow/refuse)   | ✅ Done | Implemented                                |
+| ClaimsChecker              | ✅ Done | Implemented                                |
+| PIIRedactor                | ✅ Done | Implemented                                |
+| OverrideController         | ✅ Done | Implemented                                |
+| Audit timeline             | ✅ Done | Persistent audit trail                     |
+| AuditTrail module          | ✅ Done | Created and tested                         |
+| FallbackPlanner            | ✅ Done | Created and tested                         |
+| Policy cancel stops Lane B | ✅ Done | Lane C triggers cancellation               |
 
-**Milestone 3: NOT STARTED (0% complete)**
+**Milestone 3: COMPLETE** ✅
 
 ---
 
@@ -69,15 +71,15 @@ The project has a solid foundation for Milestones 1 and 2, but the user's concer
 
 | Feature                   | Status     | Notes                                         |
 | ------------------------- | ---------- | --------------------------------------------- |
-| NextGen AI Knowledge Pack | 🔶 Partial | `knowledge/nxtg_facts.jsonl` exists (5 facts) |
-| Vector store integration  | ❌ Missing | `/server/src/retrieval/` is empty             |
-| Retrieval tool definition | ❌ Missing | Tool schemas defined, no implementation       |
-| Facts pack injection      | ❌ Missing | No RAG pipeline                               |
-| retrieve_nxtg_facts tool  | ❌ Missing | Not implemented                               |
-| lookup_disclaimer tool    | ❌ Missing | Not implemented                               |
-| Grounded responses        | ❌ Missing | Responses NOT using knowledge pack            |
+| NextGen AI Knowledge Pack | ✅ Done | Knowledge pack loaded and indexed    |
+| Vector store integration  | ✅ Done | ChromaDB integration shipped         |
+| Retrieval tool definition | ✅ Done | Tool schemas and implementation done |
+| Facts pack injection      | ✅ Done | RAG pipeline operational             |
+| retrieve_nxtg_facts tool  | ✅ Done | Implemented                          |
+| lookup_disclaimer tool    | ✅ Done | Implemented                          |
+| Grounded responses        | ✅ Done | Responses use knowledge pack         |
 
-**Milestone 4: 10% complete (data files only)**
+**Milestone 4: COMPLETE** ✅
 
 ---
 
@@ -85,11 +87,11 @@ The project has a solid foundation for Milestones 1 and 2, but the user's concer
 
 | Module                | Status     | File Path                                                 |
 | --------------------- | ---------- | --------------------------------------------------------- |
-| LatencyBudget         | ✅ Done    | `/server/src/insurance/LatencyBudget.ts`                  |
-| PolicyGate            | ❌ Missing | Not created                                               |
-| AllowedClaimsRegistry | ❌ Missing | Data exists in `knowledge/allowed_claims.json`, no loader |
-| AuditTrail            | ❌ Missing | Not created                                               |
-| FallbackPlanner       | ❌ Missing | Not created                                               |
+| LatencyBudget         | ✅ Done | `/server/src/insurance/LatencyBudget.ts`         |
+| PolicyGate            | ✅ Done | Implemented and tested                           |
+| AllowedClaimsRegistry | ✅ Done | Data loaded, claims validation operational       |
+| AuditTrail            | ✅ Done | Append-only event log with FK integrity          |
+| FallbackPlanner       | ✅ Done | Safe fallback strategies implemented             |
 
 ---
 
@@ -273,14 +275,6 @@ Client ──WebSocket──> Orchestrator ──> OpenAI Realtime
 
 ## Conclusion
 
-The voice loop and lane arbitration are solid (Milestones 1-2). However, the project is missing critical components for a production-ready voice assistant:
+**All gaps have been closed.** As of 2026-03-26, the project is production-ready with all 4 milestones shipped, all insurance modules implemented, and all 5 UAT bugs resolved. Test coverage is at 97.24% stmt / 92.71% branch across 4,998 tests / 153 suites. 66/66 initiatives complete.
 
-1. **Memory/Persistence** - The #1 user complaint; no conversation history across sessions
-2. **Control Plane** - Lane C is completely unimplemented
-3. **RAG** - Knowledge files exist but aren't used
-
-**Recommended Priority:**
-
-1. Fix memory issue first (highest user impact)
-2. Add RAG for grounded responses
-3. Implement Lane C for safety/compliance
+This document is retained for historical reference.

@@ -126,30 +126,30 @@ interface Event {
 
 ## Development Phases
 
-### Milestone 1: Voice Loop MVP
-- [ ] Browser mic capture
-- [ ] Provider adapter connected
-- [ ] Streaming audio playback
-- [ ] Basic barge-in
+### Milestone 1: Voice Loop MVP ✅ SHIPPED
+- [x] Browser mic capture
+- [x] Provider adapter connected
+- [x] Streaming audio playback
+- [x] Basic barge-in
 
-### Milestone 2: Lane Arbitration
-- [ ] Lane A reflex implementation
-- [ ] Lane B preemption
-- [ ] State machine validation
+### Milestone 2: Lane Arbitration ✅ SHIPPED
+- [x] Lane A reflex implementation
+- [x] Lane B preemption
+- [x] State machine validation
 
-### Milestone 3: Control Plane
-- [ ] Transcript collection
-- [ ] PolicyGate stub
-- [ ] Audit timeline
+### Milestone 3: Control Plane ✅ SHIPPED
+- [x] Transcript collection
+- [x] PolicyGate stub
+- [x] Audit timeline
 
-### Milestone 4: RAG Integration
-- [ ] NextGen AI Knowledge Pack
-- [ ] Retrieval tool
-- [ ] Facts pack injection
+### Milestone 4: RAG Integration ✅ SHIPPED
+- [x] NextGen AI Knowledge Pack
+- [x] Retrieval tool
+- [x] Facts pack injection
 
 ## Quality Standards
 
-- Test Coverage: 85% minimum
+- Test Coverage: 85% minimum (current: 97.24% stmt, 4,998 tests / 153 suites)
 - TypeScript: Strict mode
 - Linting: ESLint + Prettier
 - Documentation: TSDoc for all public APIs

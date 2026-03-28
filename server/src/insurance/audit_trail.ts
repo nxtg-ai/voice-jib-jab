@@ -61,6 +61,7 @@ const DEFAULT_TIMELINE_TYPES = new Set<string>([
 
 let defaultAuditDir: string | null = null;
 
+/** Configuration for AuditTrail including storage paths and event type filters. */
 export interface AuditTrailConfig {
   enabled: boolean;
   databasePath: string;
@@ -73,11 +74,13 @@ export interface AuditTrailConfig {
   includeResponseMetadata?: boolean;
 }
 
+/** Options for loading a session timeline from JSONL audit files. */
 export interface AuditTimelineOptions {
   jsonlDir?: string;
   types?: string[];
 }
 
+/** Options for replaying a session timeline, extending load options with emit control. */
 export interface AuditReplayOptions extends AuditTimelineOptions {
   emit?: boolean;
   emitDelayMs?: number;
@@ -103,6 +106,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Append-only audit logger persisting Lane C policy decisions to SQLite and JSONL for compliance. */
 export class AuditTrail {
   private started = false;
   private insertStmt:
@@ -320,6 +324,7 @@ export class AuditTrail {
 
 let auditTrailInstance: AuditTrail | null = null;
 
+/** Create and start the singleton AuditTrail instance, or return null if disabled. */
 export function initializeAuditTrail(config: AuditTrailConfig): AuditTrail | null {
   if (!config.enabled) {
     return null;
@@ -333,6 +338,7 @@ export function initializeAuditTrail(config: AuditTrailConfig): AuditTrail | nul
   return auditTrailInstance;
 }
 
+/** Load audit events for a session from JSONL files, filtered by event type. */
 export async function loadSessionTimeline(
   sessionId: string,
   options: AuditTimelineOptions = {},
@@ -369,6 +375,7 @@ export async function loadSessionTimeline(
   return events.sort((a, b) => a.t_ms - b.t_ms);
 }
 
+/** Load and optionally re-emit a session's audit events through the event bus. */
 export async function replaySessionTimeline(
   sessionId: string,
   options: AuditReplayOptions = {},

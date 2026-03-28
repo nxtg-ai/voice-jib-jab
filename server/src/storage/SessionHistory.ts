@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getDatabase } from "./Database.js";
 import { getTranscriptStore } from "./TranscriptStore.js";
 
+/** Identified user record linked by browser/device fingerprint. */
 export interface User {
   id: string;
   fingerprint: string;
@@ -20,6 +21,7 @@ export interface User {
   metadata: Record<string, unknown>;
 }
 
+/** Persisted record of a single voice session. */
 export interface SessionRecord {
   id: string;
   userId: string | null;
@@ -29,6 +31,7 @@ export interface SessionRecord {
   metadata: Record<string, unknown>;
 }
 
+/** Compressed summary of a conversation for cross-session context. */
 export interface ConversationSummary {
   id: number;
   userId: string;
@@ -39,6 +42,7 @@ export interface ConversationSummary {
   createdAt: string;
 }
 
+/** Aggregated context for a returning user starting a new session. */
 export interface SessionContext {
   userId: string;
   isReturningUser: boolean;
@@ -370,6 +374,7 @@ export class SessionHistory {
 // Singleton instance
 let instance: SessionHistory | null = null;
 
+/** Get or create the SessionHistory singleton. */
 export function getSessionHistory(): SessionHistory {
   if (!instance) {
     instance = new SessionHistory();

@@ -8,11 +8,104 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Project Status
 
-**15/15 initiatives SHIPPED** | **2,251 tests** | **94% coverage**
+**66/66 initiatives SHIPPED** | **4,998 tests** | **97% coverage**
 
 ---
 
 ## [Unreleased]
+
+---
+
+## N-66 — Prometheus Metrics · OBSERVABILITY · 2026-03-24
+
+### Added
+- Prometheus metrics endpoint (`/metrics`) powered by `prom-client`
+- Request duration histograms, active connection gauges, error counters
+
+### Stats
+- Tests: **4,998** across **153 suites**
+- Coverage: **97.24% stmt / 92.71% branch / 96.83% fn / 97.49% lines**
+
+---
+
+## N-63 through N-65 — Production Hardening · OBSERVABILITY · 2026-03-22
+
+### Added
+- N-63: Liveness probe, `RequestTracker` drain, Artillery load test suite
+- N-64: WebSocket health check, `registerCheck()` API, enhanced `/health` endpoint
+- N-65: Graceful WebSocket drain on SIGTERM — notify connected clients, wait, close
+
+---
+
+## N-48 through N-62 — Coverage + Quality Hardening · OBSERVABILITY · 2026-03-21
+
+### Added
+- N-48: Property-based testing via `fast-check` — fuzz-tested core parsers and validators
+- N-49 through N-62: Branch coverage campaigns across ~50 files
+
+### Changed
+- Branch coverage raised from 82% to 92.71%
+- Statement coverage raised to 97.24%
+
+---
+
+## N-35 through N-47 — Security Hardening + Middleware · GOVERNANCE · 2026-03-21
+
+### Added
+- N-37: Request correlation ID middleware (`X-Request-Id` propagation)
+- N-38: Graceful shutdown on SIGTERM/SIGINT with in-flight request draining
+- N-39: Auth endpoint rate limiting (brute-force protection)
+- N-40: CORS hardening via `ALLOWED_ORIGINS` allowlist
+- N-41: Rate limiter configuration constants (centralised tuning)
+- N-42: Trust proxy configuration for reverse-proxy deployments
+- N-43: Helmet.js security headers on all responses
+- N-44: Request body size limit enforced at 256 KB
+- N-45: Global JSON error handler (consistent error shape)
+- N-46: JSON 404 handler — catch-all for unmatched routes
+- N-47: Structured access logger with request metadata
+
+### Fixed
+- N-35: IntentClassifier word-boundary bug — prevented partial-match false positives
+
+### Changed
+- N-36: Audit events enriched with IP address, HTTP method, and API key ID
+
+---
+
+## N-29 through N-34 — API Key Auth + Access Control · GOVERNANCE · 2026-03-21
+
+### Added
+- N-29: API key authentication system (SHA-256 hashed, header-based validation) — **P0**
+- N-30: Real-time audit event stream (SSE-based, filterable by event type)
+- N-31: API key TTL / expiry with automatic rotation support
+- N-32: Session endpoint protection (authenticated sessions only)
+- N-33: Analytics and audit endpoint access control (role-gated)
+- N-34: Remaining route protection sweep — all public routes locked behind auth
+
+---
+
+## N-26 through N-28 — Enterprise Production Readiness · GOVERNANCE · 2026-03-21
+
+### Added
+- N-26: Per-tenant rate limiting and quota enforcement
+- N-27: Webhook retry queue with exponential backoff and dead-letter storage
+- N-28: Kubernetes readiness probe (`/ready`) with dependency health checks
+
+---
+
+## N-16 through N-25 — Enterprise Feature Stack · EXTENSIBILITY · 2026-03-19
+
+### Added
+- N-16: Call routing and queue system with priority-based dispatch
+- N-17: Voice agent marketplace — browse, install, and manage agent templates
+- N-18: Voice biometrics — caller identification via voiceprint matching
+- N-19: Custom TTS voices with A/B testing framework
+- N-20: Agent personas — per-tenant personality configuration
+- N-21: Voice Agent React SDK published as `@nxtg/voice-agent-react`
+- N-22: Conversation flow builder — visual drag-and-drop dialog design
+- N-23: Real-time translation pipeline — live multilingual voice support
+- N-24: Intent detection — smart caller routing based on utterance classification
+- N-25: Voice pipeline profiler — latency breakdown per pipeline stage
 
 ---
 

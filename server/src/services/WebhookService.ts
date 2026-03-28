@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Supported webhook event types fired during voice sessions. */
 export type WebhookEventType =
   | "call_start"
   | "call_end"
@@ -23,6 +24,7 @@ export type WebhookEventType =
   | "sentiment_alert"
   | "quality_alert";
 
+/** Per-tenant webhook endpoint configuration with optional HMAC signing. */
 export interface WebhookConfig {
   webhookId: string;
   tenantId: string;
@@ -35,6 +37,7 @@ export interface WebhookConfig {
   description?: string;
 }
 
+/** Record of a single webhook delivery attempt with status and timing. */
 export interface WebhookDelivery {
   deliveryId: string;
   webhookId: string;
@@ -48,6 +51,7 @@ export interface WebhookDelivery {
   error?: string;
 }
 
+/** Event payload sent to webhook endpoints. */
 export interface WebhookPayload {
   event: WebhookEventType;
   tenantId: string;
@@ -65,6 +69,7 @@ const MAX_DELIVERIES = 1000;
 
 // ── WebhookService ─────────────────────────────────────────────────────
 
+/** Manages webhook CRUD, HMAC-signed delivery, and delivery audit history. */
 export class WebhookService {
   private storageFile: string;
   private data: StorageFormat;

@@ -17,14 +17,17 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Agent persona category used for template classification. */
 export type PersonaType = "customer_support" | "sales" | "tech_support" | "receptionist" | "custom";
 
+/** Rules governing when a session should be escalated to a human. */
 export interface EscalationRules {
   escalateOnFrustration: boolean;
   escalateOnKeywords: string[];
   maxTurnsBeforeEscalate: number | null;
 }
 
+/** Complete agent template with persona, policy, and voice configuration. */
 export interface AgentTemplate {
   templateId: string;
   name: string;
@@ -43,6 +46,7 @@ export interface AgentTemplate {
 
 // ── Built-in Templates ────────────────────────────────────────────────
 
+/** Hardcoded built-in agent templates always available in the marketplace. */
 export const BUILTIN_TEMPLATES: AgentTemplate[] = [
   {
     templateId: "builtin-customer-support",
@@ -181,6 +185,7 @@ export const BUILTIN_TEMPLATES: AgentTemplate[] = [
 
 // ── AgentTemplateStore ────────────────────────────────────────────────
 
+/** Manages built-in and custom agent templates with marketplace publishing. */
 export class AgentTemplateStore {
   private templates: Map<string, AgentTemplate> = new Map();
   private storageFile: string;

@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Named steps in the tenant onboarding wizard sequence. */
 export type OnboardingStep =
   | "tenant_registration"
   | "voice_configuration"
@@ -24,8 +25,10 @@ export type OnboardingStep =
   | "test_call"
   | "complete";
 
+/** Lifecycle status of a single onboarding wizard step. */
 export type StepStatus = "pending" | "in_progress" | "complete" | "skipped";
 
+/** Tracked state for a single wizard step including captured data. */
 export interface WizardStepState {
   step: OnboardingStep;
   status: StepStatus;
@@ -35,6 +38,7 @@ export interface WizardStepState {
   validationErrors?: string[];
 }
 
+/** Full wizard session state for a tenant progressing through onboarding. */
 export interface OnboardingSession {
   sessionId: string;
   tenantId: string;
@@ -51,6 +55,7 @@ export interface OnboardingSession {
   };
 }
 
+/** Union of all step-specific data fields submitted when completing a step. */
 export interface StepCompletionPayload {
   // tenant_registration
   tenantName?: string;

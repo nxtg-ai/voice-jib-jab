@@ -291,6 +291,7 @@ async function initializeOpa(): Promise<OpaEvaluator | undefined> {
 // ── Startup ───────────────────────────────────────────────────────────────
 
 // ── Session Recorder singleton ────────────────────────────────────────
+/** Session recorder singleton — captures timeline events and policy decisions per session. */
 export const sessionRecorder = new SessionRecorder({
   recordingsDir: resolve(dirname(config.storage.databasePath), "recordings"),
   storeRawAudio: config.safety.storeRawAudio,
@@ -299,6 +300,7 @@ export const sessionRecorder = new SessionRecorder({
 
 // ── Recording Store (audio export) ────────────────────────────────────
 const recordingRetentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS ?? "30", 10);
+/** Recording store singleton — manages audio file persistence and retention. */
 export const recordingStore = new RecordingStore({
   audioDir: resolve(dirname(config.storage.databasePath), "audio"),
   retentionDays: Number.isFinite(recordingRetentionDays) ? recordingRetentionDays : 30,
@@ -403,6 +405,7 @@ const healthChecks = createVoiceAgentHealthChecks({
   sqlitePath: config.storage.databasePath,
   postgresUrl: process.env.DATABASE_URL,
 });
+/** Health monitor singleton — runs periodic health checks and alerts on failure. */
 export const healthMonitor = new HealthMonitorService(healthChecks, {
   intervalMs: 10_000,
   webhookUrl: process.env.HEALTH_WEBHOOK_URL,
@@ -430,6 +433,7 @@ const sessionExportService = new SessionExportService(sessionRecorder, recording
 app.use("/export", createExportRouter(sessionExportService));
 
 // ── SLA Monitor ───────────────────────────────────────────────────────
+/** SLA monitor singleton — tracks latency and availability within rolling windows. */
 export const slaMonitor = new SlaMonitor({
   windowMinutes: 60,
   webhookUrl: process.env.SLA_WEBHOOK_URL,
@@ -508,6 +512,7 @@ app.use("/supervisor", createSupervisorRouter(supervisorRegistry, sessionManager
 const supervisorWsServer = new SupervisorWebSocketServer(supervisorRegistry, sessionManager);
 
 // ── Voice Trigger Service + Voice API ────────────────────────────────
+/** Voice trigger service singleton — initiates outbound voice sessions. */
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
   systemConfigStore,

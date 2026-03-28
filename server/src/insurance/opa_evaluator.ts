@@ -19,6 +19,7 @@ import type { PolicyDecision } from "../schemas/events.js";
 
 // ── Input/Output types ─────────────────────────────────────────────────
 
+/** Single policy check result passed as input to OPA aggregation. */
 export interface OpaCheckInput {
   name: string;
   decision: PolicyDecision;
@@ -28,10 +29,12 @@ export interface OpaCheckInput {
   requiredDisclaimerId?: string;
 }
 
+/** Top-level input envelope for OPA policy aggregation evaluation. */
 export interface OpaInput {
   checks: OpaCheckInput[];
 }
 
+/** Aggregated decision returned by OPA policy evaluation. */
 export interface OpaOutput {
   decision: PolicyDecision;
   severity: number;
@@ -39,6 +42,7 @@ export interface OpaOutput {
   requiredDisclaimerId: string | null;
 }
 
+/** Input for OPA moderator_check rule with category scores and thresholds. */
 export interface OpaModeratorInput {
   moderator_check: {
     categories: Array<{ name: string; score: number }>;
@@ -47,12 +51,14 @@ export interface OpaModeratorInput {
   };
 }
 
+/** Decision returned by OPA moderator_check rule evaluation. */
 export interface OpaModeratorOutput {
   decision: PolicyDecision;
   severity: number;
   reasonCode: string | null;
 }
 
+/** Input for OPA claims_check rule with similarity score and threshold. */
 export interface OpaClaimsInput {
   claims_check: {
     similarity_score: number;
@@ -61,6 +67,7 @@ export interface OpaClaimsInput {
   };
 }
 
+/** Decision returned by OPA claims_check rule evaluation. */
 export interface OpaClaimsOutput {
   decision: PolicyDecision;
   severity: number;
@@ -81,6 +88,7 @@ interface OpaWasmModule {
 
 // ── TenantPolicyData ───────────────────────────────────────────────────
 
+/** Per-tenant policy overrides for moderation thresholds and claims evaluation. */
 export interface TenantPolicyData {
   /** Per-category moderation thresholds that override global config for this tenant. */
   moderationThresholds?: Record<string, number>;
@@ -90,6 +98,7 @@ export interface TenantPolicyData {
 
 // ── OpaEvaluator ──────────────────────────────────────────────────────
 
+/** Wraps @open-policy-agent/opa-wasm for sub-1ms in-process WASM policy evaluation. */
 export class OpaEvaluator {
   private policy: OpaPolicy | null = null;
   private readonly bundlePath: string;

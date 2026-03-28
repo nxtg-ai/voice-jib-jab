@@ -14,8 +14,10 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Supervisor-assigned quality label for a transcript turn. */
 export type AnnotationLabel = "good_response" | "needs_improvement" | "neutral";
 
+/** A supervisor's annotation on a single transcript turn with label and optional note. */
 export interface TurnAnnotation {
   annotationId: string;
   sessionId: string;
@@ -28,6 +30,7 @@ export interface TurnAnnotation {
   createdAt: string;
 }
 
+/** A single fine-tuning example with system/user/assistant messages and provenance. */
 export interface TrainingExample {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   sourceSessionId: string;
@@ -35,6 +38,7 @@ export interface TrainingExample {
   qualityLabel: AnnotationLabel;
 }
 
+/** Metadata for a built training dataset including example counts and applied filters. */
 export interface TrainingDataset {
   datasetId: string;
   name: string;
@@ -46,6 +50,7 @@ export interface TrainingDataset {
   filters: DatasetFilters;
 }
 
+/** Filters for selecting annotations when building a training dataset. */
 export interface DatasetFilters {
   labels?: AnnotationLabel[];
   sessionIds?: string[];
@@ -62,6 +67,7 @@ interface StorageFormat {
 
 // ── TrainingDataService ───────────────────────────────────────────────
 
+/** Manages supervisor annotations and builds fine-tuning datasets from annotated conversations. */
 export class TrainingDataService {
   private storageFile: string;
   private data: StorageFormat;
