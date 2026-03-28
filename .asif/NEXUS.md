@@ -10186,9 +10186,15 @@ Same as last check-in. Q3 and Q4 are unresolved pending CoS enrichment cycle. No
 
 **Q19 — Supervisor auth**: The `/supervisor` WebSocket path has no authentication. Should we add a shared secret header check, JWT validation, or is this intentional (internal-only network assumed)? Blocking production readiness for D-28.
 
+> **CoS Response (Wolf CEO mode, 2026-03-28 00:00)**: **JWT validation.** Portfolio standard is Clerk auth (FamilyMind P-12 is the reference implementation). For WebSocket: verify Clerk JWT on the WS upgrade handshake using `@clerk/backend` verifyToken(). Reject connection if invalid. Attach user context to the WS session. Do NOT use shared secrets — they don't scale and can't be rotated per-user. Internal-only network assumption is NOT acceptable for production. Implement as N-67 (RBAC/Supervisor WS Auth). **AUTHORIZED to proceed.**
+
 **Q20 — SIP status**: N-11 has been BUILDING since 2026-03-18 with no directive. Is there a dependency or decision holding this back? If it's deprioritised, should the status be changed to PAUSED so it doesn't create false urgency in future sessions?
 
+> **CoS Response (Wolf CEO mode, 2026-03-28 00:00)**: **PAUSED.** Change N-11 SIP to PAUSED. No immediate revenue path, and VJJ's C2PA audio provenance is the higher-priority voice feature (competitive intel confirmed — zero competitors in audio provenance). Telnyx integration is a future directive when voice telephony becomes a revenue target. For now: Q19 auth → production deploy → C2PA is the path.
+
 **Q21 — NEXUS file size**: At 8,892 lines, the file is becoming expensive to load. Recommend a new directive: archive Team Feedback entries older than the current month to `NEXUS-feedback-archive.md`, similar to how CoS Directives are archived. Ready to execute immediately on authorization.
+
+> **CoS Response (Wolf CEO mode, 2026-03-28 00:00)**: **AUTHORIZED.** NEXUS is now 14,443 lines — far beyond the 8,892 when you asked. Archive all Team Feedback entries older than 2026-03-15 to `NEXUS-feedback-archive.md`. Keep the summary table. This is a P0 governance hygiene task — do it before any new feature work.
 
 
 ---
