@@ -14866,3 +14866,53 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
 No delta since check-in 225 (UAT-Guide dedup). All docs audit items complete except NEXUS archive and CHANGELOG automation. Idle, Q50 pending.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-03-30 (check-in 227) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**Local Jest environment diagnosis.** No code shipped — this session was pure investigation in response to a report that all 167 server test suites fail locally with a Babel SyntaxError while CI runs 4,998 tests green.
+
+Root cause identified and documented:
+- `server/node_modules/` does not exist (no `npm install` has been run inside `server/`)
+- `server/jest.config.js` configures `ts-jest` as the transform, but ts-jest is absent without node_modules
+- Jest falls back to its built-in Babel transform, which lacks the TypeScript plugin needed for `import { type X }` syntax
+- Every suite fails with `Unexpected token, expected ","` at the first TypeScript type import
+- CI is green because the CI pipeline runs `npm ci` inside `server/` as part of its setup step; local dev does not
+
+**Fix**: `cd server && npm ci`. Could not execute — Bash was denied in this session. Requires user to run directly or via `! cd server && npm ci` in the prompt.
+
+---
+
+### 2. What surprised me?
+
+**The error message is maximally misleading.** "Babel SyntaxError on `import { type X }`" points directly at Babel config — missing plugin, wrong preset. The actual cause is one level deeper: Babel is only running because the real transformer (ts-jest) isn't installed. Anyone who debugs the Babel config goes in circles indefinitely.
+
+**CI/local divergence is invisible until you need to run tests.** The server directory uses a nested `package.json` but is NOT declared as an npm workspace at the root. A fresh clone with `npm install` at the root silently leaves `server/node_modules` empty. The only protection is the explicit `npm ci` step in the GitHub Actions workflow.
+
+---
+
+### 3. Cross-project signals
+
+**Nested-package pitfall — affects any ASIF project with a `server/` or `packages/` subdirectory that has its own `package.json` but is not configured as an npm workspace.** The symptom (Babel fallback) is unique to Jest/ts-jest, but the root cause (missing subdirectory `node_modules`) can manifest in any tooling that relies on locally-installed binaries. Portfolio-wide recommendation: either (a) declare all nested packages as npm workspaces in the root `package.json`, or (b) ensure local dev setup docs explicitly call out per-directory `npm install`.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **NEXUS archive (Q18 — standing auth granted)** — file is 14,868 lines. Archive check-ins 1–240 to `.asif/NEXUS-checkins-archive-2026-Q1.md`. Highest-value housekeeping, explicit CoS approval in hand.
+2. **N-11 Phase 2 (Q17 — standing auth granted)** — real SIP.js adapter + G.711 codec. Phase 1 contracts locked, self-contained.
+3. **Local dev docs** — add `## Local Setup` to README/QUICKSTART documenting the two-step install.
+4. **Q50 (CHANGELOG granularity)** — still pending CoS response before CHANGELOG automation can start.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q50** — still open (check-in 213, CHANGELOG granularity). No new questions.
+
+**Observation**: Local dev experience is broken for anyone cloning fresh. Fix is trivial but undocumented. Recommend standing auth to add a Local Setup note to QUICKSTART.md while doing NEXUS archive housekeeping.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
