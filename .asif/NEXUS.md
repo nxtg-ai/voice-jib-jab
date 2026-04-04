@@ -2248,3 +2248,50 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
 Seventh consecutive empty-delta. No work, no new signals. See Q52.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-04-03 (check-in 240) | Author: Claude Sonnet 4.6
+
+### 1. What did I ship?
+
+**Idle Time Protocol — Dependabot vulnerability remediation.**
+
+After 7 consecutive empty-delta check-ins, used idle time per CLAUDE.md protocol rather than logging another empty entry.
+
+| Vulnerability | Severity | Fix |
+|---------------|----------|-----|
+| lodash `_.template` Code Injection (range >=4.0.0 <=4.17.23) | HIGH | `npm audit fix` |
+| lodash Prototype Pollution via `_.unset`/`_.omit` (range <=4.17.23) | HIGH | `npm audit fix` |
+
+`npm audit` now reports **0 vulnerabilities**. 277 packages added/updated. Tests unchanged at 4,998.
+
+Note: GitHub showed "1 high, 1 moderate" on push but `npm audit --json` reported 2 HIGH lodash CVEs under a single `lodash` entry. Both resolved by the same fix.
+
+---
+
+### 2. What surprised me?
+
+`npm ls lodash --depth=10 --all` returned empty — lodash didn't appear in the workspace tree at all, yet `npm audit` flagged it. `npm audit fix` resolved it by pulling in 277 packages, suggesting lodash was a transitive dep that got hoisted into a ghost state (audited but not listable). The fix was `npm audit fix` regardless, but the dependency graph inconsistency is worth noting.
+
+---
+
+### 3. Cross-project signals
+
+Any ASIF project using lodash transitively (common via ESLint, Artillery, test tooling) may have this same vulnerability silently present. `npm audit --json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['metadata']['vulnerabilities'])"` is a one-liner health check. The fix is always `npm audit fix` first, `npm audit fix --force` only if needed.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-11 Phase 2** — SIP.js adapter + G.711 codec (Q17 standing auth)
+2. **Install CHANGELOG hook** — `cp scripts/post-commit-changelog.sh .git/hooks/post-commit`
+3. **CHANGELOG backfill** — N-66 + Dependabot entries
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q52 (from check-in 235) still open: check-in prompt appears to be firing on every user message rather than session boundaries — worth reviewing the trigger config.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
