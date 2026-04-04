@@ -16,6 +16,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## Security + Maintenance · 2026-04-03
+
+### Fixed
+- Resolved 2 high-severity lodash vulnerabilities (Code Injection via `_.template`, Prototype Pollution via `_.unset`/`_.omit`, range <=4.17.23) — bumped to 4.18.1 via `npm audit fix`
+- Removed stale `nxtg-forge/` directory (25MB orphaned forge-plugin clone) that was polluting portfolio pytest health checks — added `pyproject.toml` with `testpaths = ["tests"]` guard
+
+### Stats
+- Tests: **4,998** across **153 suites** (unchanged)
+- Vulnerabilities: **0** (was: 2 high)
+
+---
+
+## Security · 2026-03-28
+
+### Fixed
+- Resolved 5 Dependabot vulnerabilities: `path-to-regexp` ReDoS (critical + high), `picomatch` method injection + ReDoS (2 high), `yaml` stack overflow via OPA-wasm transitive dep (moderate)
+- `npm audit` reports 0 vulnerabilities post-fix
+
+---
+
 ## N-66 — Prometheus Metrics · OBSERVABILITY · 2026-03-24
 
 ### Added

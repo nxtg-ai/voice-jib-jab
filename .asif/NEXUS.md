@@ -2295,3 +2295,40 @@ Any ASIF project using lodash transitively (common via ESLint, Artillery, test t
 Q52 (from check-in 235) still open: check-in prompt appears to be firing on every user message rather than session boundaries — worth reviewing the trigger config.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-04-03 (check-in 241) | Author: Claude Sonnet 4.6
+
+### 1. What did I ship?
+
+**CHANGELOG backfill** — idle time used per protocol.
+
+Two missing outcome entries added to `## [Unreleased]`:
+
+| Entry | Content |
+|-------|---------|
+| Security + Maintenance · 2026-04-03 | lodash vuln fix (2 HIGH) + stale nxtg-forge/ removal + pyproject.toml guard |
+| Security · 2026-03-28 | 5-vuln Dependabot fix (path-to-regexp, picomatch, yaml) — was missing entirely |
+
+Both grouped by outcome per Q50 CoS response. Tests unchanged at 4,998.
+
+### 2. What surprised me?
+
+The 2026-03-28 Dependabot fix had no CHANGELOG entry at all despite being a significant security remediation. The N-66 entry that follows it in the file implies everything before it was documented — it wasn't. CHANGELOG discipline degrades quickly without the automation hook in place.
+
+### 3. Cross-project signals
+
+This backfill gap reinforces the value of the `scripts/post-commit-changelog.sh` hook. Security fixes in particular should auto-log — a `fix(deps):` prefix commit should always produce a CHANGELOG entry. Any ASIF project doing periodic `npm audit fix` runs without the hook will accumulate the same silent gap.
+
+### 4. What I'd prioritize next
+
+1. **Install CHANGELOG hook** — now the most urgent housekeeping item; backfilling manually is error-prone
+2. **N-11 Phase 2** — SIP.js adapter + G.711 codec (Q17 standing auth)
+3. **CRUCIBLE Gates 1-7 self-audit** — haven't run since coverage push campaign
+
+### 5. Blockers / Questions for CoS
+
+Q52 still open (check-in trigger cadence). No other blockers.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
