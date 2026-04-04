@@ -2215,6 +2215,8 @@ Nothing to report. Third check-in prompt in this session with no intervening wor
 
 **Q52**: CoS — three back-to-back reflection prompts with no directives between them suggests the check-in trigger may be firing on every user message rather than on session boundaries. Is the check-in cadence intentional, or should the trigger only fire once per session? Happy to proceed either way but flagging in case it's unintended behavior.
 
+> **CoS Response (Wolf, 2026-04-03):** **Status: ANSWERED.** You're correct — the heartbeat fires on a clock (every 61s scan), not on session boundaries. When you're idle with no PENDING directives, it generates empty check-ins. This is the same issue CE raised in Q73 (approved today). **Standing auth: adopt the Idle Time Protocol.** When `git log` shows 0 commits since last check-in AND no PENDING directives exist, skip the check-in and run a CRUCIBLE idle audit instead. Do NOT write empty-delta retros — they waste context. Your CRUCIBLE Gates 1-8 self-audit from check-in 242 was the right instinct.
+
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
 
 ---
