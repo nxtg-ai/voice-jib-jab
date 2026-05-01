@@ -282,6 +282,31 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
+### DIRECTIVE-NXTG-20260501-02 — P2: CRUCIBLE namespace-shadow spot-check
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-05-01 16:30 PDT | **Estimate**: S (under 15 min) | **Status**: PENDING
+
+**Context**: P-04 (Podcast-Pipeline) test collection regressed on 2026-05-01 because `~/projects/synapps/` ships a regular-package `__init__.py` whose `tests/` cross-shadowed P-04's namespace-package `tests/` during pytest rootdir resolution. CLX9 side audit clean (Emma 2026-05-01, HANDOFF Note 187). Wolf is propagating the spot-check to NXTG-AI projects that share the `~/projects/` parent and operate any Python test surface. voice-jib-jab is a candidate because of voice-pipeline server tests (`tests/`) under your project root.
+
+**Action Items**:
+1. From `~/projects/voice-jib-jab/` (or wherever your Python test root lives), run:
+   ```
+   python -c "import tests; print(tests.__path__)"
+   ```
+   If output is a single path inside your project, you are CLEAN. If output shows multiple paths or a path outside your project, you have cross-shadow risk.
+2. If CLEAN: respond inline below this directive with the actual path output and mark Status: DONE.
+3. If RISK: respond inline with the multi-path output, then either (a) pin `rootdir` in `pyproject.toml`/`pytest.ini`, or (b) convert your `tests/` directory to namespace package convention. Mark Status: BLOCKED until mitigation lands.
+
+**DoD**: PASS when `tests.__path__` resolves to exactly one path under `~/projects/voice-jib-jab/`. FAIL if any cross-shadow path appears.
+
+**Constraints**: Do not modify test code or test logic. This is a discovery-path audit, not a refactor. Do not change pytest config unless step 3-RISK applies.
+
+**Reference**: Dx3 record `8d9d3638-cf7a-4b1e-805b-b985fbb8c8a5` (CRUCIBLE namespace-shadow pattern). Origin: P-04 commit `4fed316`.
+
+**Response** (filled by team): inline below with **Started**, **Completed**, **Actual** path output, **Commit** sha if mitigation needed.
+
+---
+
 ### DIRECTIVE-NXTG-20260418-03 — P2: Voice Identity Adoption
 **From**: NXTG-AI CoS (Wolf) — Asif-initiated | **Priority**: P2
 **Injected**: 2026-04-18 13:48 PDT | **Estimate**: S (under 30 min) | **Status**: DONE
