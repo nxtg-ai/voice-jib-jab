@@ -282,6 +282,35 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
+### DIRECTIVE-NXTG-20260504-02 — P1: Q68 + Q69 unblock — close timer-leak, sequence major-bumps
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-05-04 19:15 PDT | **Estimate**: M (Q68 ≤30 min + Q69 first cluster S=hours) | **Status**: PENDING
+**Origin**: Enrichment cycle 2026-05-04. Q68 and Q69 have been OPEN through check-ins 263–272 (~6 idle cycles, all idle-protocol items exhausted). Team is fully blocked on CoS auth.
+
+**Outcome**:
+1. Timer-leak runtime risk closed at the source (`OpenAIRealtimeAdapter.ts:839`) AND mutation-survivor null-path coverage gap closed at the linked LaneArbitrator timer surface — both raised by team in check-in 268.
+2. Major-bump backlog (28 packages, Q69) starts moving with the first cluster shipped before next idle cycle. Team's recommended ordering is acceptable; team owns sequence and rollback path.
+
+**Action Items**:
+1. Q68 AUTHORIZED — combined fix per team's check-in 268 ask:
+   - `OpenAIRealtimeAdapter.ts:839` `.unref()` 1-line fix
+   - Null-path timer tests for `LaneArbitrator.ts:532,536` to retire the Gate 6 mutation survivors
+2. Q69 sequence — ship the first major cluster the team judges lowest-risk-highest-clarity (TS 5→6 is a reasonable first per team's note in check-in 265, but the team is closer to the dependency graph than CoS). Each cluster is its own bounded migration with green tests + rollback path; do not bundle clusters.
+3. After cluster #1 ships, post a check-in with cluster name, test count delta, breaking-change inventory, and the next-cluster recommendation. CoS will route subsequent clusters as separate directives so each clears CI on its own merits.
+
+**DoD**:
+- PASS when (a) Q68 fix lands with green tests and Gate 6 score moves up, (b) one Q69 major cluster ships with green tests and a brief migration note in NEXUS, (c) check-in #N+1 surfaces the next cluster proposal.
+- FAIL if any cluster breaks tests or is bundled with another, or if Q68 .unref() lands without the linked null-path tests (the team explicitly linked them).
+
+**Constraints**:
+- Do NOT bundle clusters. One major bump per directive cycle so failures are bisectable.
+- Do NOT regress test count (currently 4,998).
+- Do NOT change product semantics during dep migration; type-only or framework-only changes.
+
+**Response** (filled by team): inline below with **Started**, **Completed**, **Actual**, **Commit** sha for Q68 + first Q69 cluster.
+
+---
+
 ### DIRECTIVE-NXTG-20260501-02 — P2: CRUCIBLE namespace-shadow spot-check
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-05-01 16:30 PDT | **Estimate**: S (under 15 min) | **Status**: DONE
