@@ -2907,3 +2907,53 @@ Also: the CRUCIBLE Gate 2 result (8.4:1 assertion:mock ratio) is healthier than 
 **Q69 (OPEN)**: Major-bump cluster directives — requesting prioritization order. Recommend: TS 6 first (enables React 19), then React 19, then Jest 30, then openai 6 (most risk).
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. 2 vulns (moderate). CI green.**
+
+---
+
+> Session: 2026-05-04 (check-in 269 — Gate 6 mutation testing) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+No code changes. Tests: 4,998 / 4,998. No new dep updates (29 major gaps held).
+
+**Gate 6 — Stryker mutation testing** executed (queued since check-in 252). 14 min run.
+
+Results:
+```
+File                         | % Mutation score | # killed | # survived | # no cov
+All files                    |  66.33 / 68.22   |      777 |        369 |       33
+  allowed_claims_registry.ts |  59.42 / 61.56   |      202 |        128 |       12
+  policy_gate.ts             |  72.03 / 73.36   |      357 |        130 |        9
+  LaneArbitrator.ts          |  65.06 / 67.35   |      218 |        111 |       12
+```
+Thresholds: high 60, low 40, break null.
+
+**Gate 6 verdict**: PASS overall (66.33% > 60). One yellow flag:
+- `allowed_claims_registry.ts` at **59.42%** — below "high" threshold (60). Not a break, but the weakest file.
+
+### 2. What surprised you?
+
+Two timer null-guard mutants survived in `LaneArbitrator.ts:532` and `:536`:
+```
+if (this.reflexTimer) → if (true)   [SURVIVED]
+if (this.reflexTimeoutTimer) → if (true)  [SURVIVED]
+```
+Tests run against these mutants (108 each) but none catch the `null` path. This means we have no test that exercises "timer was never set, clear is a no-op." This is the same timer surface flagged in Q68 (`.unref()` missing). The timer management in LaneArbitrator has a coverage blind spot at both the unref level (runtime leak) and the null-guard level (mutation survival).
+
+### 3. Cross-project signals
+
+Mutation score 66% with 369 survivors across 3 files is a normal result for production code this age — not alarming. But the timer null-guard pattern is a systemic gap: tests set up mocks but don't test the "timer not initialized" path. Any project with timer-based state machines should spot-check this.
+
+### 4. What would I prioritize next?
+
+1. **Q68 + timer null-guard tests** — authorize the 1-line `.unref()` fix AND add null-path timer tests for `LaneArbitrator:532/536`. Together these close both the runtime leak and the mutation survivors. ~30 min.
+2. **`allowed_claims_registry.ts` assertion strengthening** — 128 survivors at 59%. Needs targeted test additions to break the weakest claim-matching mutants.
+3. **Q69 major-bump clusters** — TS 6 first.
+
+### 5. Blockers / questions for CoS
+
+**Q68 (OPEN — now upgraded)**: The `.unref()` timer fix and the null-guard test additions are linked. Authorizing Q68 should include: (a) `.unref()` on `OpenAIRealtimeAdapter.ts:839`, (b) null-path timer tests for `LaneArbitrator.ts:532,536`. Together they close a runtime leak and improve Gate 6 score. Request combined auth.
+
+**Q69 (OPEN)**: Major-bump clusters — prioritization still needed.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. 2 vulns (moderate). Gate 6: 66.33% PASS (yellow: allowed_claims_registry 59.42%).**
