@@ -16,6 +16,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## Maintenance · 2026-05-04
+
+### Fixed
+- Resolved Python `tests/` namespace-shadow: added `tests/__init__.py` to prevent merge with `miniconda3/site-packages/tests/` (DIRECTIVE-NXTG-20260501-02)
+
+### Changed
+- Patch/minor dep bundle: 15 packages updated within semver range (`@types/node`, `@types/react`, `vite`, `@modelcontextprotocol/sdk`, `@stryker-mutator/*`, `autoprefixer`, `better-sqlite3`, `chromadb`, `fast-check`, `framer-motion`, `postcss`, `prettier`, `tailwind-merge`, `ts-jest`, `ws`)
+
+### Stats
+- Tests: **4,998** across **153 suites** (unchanged)
+- Vulnerabilities: **2 moderate** (was: 15 — patch bundle resolved 13)
+- Gate 6 mutation score: **66.33%** (threshold 60 — PASS; `allowed_claims_registry.ts` yellow at 59.42%)
+
+---
+
 ## Security + Maintenance · 2026-04-03
 
 ### Fixed
