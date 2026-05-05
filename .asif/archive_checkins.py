@@ -66,8 +66,8 @@ def parse_tf_section(section_lines, section_start_lineno):
     # The header is lines up to (but not including) the first "> Session:" line
     # (accounting for blank lines before it)
     header_end = 0
-    for j, l in enumerate(section_lines):
-        if SESSION_RE.match(l):
+    for j, line in enumerate(section_lines):
+        if SESSION_RE.match(line):
             header_end = j
             break
     else:
@@ -142,8 +142,7 @@ def rebuild_tf_section(items, section_header_line):
                 keep_blocks.append(item)
 
     # Build new section lines
-    header_item = next((x for x in items if x['type'] == 'header'), None)
-    tail_item   = next((x for x in items if x['type'] == 'tail'), None)
+    tail_item = next((x for x in items if x['type'] == 'tail'), None)
 
     new_lines = []
     new_lines.append(section_header_line)  # "## Team Feedback"
@@ -234,7 +233,7 @@ archive_sessions = re.findall(r'^> Session:.*\(check-in (\d+)\)', archive_conten
 nexus_checkin_nums = sorted(int(x) for x in nexus_sessions)
 archive_checkin_nums = sorted(int(x) for x in archive_sessions)
 
-print(f"\n=== VERIFICATION ===")
+print("\n=== VERIFICATION ===")
 print(f"Archive check-in count : {len(archive_checkin_nums)}")
 if archive_checkin_nums:
     print(f"  Range: {archive_checkin_nums[0]}–{archive_checkin_nums[-1]}")
