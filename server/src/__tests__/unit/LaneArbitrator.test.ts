@@ -1072,4 +1072,43 @@ describe("LaneArbitrator", () => {
       expect(arbitrator.getState()).toBe("ENDED");
     });
   });
+
+  describe("clearTimers null-guard (LaneArbitrator:532,536 — Gate 6 mutation survivors)", () => {
+    it("endSession does not call clearTimeout when reflexTimer was never set", () => {
+      const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
+      arbitrator.startSession();
+      // Never called onUserSpeechEnded() — reflexTimer remains null
+      arbitrator.endSession();
+      expect(clearTimeoutSpy).not.toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("endSession calls clearTimeout when reflexTimer is set (non-null path)", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded(); // sets reflexTimer (laneAEnabled: true)
+      const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
+      arbitrator.endSession();
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("endSession does not call clearTimeout when reflexTimeoutTimer was never set", () => {
+      const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
+      arbitrator.startSession();
+      // Never advanced timers to trigger Lane A — reflexTimeoutTimer remains null
+      arbitrator.endSession();
+      expect(clearTimeoutSpy).not.toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it("endSession calls clearTimeout for reflexTimeoutTimer after Lane A triggers", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded(); // sets reflexTimer
+      jest.advanceTimersByTime(100); // fires reflexTimer → sets reflexTimeoutTimer, state → A_PLAYING
+      const clearTimeoutSpy = jest.spyOn(global, "clearTimeout");
+      arbitrator.endSession(); // clears reflexTimeoutTimer (non-null)
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+      clearTimeoutSpy.mockRestore();
+    });
+  });
 });

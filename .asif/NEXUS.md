@@ -284,7 +284,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260504-02 — P1: Q68 + Q69 unblock — close timer-leak, sequence major-bumps
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-05-04 19:15 PDT | **Estimate**: M (Q68 ≤30 min + Q69 first cluster S=hours) | **Status**: PENDING
+**Injected**: 2026-05-04 19:15 PDT | **Estimate**: M (Q68 ≤30 min + Q69 first cluster S=hours) | **Status**: DONE
 **Origin**: Enrichment cycle 2026-05-04. Q68 and Q69 have been OPEN through check-ins 263–272 (~6 idle cycles, all idle-protocol items exhausted). Team is fully blocked on CoS auth.
 
 **Outcome**:
@@ -308,6 +308,23 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Do NOT change product semantics during dep migration; type-only or framework-only changes.
 
 **Response** (filled by team): inline below with **Started**, **Completed**, **Actual**, **Commit** sha for Q68 + first Q69 cluster.
+
+**Started**: 2026-05-04
+**Completed**: 2026-05-04
+**Status**: DONE
+
+**Q68 — timer fix**:
+- `.unref()` at `OpenAIRealtimeAdapter.ts:845` was already in place (pre-existing from earlier commit) — no change needed.
+- 4 null-path timer tests added to `LaneArbitrator.test.ts` to kill Gate 6 mutation survivors at `:532` and `:536`. Tests spy on `clearTimeout` to assert: (a) not called when timer is null, (b) called when timer is set. All 4 tests pass.
+- Tests: **5,002** (was 4,998 — +4 new tests).
+
+**Q69 cluster #1 — TypeScript 5→6**:
+- Updated 3 package.json files: root, server, client (`"^5.3.3"/"^5.9.3"` → `"^6.0.0"`).
+- Installed TypeScript 6.0.3. Zero type errors surfaced — codebase compiled clean under TS 6 without any changes to source or type annotations.
+- Tests: **5,002 / 5,002 passed**, 153 suites. No regressions.
+- Breaking changes inventory: none encountered. Project uses `skipLibCheck: true` (client) and ts-jest compiles server at test time — both handled TS 6 without friction.
+
+**Next cluster recommendation**: Jest 29→30. Rationale: test infrastructure only, bounded scope, zero production-code surface. Recommend as DIRECTIVE-NXTG-20260504-03 or next enrichment cycle.
 
 ---
 
