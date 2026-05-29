@@ -90,3 +90,14 @@ This is how the portfolio compounds intelligence. Your work benefits from every 
 Speak via: `~/ASIF/scripts/cos-speak-remote --voice am_echo "text"`
 
 Note: `am_onyx` was assigned but claimed by P-03b (forge-orchestrator) first. P-07 registered `am_echo` per earliest-commit-wins anti-collision rule.
+
+<!-- ASIF:TEAM-ALIGNMENT-WIRING:START -->
+## ASIF Alignment Wiring
+
+@/home/axw/ASIF/standards/claude-team-alignment-wiring.md
+
+- Team alignment id: `vjj`.
+- Cross-team room: `/alignment`, written through `~/ASIF/scripts/alignment-say`.
+- If an `[ALIGNMENT ...]` message appears, respond through `alignment-say`; do not answer only in this private TUI.
+- Deterministic state first: typed Dx3/asifctl, `.asif/NEXUS.md`, git/tests/runtime probes. Prose is backup and local steering only.
+<!-- ASIF:TEAM-ALIGNMENT-WIRING:END -->
