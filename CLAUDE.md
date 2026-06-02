@@ -16,7 +16,7 @@
 - Do NOT remove the 3-lane architecture — this is a portfolio-level architectural decision
 - Preserve sub-400ms latency achievement
 - UAT bugs #1 (audio feedback loop) and #5 (audit trail FK race) — RESOLVED 2026-02-20, verified 2026-03-12
-- Test coverage: 91% (floor enforced via coverageThreshold in jest.config.js — stmt 88, branch 78, fn 87, lines 88)
+- Test coverage: ~97% actual (server: stmt 97.25 / branch 92.3 / fn 96.65 / lines 97.49). Floor enforced via `coverageThreshold` in `server/jest.config.js` — stmt 94, branch 90, fn 93, lines 94 (set ~3% below actual per 2026-03-25 CRUCIBLE). Test runner: Jest 30 (server), Vitest 3.x (client).
 
 ## Development
 
