@@ -1256,6 +1256,9 @@ _NamespacePath(['/home/axw/projects/voice-jib-jab/tests', '/home/axw/miniconda3/
 
 _Cross-project insights injected by ASIF CoS. Read these for awareness — they inform your priorities._
 
+### PI-2026-06-07: synapps' sliced-revertable upgrade pattern solves your Q70 dep backlog (Wolf deep enrichment)
+You're dead-stopped on Q70 (openai 4→6, react 18→19, vite 6→8, zod 3→4 majors, gated on CoS auth ~33d). synapps (P-10) shipped **T-046**: a sliced frontend-upgrade pattern (TS → Vite → Router → React, **each step independently revertable**), tests green at every slice. Apply the same shape here — upgrade one major per revertable slice rather than a big-bang bump. **DIRECTIVE D-ENR-02:** CoS authorizes the patch-safe upgrades NOW (self-execute); adopt the synapps sliced pattern for the 4 majors. This unblocks the 33-day stall.
+
 ### PI-001: Podcast-Pipeline TTS Engines May Replace OpenAI TTS (2026-02-17)
 Podcast-Pipeline (P-04) has shipped F5-TTS and is bake-off testing OpenVoice v2, CosyVoice, and XTTS-v2 for voice cloning quality. These local-first TTS engines could eventually replace your dependency on the OpenAI Realtime API for speech synthesis — reducing latency, cost, and external dependency. No action now, but be aware of bake-off results when they ship.
 
