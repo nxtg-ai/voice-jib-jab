@@ -3369,7 +3369,7 @@ Executes the next-cluster recommendation parked in DIRECTIVE-NXTG-20260504-02 (n
 
 ### DIRECTIVE-NXTG-20260612-01 — Dependency upgrades: patch-safe NOW + majors via sliced-revertable pattern
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-06-12 00:15 | **Status**: PENDING
+**Injected**: 2026-06-12 00:15 | **Status**: DONE (named scope; 13 unnamed majors deferred to own directives)
 
 **Context**: Per enrichment D-ENR-02 (06-07). 31 outdated deps standing; Q70 (deps go-ahead) is hereby ANSWERED — proceed. This clears the "awaiting CoS" hold.
 
@@ -3379,3 +3379,19 @@ Executes the next-cluster recommendation parked in DIRECTIVE-NXTG-20260504-02 (n
 3. Report the before/after outdated count + any breaking-change notes inline here; post the sha(s) to /alignment.
 **Constraints**: suite stays green at every step; one major per commit (revertability); no behavior changes beyond the upgrades.
 **Response** (filled by team):
+
+**Started/Completed**: 2026-06-12 | **Status**: DONE (named scope) | **Outdated: 31 → 13.**
+
+Suite green at every step (server jest 5,002/5,002; client vitest 79/79). One major per commit, each independently revertable. Shas (origin/main):
+- `aca29ff` **#1 patch+minor** — npm update consumed all in-range bumps (lockfile-only; `^` ranges already permit): @types/node, @types/react, better-sqlite3, fast-check, framer-motion, helmet, postcss, prettier, tailwind-merge, tsx, ws, express 4.22.1→4.22.2, vite 6.4.2→6.4.3, vitest/@vitest/coverage-v8 3.2.4→3.2.6.
+- `a23db1f` **#2 zod 3→4** — NOTE: zod is NOT directly imported in our source; transitive peer of @modelcontextprotocol/sdk (keeps nested zod@3) + openai. Bump is clean; both majors coexist.
+- `0ea585a` **#3 openai 4→6** (6.42.0) — one file (OpenAITTS.ts), stable surface (audio.speech.create + arrayBuffer). Realtime voice loop uses raw WS, not the SDK.
+- `5725222` **#4 react 18→19** (+types) — already on createRoot; no removed-API usage across 9 components. Zero react type errors.
+- `61e726a` **#5 vite/vitest toolchain** — vite 6→8, vitest 3→4, @vitejs/plugin-react 4→6, jsdom 27→29. Node 22.21 OK. 0 npm vulns after.
+- `7d5f264` **chore (build repair)** — vitest 4 changed @types auto-inclusion → client tsc lost node globals; restored via tsconfig `types: ["node","vitest/globals"]`. Also fixed 9 PRE-EXISTING latent tsc errors. **`npm run build` (client) now GREEN.**
+
+**13 remaining = all UNNAMED breaking majors, each needs its own directive** (not self-chained): express 4→5 (+@types), tailwindcss 3→4 (config-syntax drop), eslint 8→10 (flat config) + @typescript-eslint 7→8, uuid 9→14 (**ESM-only — breaks jest node_modules transform, proven incompatible without transform-pipeline reconfig; defer**), @huggingface/transformers 3→4, dotenv 16→17, husky 8→9 (rewrites pre-push CI-gate hook — silent-failure risk), concurrently 8→10, @types/node server 20→25, @types/uuid 9→10.
+
+**FLAGS for follow-up directive (pre-existing, NOT deps-caused):**
+1. **Server `npm run build` (tsc) is RED** — never tsc-gated (CI gate = jest via ts-jest). Errors: TS6 `node10` moduleResolution deprecation; `jest` global not in build tsconfig types; unused `slaDashboardHtml`; **`authLimiter` used-before-declaration at `index.ts:180` (declared :314) — possible TDZ bug worth investigating** (app ships fine, so likely non-top-level exec, but the build flags it). Needs a build-gating + node10→bundler migration directive.
+2. Client coverage thresholds (70%) are config-only aspiration, not in the `npm test` gate (actual ~41%).
