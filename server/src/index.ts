@@ -177,6 +177,16 @@ const requireApiKey = createApiKeyMiddleware(
   process.env.API_KEY_AUTH_ENABLED !== "false",
   auditEventLogger,
 );
+
+// ── Rate limiters (N-41: configs sourced from config/rateLimits.ts) ──
+// Declared here (before their first use at /auth below) — declaring them at
+// their previous position caused a TDZ ReferenceError at boot (index.ts:180).
+const adminLimiter = createRateLimiter(RATE_LIMITS.admin);
+const voiceLimiter = createRateLimiter(RATE_LIMITS.voice);
+const analyticsLimiter = createRateLimiter(RATE_LIMITS.analytics);
+const sessionsLimiter = createRateLimiter(RATE_LIMITS.sessions);
+const authLimiter = createRateLimiter(RATE_LIMITS.auth);
+
 app.use("/auth", authLimiter, createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
 // N-29: admin/tenants/webhooks | N-32: sessions | N-33: analytics/audit/recordings/export
@@ -305,13 +315,6 @@ export const recordingStore = new RecordingStore({
   audioDir: resolve(dirname(config.storage.databasePath), "audio"),
   retentionDays: Number.isFinite(recordingRetentionDays) ? recordingRetentionDays : 30,
 });
-
-// ── Rate limiters (N-41: configs sourced from config/rateLimits.ts) ──
-const adminLimiter = createRateLimiter(RATE_LIMITS.admin);
-const voiceLimiter = createRateLimiter(RATE_LIMITS.voice);
-const analyticsLimiter = createRateLimiter(RATE_LIMITS.analytics);
-const sessionsLimiter = createRateLimiter(RATE_LIMITS.sessions);
-const authLimiter = createRateLimiter(RATE_LIMITS.auth);
 
 // Mount sessions API
 app.use("/sessions", sessionsLimiter, createSessionsRouter(sessionRecorder));
