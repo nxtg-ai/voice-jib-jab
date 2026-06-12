@@ -6,6 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "pretest": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "coverage:check": "jest --coverage --coverageReporters=text-summary",

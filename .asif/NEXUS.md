@@ -3397,10 +3397,25 @@ Suite green at every step (server jest 5,002/5,002; client vitest 79/79). One ma
 2. Client coverage thresholds (70%) are config-only aspiration, not in the `npm test` gate (actual ~41%).
 
 ### DIRECTIVE-NXTG-20260612-02 — P2: gate server tsc-build + verify the authLimiter TDZ flag is benign
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P2 | **Injected**: 2026-06-12 | **Status**: PENDING
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2 | **Injected**: 2026-06-12 | **Status**: DONE — flag was a P0 boot crash (not benign), fixed + tsc gated
 **Context**: deps ship (e4b9ed0) surfaced a pre-existing gap: server `tsc` build is RED, never gated (CI=jest only). It flags `authLimiter` used-before-declaration (index.ts:180 used / :314 declared) — possible TDZ. App ships, so the :180 usage is likely deferred (non-top-level), but unverified.
 **Action**:
 1. **Real-Entry-Path verify the TDZ first (don't assume "app ships = fine"):** prove the auth rate-limiter ACTUALLY fires at runtime — hit the rate-limited endpoint N+1 times, confirm the limiter triggers (429). A TDZ'd-but-deferred limiter could silently no-op = a real security gap hiding behind a green app. If it fires → reorder the declaration (move :314 above :180) to clear the tsc flag cosmetically. If it does NOT fire → that's a live bug, escalate.
 2. Add server `tsc --noEmit` as a build gate (close the never-gated-RED gap) once #1 is resolved and the tree type-checks.
 3. The 13 remaining breaking majors (express5/tailwind4/eslint-flat/uuid14/husky9/transformers4) = each its own directive later; NOT this one.
 **Response** (team):
+
+**Started/Completed**: 2026-06-12 | **Status**: DONE. Commits `6bf69bd` (P0 fix) + `<tsc-gate sha>`.
+
+**#1 — Real-Entry-Path verify: the flag was NOT benign — it was a P0 boot crash, worse than the directive's "likely deferred/cosmetic" assumption.** (Correcting the framing — the :180 use was TOP-LEVEL, not deferred.)
+- Empirical boot `tsx src/index.ts` (the actual launch path, = `npm run dev:server`) → **hard crash**: `ReferenceError: Cannot access 'authLimiter' before initialization` at index.ts:180. Server did not start. Dormant in CI because index.ts is coverage-omitted and NO test imports it (the prior "MultiTenantE2E imports index" lead was a grep false-positive on `.index(` test content).
+- **Fix (`6bf69bd`)**: moved the 5 rate-limiter declarations above their first use at /auth (behavior-preserving — the other 4 were already declared before their uses).
+- **Proven live after fix** (real entry, not mocked): boots → "Ready for connections! 🚀", /health 200; `/auth/api-keys` ×20 → pass, **21st → 429** (max=20). The limiter is NOT a silent no-op — the security control fires. (No "if-it-doesn't-fire escalate" branch needed; it fires.)
+
+**#2 — Server tsc gated.** `npm run build` + `tsc --noEmit` now GREEN. Fixes:
+- node10 deprecation → `ignoreDeprecations: "6.0"` (node→bundler migration deferred; not semantics-safe to bundle here).
+- `jest` globals errors → build tsconfig now excludes `src/__tests__/**` + `src/__mocks__/**` (prod build shouldn't compile test infra; ts-jest still type-checks tests at test time).
+- removed dead `slaDashboardHtml` import in index.ts:80 (the route is correctly wired via sla.ts:45 — no feature lost).
+- **Gate wired**: added `pretest: "tsc --noEmit"` to server/package.json → `npm test` now runs the typecheck before jest (fails fast on prod-code type errors). Closes the never-gated-RED gap. Also added a `typecheck` script.
+
+**Side-finding (own follow-up):** `core.hooksPath=.husky` but `.husky/pre-push` is EMPTY — the ASIF CI-gate hook in `.git/hooks/pre-push` is bypassed. The `pretest` gate works regardless (runs on any `npm test`), but the pre-push hook itself is inert. Worth a small directive to reconcile husky vs .git/hooks.

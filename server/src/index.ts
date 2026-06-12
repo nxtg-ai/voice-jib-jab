@@ -77,7 +77,6 @@ import { SessionExportService } from "./services/SessionExportService.js";
 import { createExportRouter } from "./api/export.js";
 import { SlaMonitor } from "./services/SlaMonitor.js";
 import { createSlaRouter } from "./api/sla.js";
-import { slaDashboardHtml } from "./api/slaDashboard.js";
 import { LiveKbSearchService } from "./services/LiveKbSearchService.js";
 import { createKbSearchRouter } from "./api/kbSearch.js";
 import { initTrainingDataService } from "./services/TrainingDataService.js";
