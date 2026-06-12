@@ -16,7 +16,6 @@ interface TalkButtonProps {
 
 export const TalkButton: React.FC<TalkButtonProps> = ({
   state,
-  isAudioPlaying,
   onPress,
   onRelease,
   onBargeIn,

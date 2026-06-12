@@ -221,7 +221,7 @@ describe("VjjClient", () => {
     it("sendAudioChunk sends audio.chunk message", () => {
       client.sendAudioChunk("AQID");
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("audio.chunk");
       expect(sent.data).toBe("AQID");
     });
@@ -229,7 +229,7 @@ describe("VjjClient", () => {
     it("sendAudioStop sends audio.stop message", () => {
       client.sendAudioStop();
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("audio.stop");
       expect(sent.timestamp).toBeTypeOf("number");
     });
@@ -237,28 +237,28 @@ describe("VjjClient", () => {
     it("sendAudioCancel sends audio.cancel message", () => {
       client.sendAudioCancel();
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("audio.cancel");
     });
 
     it("commitAudio sends audio.commit message", () => {
       client.commitAudio();
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("audio.commit");
     });
 
     it("bargeIn sends user.barge_in message", () => {
       client.bargeIn();
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("user.barge_in");
     });
 
     it("playbackEnded sends playback.ended message", () => {
       client.playbackEnded();
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("playback.ended");
       expect(sent.timestamp).toBeTypeOf("number");
     });
@@ -266,7 +266,7 @@ describe("VjjClient", () => {
     it("setMode sends session.set_mode with correct mode", () => {
       client.setMode("open-mic");
       const ws = getWs(client);
-      const sent = JSON.parse(ws.send.mock.lastCall[0]);
+      const sent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(sent.type).toBe("session.set_mode");
       expect(sent.mode).toBe("open-mic");
     });
@@ -512,7 +512,7 @@ describe("VjjClient", () => {
       const ws = getWs(client);
       client.disconnect();
 
-      const lastSent = JSON.parse(ws.send.mock.lastCall[0]);
+      const lastSent = JSON.parse(ws.send.mock.lastCall![0]);
       expect(lastSent.type).toBe("session.end");
       expect(client.state).toBe("disconnected");
       expect(client.connected).toBe(false);
