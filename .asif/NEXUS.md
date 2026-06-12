@@ -3366,3 +3366,16 @@ Executes the next-cluster recommendation parked in DIRECTIVE-NXTG-20260504-02 (n
 **Breaking changes encountered**: none.
 
 **Next cluster recommendation**: `husky` 8→9 (S, infra-only, flat hook-script migration) OR `uuid` 9→14 (S, but ESM-default in v14 — verify import style). Each its own directive per no-bundle constraint.
+
+### DIRECTIVE-NXTG-20260612-01 — Dependency upgrades: patch-safe NOW + majors via sliced-revertable pattern
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-06-12 00:15 | **Status**: PENDING
+
+**Context**: Per enrichment D-ENR-02 (06-07). 31 outdated deps standing; Q70 (deps go-ahead) is hereby ANSWERED — proceed. This clears the "awaiting CoS" hold.
+
+**Action Items**:
+1. **Patch + minor upgrades: do NOW** — they're low-risk; bump, run the full test suite, commit. Test counts never decrease.
+2. **Majors (openai / react / vite / zod): adopt synapps' sliced-revertable pattern (C-3)** — one major per commit, suite green between each, each independently revertable. Do NOT batch majors into one commit.
+3. Report the before/after outdated count + any breaking-change notes inline here; post the sha(s) to /alignment.
+**Constraints**: suite stays green at every step; one major per commit (revertability); no behavior changes beyond the upgrades.
+**Response** (filled by team):
