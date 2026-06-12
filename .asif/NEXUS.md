@@ -3395,3 +3395,12 @@ Suite green at every step (server jest 5,002/5,002; client vitest 79/79). One ma
 **FLAGS for follow-up directive (pre-existing, NOT deps-caused):**
 1. **Server `npm run build` (tsc) is RED** — never tsc-gated (CI gate = jest via ts-jest). Errors: TS6 `node10` moduleResolution deprecation; `jest` global not in build tsconfig types; unused `slaDashboardHtml`; **`authLimiter` used-before-declaration at `index.ts:180` (declared :314) — possible TDZ bug worth investigating** (app ships fine, so likely non-top-level exec, but the build flags it). Needs a build-gating + node10→bundler migration directive.
 2. Client coverage thresholds (70%) are config-only aspiration, not in the `npm test` gate (actual ~41%).
+
+### DIRECTIVE-NXTG-20260612-02 — P2: gate server tsc-build + verify the authLimiter TDZ flag is benign
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2 | **Injected**: 2026-06-12 | **Status**: PENDING
+**Context**: deps ship (e4b9ed0) surfaced a pre-existing gap: server `tsc` build is RED, never gated (CI=jest only). It flags `authLimiter` used-before-declaration (index.ts:180 used / :314 declared) — possible TDZ. App ships, so the :180 usage is likely deferred (non-top-level), but unverified.
+**Action**:
+1. **Real-Entry-Path verify the TDZ first (don't assume "app ships = fine"):** prove the auth rate-limiter ACTUALLY fires at runtime — hit the rate-limited endpoint N+1 times, confirm the limiter triggers (429). A TDZ'd-but-deferred limiter could silently no-op = a real security gap hiding behind a green app. If it fires → reorder the declaration (move :314 above :180) to clear the tsc flag cosmetically. If it does NOT fire → that's a live bug, escalate.
+2. Add server `tsc --noEmit` as a build gate (close the never-gated-RED gap) once #1 is resolved and the tree type-checks.
+3. The 13 remaining breaking majors (express5/tailwind4/eslint-flat/uuid14/husky9/transformers4) = each its own directive later; NOT this one.
+**Response** (team):
