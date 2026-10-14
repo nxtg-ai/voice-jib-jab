@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
-    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "better-sqlite3": "^12.6.0",
     "chromadb": "^3.3.3",
